@@ -1,13 +1,15 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import authRoutes from './Routes/auth.routes.js';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
 
 // Mock candidate data
 const mockCandidate = {
@@ -74,6 +76,7 @@ const mockCandidate = {
 };
 
 // API Routes
+app.use('/api/auth', authRoutes);
 
 // Get candidate data
 app.get('/api/candidate', (req, res) => {

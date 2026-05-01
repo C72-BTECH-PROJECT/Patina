@@ -1,0 +1,42 @@
+export const jobs = [
+  {
+    _id: "job1",
+    title: "Frontend Developer",
+    description: "Work on React-based UI",
+    requiredSkills: ["React", "JavaScript", "CSS"],
+    experienceLevel: "0-2 years",
+    recruiter: "rec1",
+  },
+  {
+    _id: "job2",
+    title: "Backend Developer",
+    description: "Node.js + API development",
+    requiredSkills: ["Node.js", "Express", "MongoDB"],
+    experienceLevel: "2-4 years",
+    recruiter: "rec1",
+  },
+  {
+    _id: "job3",
+    title: "Full Stack Developer",
+    description: "React + Node full stack role",
+    requiredSkills: ["React", "Node.js"],
+    experienceLevel: "1-3 years",
+    recruiter: "rec2",
+  },
+  {
+    _id: "job4",
+    title: "Machine Learning Engineer",
+    description: "ML models + data pipelines",
+    requiredSkills: ["Python", "Machine Learning"],
+    experienceLevel: "2-5 years",
+    recruiter: "rec2",
+  },
+  {
+    _id: "job5",
+    title: "DevOps Engineer",
+    description: "CI/CD and cloud infra",
+    requiredSkills: ["Docker", "AWS", "Kubernetes"],
+    experienceLevel: "3-6 years",
+    recruiter: "rec1",
+  },
+];

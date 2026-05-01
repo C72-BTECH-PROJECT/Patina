@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import './Upload.css';
 
 function Upload() {
   const [file, setFile] = useState(null);
@@ -37,73 +36,78 @@ function Upload() {
   };
 
   return (
-    <div className="upload-page">
-      <header className="upload-header">
-        <Link to="/" className="back-button">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200">
+      <header className="flex justify-between items-center py-5 px-6 md:px-12 bg-white shadow-sm">
+        <Link to="/" className="flex items-center gap-2 no-underline text-slate-500 font-medium transition-colors hover:text-indigo-500">
           <span>←</span> Back
         </Link>
-        <div className="logo">
-          <span className="logo-icon">✓</span>
-          <span className="logo-text">SkillVerify</span>
+        <div className="flex items-center gap-2 text-xl font-bold text-indigo-500">
+          <span className="w-8 h-8 flex items-center justify-center bg-indigo-500 text-white rounded-lg text-lg">✓</span>
+          <span>SkillVerify</span>
         </div>
-        <div className="header-spacer"></div>
+        <div className="w-[100px]"></div>
       </header>
 
-      <main className="upload-main">
-        <div className="upload-container">
-          <h1 className="page-title">Upload Your Resume</h1>
-          <p className="page-subtitle">
+      <main className="flex justify-center items-center min-h-[calc(100vh-80px)] py-12 px-6">
+        <div className="max-w-2xl w-full">
+          <h1 className="text-3xl md:text-4xl font-bold text-slate-800 text-center mb-3">Upload Your Resume</h1>
+          <p className="text-lg text-slate-500 text-center mb-10">
             Upload your resume to start the skill verification process
           </p>
 
           <div
-            className={`drop-zone ${isDragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
+            className={`bg-white border-2 border-dashed rounded-2xl p-10 md:p-16 text-center transition-all cursor-pointer ${
+              isDragging ? 'border-indigo-500 bg-indigo-50' : file ? 'border-emerald-500 bg-emerald-50' : 'border-slate-300 hover:border-indigo-500 hover:bg-indigo-50'
+            }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
             {file ? (
-              <div className="file-preview">
-                <div className="file-icon">📄</div>
-                <div className="file-info">
-                  <span className="file-name">{file.name}</span>
-                  <span className="file-size">
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-5xl">📄</div>
+                <div className="flex-1 text-left">
+                  <span className="block font-semibold text-slate-800 text-lg">{file.name}</span>
+                  <span className="block text-sm text-slate-500">
                     {(file.size / 1024).toFixed(1)} KB
                   </span>
                 </div>
                 <button
-                  className="remove-file"
-                  onClick={() => setFile(null)}
+                  className="w-8 h-8 flex items-center justify-center bg-red-100 text-red-500 hover:bg-red-200 border-none rounded-full text-xl cursor-pointer transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFile(null);
+                  }}
                 >
                   ×
                 </button>
               </div>
             ) : (
               <>
-                <div className="upload-icon">📁</div>
-                <p className="upload-text">
+                <div className="text-6xl mb-4">📁</div>
+                <p className="text-lg text-slate-500 mb-2">
                   Drag and drop your resume here, or{' '}
-                  <label className="browse-link">
+                  <label className="text-indigo-500 cursor-pointer font-medium hover:underline">
                     browse
                     <input
                       type="file"
                       accept=".pdf"
                       onChange={handleFileChange}
-                      hidden
+                      className="hidden"
                     />
                   </label>
                 </p>
-                <p className="upload-hint">Supports PDF files only</p>
+                <p className="text-sm text-slate-400">Supports PDF files only</p>
               </>
             )}
           </div>
 
-          <div className="github-section card">
-            <h3>Connect GitHub (Optional)</h3>
-            <p className="github-description">
+          <div className="mt-8 p-8 bg-white rounded-xl shadow-sm text-center">
+            <h3 className="text-xl font-semibold text-slate-800 mb-2">Connect GitHub (Optional)</h3>
+            <p className="text-slate-500 mb-6">
               Connect your GitHub profile to verify your coding activity and contributions
             </p>
-            <button className="btn btn-github">
+            <button className="inline-flex items-center gap-2 py-3 px-6 bg-[#24292e] hover:bg-[#1b1f22] text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-all hover:-translate-y-0.5">
               <svg
                 viewBox="0 0 24 24"
                 width="20"
@@ -116,14 +120,14 @@ function Upload() {
             </button>
           </div>
 
-          <div className="action-buttons">
+          <div className="mt-8 text-center">
             <button
-              className="btn btn-primary btn-large"
+              className={`group inline-flex items-center justify-center py-4 px-8 rounded-lg font-medium text-lg text-white transition-all ${file ? 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer shadow-md shadow-indigo-500/30' : 'bg-slate-400 cursor-not-allowed'}`}
               onClick={handleAnalyze}
               disabled={!file}
             >
               Analyze Resume
-              <span className="btn-arrow">→</span>
+              <span className={`ml-2 transition-transform ${file ? 'group-hover:translate-x-1' : ''}`}>→</span>
             </button>
           </div>
         </div>
