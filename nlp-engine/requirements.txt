@@ -1,0 +1,21 @@
+# ── Web Framework ──────────────────────────────
+fastapi
+uvicorn
+python-multipart
+
+# ── File Parsing ───────────────────────────────
+pdfplumber
+python-docx
+
+# ── NLP Processing ─────────────────────────────
+spacy
+# run this separately after pip install:
+# python -m spacy download en_core_web_sm
+
+# ── Semantic Embeddings ────────────────────────
+sentence-transformers
+scikit-learn
+numpy
+
+# ── Config ─────────────────────────────────────
+python-dotenv
