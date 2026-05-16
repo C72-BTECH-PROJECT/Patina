@@ -9,7 +9,7 @@ function RecruiterLayout() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/recruiter/dashboard" className="flex items-center gap-2 text-xl font-bold text-indigo-500 no-underline">
             <span className="w-8 h-8 flex items-center justify-center bg-indigo-500 text-white rounded-lg text-lg">✓</span>
-            <span>SkillVerify Recruiter</span>
+<span className="font-extrabold tracking-tight text-2xl">PATINA Recruiter</span>
           </Link>
           
           <div className="flex gap-6">

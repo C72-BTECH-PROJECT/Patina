@@ -2,16 +2,14 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import authRoutes from './Routes/auth.routes.js';
+import parseRoutes from './Routes/parse.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-
-// Mock candidate data
 const mockCandidate = {
   name: "Rohit Sharma",
   email: "rohit.sharma@example.com",
@@ -32,7 +30,7 @@ const mockCandidate = {
     languages: ["JavaScript", "Python", "TypeScript", "Go"],
     totalStars: 264,
     totalForks: 45,
-    contributions:892,
+    contributions: 892,
     joinDate: "2021-03-15"
   },
   assessment: {
@@ -75,25 +73,21 @@ const mockCandidate = {
   }
 };
 
-// API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/parse', parseRoutes);
 
-// Get candidate data
 app.get('/api/candidate', (req, res) => {
   res.json(mockCandidate);
 });
 
-// Get candidate by ID (optional)
 app.get('/api/candidate/:id', (req, res) => {
   res.json(mockCandidate);
 });
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Start server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`API endpoint: http://localhost:${PORT}/api/candidate`);

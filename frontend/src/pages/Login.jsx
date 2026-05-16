@@ -76,7 +76,7 @@ function Login() {
       <header className="flex justify-between items-center py-5 px-6 md:px-12 bg-white shadow-sm shrink-0">
         <Link to="/" className="flex items-center gap-2 text-xl font-bold text-indigo-500 no-underline">
           <span className="w-8 h-8 flex items-center justify-center bg-indigo-500 text-white rounded-lg text-lg">✓</span>
-          <span>SkillVerify</span>
+<span className="font-extrabold tracking-tight text-2xl">PATINA</span>
         </Link>
         <Link to="/" className="text-slate-500 hover:text-indigo-500 font-medium">← Back to Home</Link>
       </header>

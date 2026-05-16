@@ -7,14 +7,14 @@ function RoleSelection() {
       <header className="flex justify-between items-center py-5 px-6 md:px-12 bg-white shadow-sm shrink-0">
         <Link to="/" className="flex items-center gap-2 text-xl font-bold text-indigo-500 no-underline">
           <span className="w-8 h-8 flex items-center justify-center bg-indigo-500 text-white rounded-lg text-lg">✓</span>
-          <span>SkillVerify</span>
+<span className="font-extrabold tracking-tight text-2xl">PATINA</span>
         </Link>
         <Link to="/" className="text-slate-500 hover:text-indigo-500 font-medium">← Back to Home</Link>
       </header>
 
       <main className="flex-1 flex justify-center items-center py-12 px-6">
         <div className="max-w-3xl w-full text-center">
-          <h1 className="text-4xl font-bold text-slate-800 mb-4">How would you like to use SkillVerify?</h1>
+How would you like to use PATINA?
           <p className="text-lg text-slate-500 mb-12">Choose your role to get started with the platform.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

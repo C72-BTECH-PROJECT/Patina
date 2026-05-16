@@ -7,7 +7,7 @@ function Landing() {
       <header className="flex justify-between items-center py-5 px-6 md:px-12 bg-white shadow-sm">
         <Link to="/" className="flex items-center gap-2 text-xl font-bold text-indigo-500 no-underline">
           <span className="w-8 h-8 flex items-center justify-center bg-indigo-500 text-white rounded-lg text-lg">✓</span>
-          <span>SkillVerify</span>
+          <span className="font-extrabold tracking-tight text-2xl">PATINA</span>
         </Link>
         <nav className="flex gap-4 md:gap-8">
           <Link to="/login/candidate" className="no-underline text-slate-500 font-medium transition-colors hover:text-indigo-500">For Candidates</Link>
@@ -95,7 +95,7 @@ function Landing() {
       </main>
 
       <footer className="p-8 text-center text-slate-500 border-t border-slate-200">
-        <p>&copy; 2024 SkillVerify. All rights reserved.</p>
+        <p>&copy; 2024 PATINA. All rights reserved.</p>
       </footer>
     </div>
   );
