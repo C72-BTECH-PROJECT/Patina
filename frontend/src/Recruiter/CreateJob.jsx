@@ -1,7 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
-const SUGGESTED_SKILLS = ["React", "Node.js", "Python", "AWS", "TypeScript", "Django", "Machine Learning", "Docker", "Kubernetes", "MongoDB", "SQL", "Go"];
+const SUGGESTED_SKILLS = [
+  'React',
+  'Node.js',
+  'Python',
+  'AWS',
+  'TypeScript',
+  'Django',
+  'Machine Learning',
+  'Docker',
+  'Kubernetes',
+  'MongoDB',
+  'SQL',
+  'Go',
+];
 
 function CreateJob() {
   const navigate = useNavigate();
@@ -9,43 +22,73 @@ function CreateJob() {
   const [description, setDescription] = useState('');
   const [skills, setSkills] = useState([]);
   const [experience, setExperience] = useState('');
+  const [location, setLocation] = useState('Remote');
 
   const toggleSkill = (skill) => {
     if (skills.includes(skill)) {
-      setSkills(skills.filter(s => s !== skill));
+      setSkills(skills.filter((s) => s !== skill));
     } else {
       setSkills([...skills, skill]);
     }
   };
 
-  const handleCreate = (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
-    if(!title || skills.length === 0) {
-      alert("Please fill title and select at least one skill.");
+
+    if (!title || skills.length === 0 || !experience || !location) {
+      alert('Please fill title, location, experience level, and select at least one skill.');
       return;
     }
-    // Simulate pushing to backend and navigating
-    setTimeout(() => {
+
+    if (!description.trim()) {
+      alert('Please add a job description.');
+      return;
+    }
+
+    const payload = {
+      title: title.trim(),
+      skills,
+      description: description.trim(),
+      experienceLevel: experience,
+      location,
+    };
+
+    try {
+      const resp = await fetch('http://localhost:5001/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => '');
+        throw new Error(`Create job failed (${resp.status}) ${txt}`);
+      }
+
+      await resp.json().catch(() => null);
       navigate('/recruiter/jobs');
-    }, 500);
+    } catch (err) {
+      alert(err.message || 'Failed to create job');
+    }
   };
 
   return (
     <div className="max-w-3xl mx-auto animate-fadeIn">
       <div className="mb-8">
-        <Link to="/recruiter/dashboard" className="text-slate-500 hover:text-indigo-600 mb-4 inline-block font-medium">← Back to Dashboard</Link>
+        <Link to="/recruiter/dashboard" className="text-slate-500 hover:text-indigo-600 mb-4 inline-block font-medium">
+          ← Back to Dashboard
+        </Link>
         <h1 className="text-3xl font-bold text-slate-800">Create New Job Listing</h1>
         <p className="text-slate-500 mt-2">Fill out the details below to start receiving vetted candidates.</p>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
         <form onSubmit={handleCreate} className="flex flex-col gap-6">
-          
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">Job Title</label>
-            <input 
-              type="text" 
-              required 
+            <input
+              type="text"
+              required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
@@ -57,7 +100,7 @@ function CreateJob() {
             <label className="block text-sm font-semibold text-slate-700 mb-2">Required Skills</label>
             <p className="text-xs text-slate-500 mb-3">Select the core skills required for this position to filter credibility scores appropriately.</p>
             <div className="flex flex-wrap gap-2">
-              {SUGGESTED_SKILLS.map(skill => {
+              {SUGGESTED_SKILLS.map((skill) => {
                 const isSelected = skills.includes(skill);
                 return (
                   <button
@@ -65,8 +108,8 @@ function CreateJob() {
                     type="button"
                     onClick={() => toggleSkill(skill)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all transform hover:scale-105 active:scale-95 border-2 ${
-                      isSelected 
-                        ? 'bg-indigo-100 text-indigo-700 border-indigo-200' 
+                      isSelected
+                        ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
                         : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
                     }`}
                   >
@@ -82,7 +125,7 @@ function CreateJob() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Experience Level</label>
-              <select 
+              <select
                 value={experience}
                 onChange={(e) => setExperience(e.target.value)}
                 className="w-full px-4 py-3 bg-white rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors appearance-none"
@@ -93,28 +136,39 @@ function CreateJob() {
                 <option value="5+ years">5+ years (Senior Level)</option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Location</label>
+              <input
+                type="text"
+                required
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                placeholder="e.g., Remote / Bangalore"
+              />
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
-            <textarea 
+            <textarea
               rows="4"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors resize-none"
               placeholder="Describe the role responsibilities..."
-            ></textarea>
+            />
           </div>
 
           <div className="pt-6 mt-2 border-t border-slate-100 flex justify-end">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl transition-colors shadow-sm"
             >
               Post Job Listing
             </button>
           </div>
-
         </form>
       </div>
     </div>
@@ -122,3 +176,4 @@ function CreateJob() {
 }
 
 export default CreateJob;
+

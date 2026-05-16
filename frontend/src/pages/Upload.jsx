@@ -1,10 +1,31 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 function Upload() {
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [jobs, setJobs] = useState([]);
+  const [jobId, setJobId] = useState('');
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [jobsError, setJobsError] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadJobs = async () => {
+      try {
+        const res = await fetch('http://localhost:5001/api/jobs');
+        if (!res.ok) throw new Error('Failed to fetch jobs');
+        const data = await res.json();
+        setJobs(data || []);
+        setJobId((data && data[0] && String(data[0].id || data[0]._id)) ? String(data[0].id || data[0]._id) : '');
+      } catch (e) {
+        setJobsError(e.message || 'Failed to load jobs');
+      } finally {
+        setLoadingJobs(false);
+      }
+    };
+    loadJobs();
+  }, []);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -32,7 +53,15 @@ function Upload() {
   };
 
   const handleAnalyze = () => {
-    navigate('/processing');
+    if (!jobId) {
+      alert('Select a job position first.');
+      return;
+    }
+    if (!file) {
+      alert('Upload a PDF resume first.');
+      return;
+    }
+    navigate('/candidate/processing', { state: { file, jobId } });
   };
 
   return (
@@ -54,6 +83,28 @@ function Upload() {
           <p className="text-lg text-slate-500 text-center mb-10">
             Upload your resume to start the skill verification process
           </p>
+
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Select Position</label>
+            {loadingJobs ? (
+              <div className="text-sm text-slate-500">Loading jobs...</div>
+            ) : jobsError ? (
+              <div className="text-sm text-red-500">{jobsError}</div>
+            ) : (
+              <select
+                value={jobId}
+                onChange={(e) => setJobId(e.target.value)}
+                className="w-full px-4 py-3 bg-white rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors appearance-none"
+              >
+                {jobs.map((j) => (
+                  <option key={j.id || j._id} value={String(j.id || j._id)}>
+                    {j.title}
+                  </option>
+                ))}
+              </select>
+            )}
+            <p className="text-xs text-slate-500 mt-2">Choose the role you’re applying for. We’ll match your resume to this job.</p>
+          </div>
 
           <div
             className={`bg-white border-2 border-dashed rounded-2xl p-10 md:p-16 text-center transition-all cursor-pointer ${
