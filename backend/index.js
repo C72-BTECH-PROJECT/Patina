@@ -4,6 +4,7 @@ import cors from 'cors';
 import authRoutes from './Routes/auth.routes.js';
 import jobsRoutes from './Routes/jobs.routes.js';
 import analysisRoutes from './Routes/analysis.routes.js';
+import parseRoutes from './Routes/parse.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -11,7 +12,7 @@ const PORT = process.env.PORT || 5001;
 app.use(cors());
 app.use(express.json());
 
-// Debug routing
+// Debug routing (safe)
 app.use((req, _res, next) => {
   console.log(`[API] ${req.method} ${req.url}`);
   next();
@@ -19,9 +20,16 @@ app.use((req, _res, next) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobsRoutes);
+
+// analysisRoutes defines:
+// POST /analyze
+// GET  /candidate-analysis
 app.use('/api', analysisRoutes);
 
-// Backward compatible candidate endpoints (still mock)
+// parseRoutes defines POST / (mounted at /api/parse)
+app.use('/api/parse', parseRoutes);
+
+// Backward compatible candidate endpoints (mock)
 const mockCandidate = {
   name: 'Rohit Sharma',
   email: 'rohit.sharma@example.com',
@@ -86,15 +94,15 @@ const mockCandidate = {
   },
 };
 
-app.get('/api/candidate', (req, res) => {
+app.get('/api/candidate', (_req, res) => {
   res.json(mockCandidate);
 });
 
-app.get('/api/candidate/:id', (req, res) => {
+app.get('/api/candidate/:id', (_req, res) => {
   res.json(mockCandidate);
 });
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -106,7 +114,6 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(
-    `API endpoints:\n- GET  /api/jobs\n- POST /api/jobs\n- POST /api/analyze\n- GET  /api/candidate-analysis`
+    `API endpoints:\n- GET  /api/jobs\n- POST /api/jobs\n- POST /api/analyze\n- GET  /api/candidate-analysis\n- POST /api/parse`
   );
 });
-
