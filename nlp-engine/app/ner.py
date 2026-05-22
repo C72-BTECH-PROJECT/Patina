@@ -1,73 +1,89 @@
 import spacy
+import re
 
-# load the same english model
-# spacy is smart enough to cache this so it
-# does not reload if preprocessor already loaded it
 nlp = spacy.load("en_core_web_sm")
 
-# define your own skill keywords list
-# this acts as a rule based matcher for technical skills
-# since en_core_web_sm is not trained on tech resumes
-# it won't detect "React" or "MongoDB" as skills by default
-# so we manually define what we consider a skill
 SKILL_KEYWORDS = [
     # programming languages
-    "python", "java", "javascript", "typescript", "c", "c++", "c#",
-    "ruby", "go", "rust", "swift", "kotlin", "php", "scala", "r",
-    # web frameworks
-    "react", "angular", "vue", "nextjs", "nodejs", "express", "django",
-    "flask", "fastapi", "spring", "laravel",
+    "python", "java", "javascript", "typescript", "golang",
+    "ruby", "rust", "swift", "kotlin", "php", "scala",
+    "matlab", "perl", "bash", "dart", "lua", "r language",
+
+    # web frameworks and libraries
+    "react", "angular", "vue", "nextjs", "nuxtjs", "nodejs", "express",
+    "django", "flask", "fastapi", "spring", "laravel", "rails",
+    "jquery", "bootstrap", "tailwind", "redux", "graphql", "webpack",
+    "vite", "gatsby", "svelte", "remix",
+
     # databases
     "mongodb", "mysql", "postgresql", "sqlite", "redis", "firebase",
-    "cassandra", "elasticsearch",
+    "cassandra", "elasticsearch", "dynamodb", "oracle", "mariadb",
+    "neo4j", "couchdb", "supabase", "prisma", "sequelize", "mongoose",
+
     # cloud and devops
     "aws", "azure", "gcp", "docker", "kubernetes", "jenkins", "git",
-    "github", "gitlab", "linux", "terraform", "ansible",
-    # data and ml
+    "github", "gitlab", "bitbucket", "linux", "terraform", "ansible",
+    "nginx", "apache", "heroku", "vercel", "netlify", "cloudflare",
+    "digitalocean", "circleci", "tomcat", "grunt", "maven",
+
+    # data science and ml
     "tensorflow", "pytorch", "keras", "scikit-learn", "pandas", "numpy",
-    "matplotlib", "opencv", "nlp", "machine learning", "deep learning",
-    # general tech skills
-    "html", "css", "rest", "graphql", "api", "microservices", "agile",
-    "scrum", "sql", "nosql", "json", "xml",
+    "matplotlib", "seaborn", "opencv", "nlp", "machine learning",
+    "deep learning", "computer vision", "data science", "jupyter",
+    "spark", "hadoop", "airflow", "mlflow", "transformers", "bert",
+    "langchain", "openai", "hugging face",
+
+    # mobile
+    "android", "ios", "react native", "flutter", "xamarin", "ionic",
+    "expo",
+
+    # general tech
+    "html", "css", "sass", "rest", "api", "microservices", "agile",
+    "scrum", "sql", "nosql", "json", "xml", "yaml", "jwt", "oauth",
+    "websocket", "grpc", "kafka", "rabbitmq", "celery",
+
+    # testing
+    "jest", "mocha", "pytest", "selenium", "cypress", "postman",
+    "unit testing", "integration testing",
+
+    # concepts
+    "system design", "data structures", "algorithms", "oop",
+    "design patterns", "solid principles", "clean code",
+    "typescript", "exponentjs",
 ]
 
 def extract_entities(text: str) -> dict:
     doc = nlp(text)
     text_lower = text.lower()
 
-    # ── 1. SKILLS ──────────────────────────────────────
-    # check which skills from our keyword list
-    # appear anywhere in the resume text
+    # ── 1. SKILLS — word boundary matching ──────────────
     found_skills = []
     for skill in SKILL_KEYWORDS:
-        if skill.lower() in text_lower:
-            found_skills.append(skill)
+        pattern = r'\b' + re.escape(skill) + r'\b'
+        if re.search(pattern, text_lower, re.IGNORECASE):
+            if skill not in found_skills:
+                found_skills.append(skill)
 
-    # ── 2. EXPERIENCE ───────────────────────────────────
-    # spacy's built in NER detects ORG (organisations)
-    # and DATE entities which map to work experience
+    # ── 2. EXPERIENCE ────────────────────────────────────
     experience = []
     for ent in doc.ents:
         if ent.label_ == "ORG":
-            # organisation names = companies worked at
             experience.append({
                 "type": "organisation",
                 "value": ent.text.strip()
             })
         elif ent.label_ == "DATE":
-            # date ranges = employment periods
             experience.append({
                 "type": "date",
                 "value": ent.text.strip()
             })
 
-    # ── 3. EDUCATION ────────────────────────────────────
-    # look for education related keywords in sentences
+    # ── 3. EDUCATION ─────────────────────────────────────
     education_keywords = [
         "university", "college", "bachelor", "master", "phd",
         "degree", "diploma", "school", "b.tech", "m.tech",
-        "b.e", "m.e", "bsc", "msc", "hsc", "ssc", "year 11",
-        "year 12", "engineering", "computer science"
+        "b.e", "m.e", "bsc", "msc", "hsc", "ssc",
+        "engineering", "computer science", "information technology"
     ]
     education = []
     for sent in doc.sents:
@@ -75,13 +91,13 @@ def extract_entities(text: str) -> dict:
         for keyword in education_keywords:
             if keyword in sent_lower:
                 education.append(sent.text.strip())
-                break  # avoid adding same sentence twice
+                break
 
-    # ── 4. PROJECTS ─────────────────────────────────────
-    # look for project related keywords in sentences
+    # ── 4. PROJECTS ──────────────────────────────────────
     project_keywords = [
         "project", "built", "developed", "created", "implemented",
-        "designed", "deployed", "worked on", "contributed"
+        "designed", "deployed", "worked on", "contributed",
+        "developed", "architected", "launched", "led", "built"
     ]
     projects = []
     for sent in doc.sents:
@@ -89,9 +105,8 @@ def extract_entities(text: str) -> dict:
         for keyword in project_keywords:
             if keyword in sent_lower:
                 projects.append(sent.text.strip())
-                break  # avoid adding same sentence twice
+                break
 
-    # remove duplicates while preserving order
     experience = [dict(t) for t in {tuple(d.items()) for d in experience}]
 
     return {
@@ -102,7 +117,7 @@ def extract_entities(text: str) -> dict:
         "skill_count": len(found_skills)
     }
 
-# ── TEST BLOCK ──────────────────────────────────────────
+# ── TEST BLOCK ───────────────────────────────────────────
 if __name__ == "__main__":
     import sys
     import os
@@ -115,6 +130,9 @@ if __name__ == "__main__":
     print("──── SKILLS FOUND ────")
     print(result["skills"])
 
+    print("\n──── SKILL COUNT ────")
+    print(result["skill_count"])
+
     print("\n──── EXPERIENCE ────")
     for item in result["experience"]:
         print(f"  {item['type']}: {item['value']}")
@@ -126,6 +144,3 @@ if __name__ == "__main__":
     print("\n──── PROJECTS ────")
     for proj in result["projects"]:
         print(f"  {proj}")
-
-    print("\n──── SKILL COUNT ────")
-    print(result["skill_count"])

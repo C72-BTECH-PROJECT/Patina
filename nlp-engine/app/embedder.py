@@ -36,29 +36,46 @@ def compute_similarity(text1: str, text2: str) -> float:
     # round to 4 decimal places for clean output
     return round(float(score), 4)
 
-def analyse(resume_text: str, jd_text: str) -> dict:
-    # get individual embeddings
-    resume_embedding = get_embedding(resume_text)
-    jd_embedding = get_embedding(jd_text)
+def analyse(resume_text: str, jd_text: str, 
+            skills: list = None, 
+            noun_chunks: list = None) -> dict:
+    
+    # build focused resume representation
+    # use skills + noun chunks if available
+    # much cleaner signal than full resume text
+    if skills and noun_chunks:
+        # combine skills and noun chunks into focused text
+        focused_resume = " ".join(skills) + " " + " ".join(noun_chunks[:20])
+    else:
+        # fallback to full text if nothing else available
+        focused_resume = resume_text
 
-    # compute similarity score
-    similarity = compute_similarity(resume_text, jd_text)
+    # compute similarity on focused text vs JD
+    similarity = compute_similarity(focused_resume, jd_text)
 
-    # interpret the score for the dashboard
-    if similarity >= 0.75:
+    # also compute full text similarity as secondary score
+    full_similarity = compute_similarity(resume_text[:1000], jd_text)
+
+    # take the higher of the two scores
+    # gives benefit of doubt to the candidate
+    final_score = max(similarity, full_similarity)
+
+    if final_score >= 0.75:
         match_level = "Strong Match"
-    elif similarity >= 0.50:
+    elif final_score >= 0.50:
         match_level = "Moderate Match"
-    elif similarity >= 0.30:
+    elif final_score >= 0.30:
         match_level = "Weak Match"
     else:
         match_level = "Poor Match"
 
     return {
-        "similarity_score": similarity,
+        "similarity_score": round(final_score, 4),
+        "focused_score": round(similarity, 4),
+        "full_text_score": round(full_similarity, 4),
         "match_level": match_level,
-        "resume_embedding_size": len(resume_embedding),
-        "jd_embedding_size": len(jd_embedding),
+        "resume_embedding_size": 384,
+        "jd_embedding_size": 384,
     }
 
 # ── TEST BLOCK ──────────────────────────────────────────
