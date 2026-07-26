@@ -210,21 +210,37 @@ const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#ec4899'];
 
 // Main Dashboard Component
 function RecruiterDashboard() {
-  // Mock data from mockData
+  const [applications, setApplications] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    fetch('http://localhost:5001/api/candidates')
+      .then(res => res.json())
+      .then(data => {
+        // Map backend candidate schema to frontend expectation
+        const mappedData = data.map(c => ({
+          _id: c.id || Math.random().toString(),
+          candidateInfo: c.candidate,
+          credibilityScore: c.credibilityScore || 0,
+          skills: c.verifiedSkills || [],
+          status: 'applied'
+        }));
+        setApplications(mappedData);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch candidates:', err);
+        setLoading(false);
+      });
+  }, []);
+
+  // Mock data for jobs (can be wired up later)
   const jobs = [
     { _id: 'job1', title: 'Frontend Developer', description: 'Work on React-based UI', requiredSkills: ['React', 'JavaScript', 'CSS'], experienceLevel: '0-2 years' },
     { _id: 'job2', title: 'Backend Developer', description: 'Node.js + API development', requiredSkills: ['Node.js', 'Express', 'MongoDB'], experienceLevel: '2-4 years' },
     { _id: 'job3', title: 'Full Stack Developer', description: 'React + Node full stack role', requiredSkills: ['React', 'Node.js'], experienceLevel: '1-3 years' },
     { _id: 'job4', title: 'Machine Learning Engineer', description: 'ML models + data pipelines', requiredSkills: ['Python', 'Machine Learning'], experienceLevel: '2-5 years' },
     { _id: 'job5', title: 'DevOps Engineer', description: 'CI/CD and cloud infra', requiredSkills: ['Docker', 'AWS', 'Kubernetes'], experienceLevel: '3-6 years' },
-  ];
-
-  const applications = [
-    { _id: 'app1', candidateInfo: { name: 'Rohit Sharma', location: 'Mumbai' }, credibilityScore: 82, skills: [{ name: 'React', verified: true }, { name: 'Node.js', verified: true }], status: 'applied' },
-    { _id: 'app2', candidateInfo: { name: 'Priya Patel', location: 'Ahmedabad' }, credibilityScore: 91, skills: [{ name: 'React', verified: true }, { name: 'CSS', verified: true }], status: 'shortlisted' },
-    { _id: 'app3', candidateInfo: { name: 'Arjun Mehta', location: 'Delhi' }, credibilityScore: 65, skills: [{ name: 'Node.js', verified: false }], status: 'rejected' },
-    { _id: 'app4', candidateInfo: { name: 'Sneha Iyer', location: 'Bangalore' }, credibilityScore: 88, skills: [{ name: 'Full Stack', verified: true }], status: 'shortlisted' },
-    { _id: 'app5', candidateInfo: { name: 'Karan Singh', location: 'Pune' }, credibilityScore: 72, skills: [{ name: 'Python', verified: true }], status: 'applied' },
   ];
 
   const topCandidates = [...applications].sort((a, b) => b.credibilityScore - a.credibilityScore);

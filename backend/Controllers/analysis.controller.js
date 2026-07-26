@@ -3,9 +3,12 @@ import FormData from 'form-data';
 import fetch from 'node-fetch';
 
 import { jobs } from '../Config/Job.js';
+import { fetchGitHubLanguages } from './githubAggregator.js';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+// In-memory array to store all candidate analyses for the Recruiter Dashboard
+export const allAnalyses = [];
 let latestAnalysis = null;
 let latestJob = null;
 
@@ -62,13 +65,29 @@ export const analyzeResume = [upload.single('resume'), async (req, res) => {
 
     const extractedSkills = Array.isArray(nlpJson?.entities?.skills) ? nlpJson.entities.skills : [];
     const projects = Array.isArray(nlpJson?.entities?.projects) ? nlpJson.entities.projects : [];
+    
+    // Get newly extracted fields
+    const email = nlpJson?.entities?.email || '';
+    const phone = nlpJson?.entities?.phone || '';
+    const github = nlpJson?.entities?.github || '';
+    const linkedin = nlpJson?.entities?.linkedin || '';
 
-    // Keep existing “verified” heuristic for now, but it will now be based on real extracted skills
-    const verifiedSkills = extractedSkills.map((s, idx) => ({
-      name: s,
-      verified: idx < 2,
-      level: idx === 0 ? 'Advanced' : 'Intermediate',
-    }));
+    // Fetch GitHub languages to verify skills
+    const githubLanguages = await fetchGitHubLanguages(github);
+
+
+    // Verify skills using GitHub data (or fallback to heuristic if no GitHub provided)
+    const verifiedSkills = extractedSkills.map((s, idx) => {
+      // If we have github data, verify by checking if the skill name is in the repo languages/topics
+      const isVerifiedByGithub = githubLanguages.length > 0 && githubLanguages.includes(s.toLowerCase());
+      
+      return {
+        name: s,
+        verified: githubLanguages.length > 0 ? isVerifiedByGithub : idx < 2, // Fallback to heuristic
+        level: idx === 0 ? 'Advanced' : 'Intermediate',
+      };
+    });
+
 
     const credibilityScore = Math.max(
       20,
@@ -80,10 +99,17 @@ export const analyzeResume = [upload.single('resume'), async (req, res) => {
       .trim();
 
     latestAnalysis = {
+      id: `cand-${Date.now()}`,
       candidate: {
         name: candidateNameFromFilename || 'Candidate',
         location: latestJob?.location || '—',
+        email,
+        phone,
+        github,
+        linkedin
       },
+      jobId: latestJob?.id || latestJob?._id,
+      jobTitle: latestJob?.title,
       matchPercentage: Math.round(semanticSimilarity * 100),
       extractedSkills,
       projects,
@@ -93,7 +119,10 @@ export const analyzeResume = [upload.single('resume'), async (req, res) => {
       experienceLevel: job.experienceLevel,
       credibilityScore,
       raw_text_preview: nlpJson?.raw_text_preview,
+      appliedAt: new Date().toISOString()
     };
+
+    allAnalyses.push(latestAnalysis);
 
     return res.json(latestAnalysis);
   } catch (err) {
@@ -110,5 +139,9 @@ export const getCandidateAnalysis = (req, res) => {
   return res.json({
     ...latestAnalysis,
   });
+};
+
+export const getAllCandidates = (req, res) => {
+  return res.json(allAnalyses);
 };
 

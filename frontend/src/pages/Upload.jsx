@@ -473,6 +473,7 @@ function Upload() {
               Connect your GitHub profile to verify your coding activity and contributions
             </p>
             <motion.button
+              onClick={() => window.location.href = 'http://localhost:5001/api/auth/github?role=candidate'}
               className="inline-flex items-center gap-2 px-6 py-3 bg-[#24292e]/80 hover:bg-[#24292e] text-white rounded-xl text-sm font-semibold transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

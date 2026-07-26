@@ -78,6 +78,9 @@ def extract_entities(text: str) -> dict:
                 "value": ent.text.strip()
             })
 
+    # Split text line by line to prevent massive blocks caused by missing punctuation in resumes
+    lines = [line.strip() for line in text.split('\n') if len(line.strip()) > 5]
+
     # ── 3. EDUCATION ─────────────────────────────────────
     education_keywords = [
         "university", "college", "bachelor", "master", "phd",
@@ -86,30 +89,49 @@ def extract_entities(text: str) -> dict:
         "engineering", "computer science", "information technology"
     ]
     education = []
-    for sent in doc.sents:
-        sent_lower = sent.text.lower()
+    for line in lines:
+        line_lower = line.lower()
         for keyword in education_keywords:
-            if keyword in sent_lower:
-                education.append(sent.text.strip())
+            if keyword in line_lower:
+                if line not in education:
+                    education.append(line)
                 break
 
     # ── 4. PROJECTS ──────────────────────────────────────
     project_keywords = [
         "project", "built", "developed", "created", "implemented",
         "designed", "deployed", "worked on", "contributed",
-        "developed", "architected", "launched", "led", "built"
+        "architected", "launched", "led"
     ]
     projects = []
-    for sent in doc.sents:
-        sent_lower = sent.text.lower()
+    for line in lines:
+        line_lower = line.lower()
         for keyword in project_keywords:
-            if keyword in sent_lower:
-                projects.append(sent.text.strip())
+            if keyword in line_lower:
+                if line not in projects:
+                    projects.append(line)
                 break
 
-    experience = [dict(t) for t in {tuple(d.items()) for d in experience}]
+    # ── 5. REGEX EXTRACTIONS (Email, Phone, Links) ───────
+    email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+    phone_pattern = r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}'
+    github_pattern = r'(?:https?://)?(?:www\.)?github\.com/[A-Za-z0-9_.-]+'
+    linkedin_pattern = r'(?:https?://)?(?:www\.)?linkedin\.com/in/[A-Za-z0-9_.-]+'
+
+    emails = list(set(re.findall(email_pattern, text)))
+    
+    # Phone numbers might have duplicates due to formatting, keep distinct digits
+    phones_raw = re.findall(phone_pattern, text)
+    phones = list(set([re.sub(r'[^0-9+]', '', p) for p in phones_raw if len(re.sub(r'[^0-9]', '', p)) >= 10]))
+
+    github_links = list(set(re.findall(github_pattern, text)))
+    linkedin_links = list(set(re.findall(linkedin_pattern, text)))
 
     return {
+        "email": emails[0] if emails else None,
+        "phone": phones[0] if phones else None,
+        "github": github_links[0] if github_links else None,
+        "linkedin": linkedin_links[0] if linkedin_links else None,
         "skills": found_skills,
         "experience": experience,
         "education": education,
@@ -127,7 +149,13 @@ if __name__ == "__main__":
     raw_text = extract_text("sample_resume.pdf")
     result = extract_entities(raw_text)
 
-    print("──── SKILLS FOUND ────")
+    print("──── CONTACT & LINKS ────")
+    print(f"Email: {result['email']}")
+    print(f"Phone: {result['phone']}")
+    print(f"GitHub: {result['github']}")
+    print(f"LinkedIn: {result['linkedin']}")
+
+    print("\n──── SKILLS FOUND ────")
     print(result["skills"])
 
     print("\n──── SKILL COUNT ────")
