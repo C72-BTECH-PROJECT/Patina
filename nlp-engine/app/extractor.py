@@ -28,7 +28,7 @@ def extract_text(file_path: str) -> str:
     else:
         raise ValueError(f"Unsupported file type: {ext}")
 
-# ── TEST BLOCK ──────────────────────────────────────────
+# TEST BLOCK
 if __name__ == "__main__":
     test_file = "sample_resume.pdf"
     result = extract_text(test_file)

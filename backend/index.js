@@ -6,11 +6,27 @@ import jobsRoutes from './Routes/jobs.routes.js';
 import analysisRoutes from './Routes/analysis.routes.js';
 import parseRoutes from './Routes/parse.routes.js';
 
+import session from 'express-session';
+import passport from './Config/passport.js';
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true
+}));
 app.use(express.json());
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'supersecret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 1 day
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Debug routing (safe)
 app.use((req, _res, next) => {

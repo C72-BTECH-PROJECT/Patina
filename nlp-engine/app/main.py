@@ -68,6 +68,7 @@ async def parse_resume(
                 "sentence_count": len(preprocessed["sentences"])
             },
             "entities": {
+                "candidate_name": entities.get("candidate_name"),
                 "email": entities.get("email"),
                 "phone": entities.get("phone"),
                 "github": entities.get("github"),

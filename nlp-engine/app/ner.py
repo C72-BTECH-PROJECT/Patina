@@ -56,6 +56,16 @@ def extract_entities(text: str) -> dict:
     doc = nlp(text)
     text_lower = text.lower()
 
+    # ── 0. CANDIDATE NAME ────────────────────────────────
+    candidate_name = None
+    for ent in doc.ents:
+        if ent.label_ == "PERSON":
+            # Usually the first person mentioned is the candidate
+            # Specifically if it's near the top
+            if len(ent.text.split()) >= 2: # Ensure it's likely a full name
+                 candidate_name = ent.text.strip()
+                 break
+
     # ── 1. SKILLS — word boundary matching ──────────────
     found_skills = []
     for skill in SKILL_KEYWORDS:
@@ -104,13 +114,38 @@ def extract_entities(text: str) -> dict:
         "architected", "launched", "led"
     ]
     projects = []
-    for line in lines:
+    
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         line_lower = line.lower()
-        for keyword in project_keywords:
-            if keyword in line_lower:
-                if line not in projects:
-                    projects.append(line)
-                break
+        is_project = any(keyword in line_lower for keyword in project_keywords)
+        
+        if is_project:
+            # Clean bullet points from title
+            title = re.sub(r'^[\W_]+', '', line).strip()
+            
+            # Grab next few lines for description
+            description_lines = []
+            j = i + 1
+            while j < len(lines) and j < i + 4:
+                desc_line = lines[j]
+                # Break if next line looks like a new section heading
+                if len(desc_line.split()) < 3 and desc_line.isupper():
+                    break
+                clean_desc = re.sub(r'^[\W_]+', '', desc_line).strip()
+                if clean_desc:
+                    description_lines.append(clean_desc)
+                j += 1
+                
+            # Avoid adding exact duplicate titles
+            if not any(p['title'] == title for p in projects):
+                projects.append({
+                    "title": title,
+                    "description": " ".join(description_lines)
+                })
+            i = j - 1 # skip lines added to description
+        i += 1
 
     # ── 5. REGEX EXTRACTIONS (Email, Phone, Links) ───────
     email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
@@ -128,6 +163,7 @@ def extract_entities(text: str) -> dict:
     linkedin_links = list(set(re.findall(linkedin_pattern, text)))
 
     return {
+        "candidate_name": candidate_name,
         "email": emails[0] if emails else None,
         "phone": phones[0] if phones else None,
         "github": github_links[0] if github_links else None,
@@ -149,7 +185,10 @@ if __name__ == "__main__":
     raw_text = extract_text("sample_resume.pdf")
     result = extract_entities(raw_text)
 
-    print("──── CONTACT & LINKS ────")
+    print("──── CANDIDATE NAME ────")
+    print(result["candidate_name"])
+    
+    print("\n──── CONTACT & LINKS ────")
     print(f"Email: {result['email']}")
     print(f"Phone: {result['phone']}")
     print(f"GitHub: {result['github']}")
@@ -171,4 +210,5 @@ if __name__ == "__main__":
 
     print("\n──── PROJECTS ────")
     for proj in result["projects"]:
-        print(f"  {proj}")
+        print(f"  Title: {proj['title']}")
+        print(f"  Description: {proj['description']}\n")
