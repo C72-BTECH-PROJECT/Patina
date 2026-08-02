@@ -2,11 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Building2, Zap, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 // GitHub Icon SVG Component
 const GithubIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
     <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+  </svg>
+);
+
+// Google Icon SVG Component
+const GoogleIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M21.35 11.1H12v2.96h5.38c-.23 1.49-1.75 4.38-5.38 4.38-3.24 0-5.88-2.68-5.88-5.98s2.64-5.98 5.88-5.98c1.85 0 3.08.79 3.79 1.47l2.58-2.5C16.72 3.9 14.58 3 12 3 7.03 3 3 7.03 3 12s4.03 9 9 9c5.19 0 8.63-3.65 8.63-8.79 0-.59-.06-1.04-.14-1.49Z"
+      fill="#fff"
+    />
   </svg>
 );
 
@@ -64,7 +75,6 @@ function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isLogin, setIsLogin] = useState(true);
-  const [showSignupFields, setShowSignupFields] = useState(false);
 
   // Form states
   const [email, setEmail] = useState('');
@@ -73,26 +83,34 @@ function Login() {
   const [companyName, setCompanyName] = useState('');
   const [verificationInfo, setVerificationInfo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login: loginWithSession, refreshUser, authFetch } = useAuth();
 
   const isRecruiter = role === 'recruiter';
 
   // Handle GitHub OAuth callback
   useEffect(() => {
     const githubSuccess = searchParams.get('github_success');
+    const googleSuccess = searchParams.get('google_success');
     const userId = searchParams.get('user_id');
 
-    if (githubSuccess === 'true' && userId) {
-      if (isRecruiter) {
-        navigate('/recruiter/dashboard');
-      } else {
-        navigate('/candidate/upload');
-      }
+    if ((githubSuccess === 'true' || googleSuccess === 'true') && userId) {
+      refreshUser().finally(() => {
+        if (isRecruiter) {
+          navigate('/recruiter/dashboard');
+        } else {
+          navigate('/candidate/upload');
+        }
+      });
     }
-  }, [searchParams, isRecruiter, navigate]);
+  }, [searchParams, isRecruiter, navigate, refreshUser]);
 
   // Handle GitHub OAuth redirect
   const handleGithubLogin = () => {
     window.location.href = `http://localhost:5001/api/auth/github?role=${role}`;
+  };
+
+  const handleGoogleLogin = () => {
+    window.location.href = `http://localhost:5001/api/auth/google?role=${role}`;
   };
 
   const handleSubmit = async (e) => {
@@ -112,19 +130,25 @@ function Login() {
         }
       }
 
-      const res = await fetch(`http://localhost:5001/api/auth/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      if (isLogin) {
+        await loginWithSession(payload);
+      } else {
+        const res = await authFetch(`http://localhost:5001/api/auth/${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (!res.ok) {
-        alert(data.message || 'Error occurred');
-        setIsSubmitting(false);
-        return;
+        if (!res.ok) {
+          alert(data.message || 'Error occurred');
+          setIsSubmitting(false);
+          return;
+        }
       }
+
+      await refreshUser();
 
       if (isRecruiter) {
         navigate('/recruiter/dashboard');
@@ -132,7 +156,7 @@ function Login() {
         navigate('/candidate/upload');
       }
     } catch (err) {
-      alert('Failed to connect to server');
+      alert(err.message || 'Failed to connect to server');
       console.error(err);
       setIsSubmitting(false);
     }
@@ -154,7 +178,6 @@ function Login() {
 
   const toggleMode = () => {
     setIsLogin(!isLogin);
-    setShowSignupFields(!isLogin);
   };
 
   return (
@@ -354,6 +377,17 @@ function Login() {
             >
               <GithubIcon className="w-5 h-5" />
               Continue with GitHub
+            </motion.button>
+
+            <motion.button
+              type="button"
+              onClick={handleGoogleLogin}
+              className="mt-4 w-full py-4 rounded-xl font-semibold text-base relative overflow-hidden bg-[#4285F4]/80 hover:bg-[#4285F4] text-white border border-white/10 transition-all flex items-center justify-center gap-3"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <GoogleIcon className="w-5 h-5" />
+              Continue with Google
             </motion.button>
 
             {/* Toggle Mode */}

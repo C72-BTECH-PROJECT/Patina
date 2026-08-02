@@ -1,10 +1,20 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle, AlertCircle, Briefcase, Users, Zap, Edit2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Briefcase, Users, Edit2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
-function RecruiterProfileCard({ recruiter }) {
-  if (!recruiter) return null;
+function RecruiterProfileCard() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="text-white/60">Loading profile...</div>;
+  }
+
+  if (!user || user.role !== 'recruiter') {
+    return <div className="text-white/60">Recruiter profile is unavailable.</div>;
+  }
+
+  const recruiter = user;
 
   return (
     <div className="glass-card p-8 relative overflow-hidden">

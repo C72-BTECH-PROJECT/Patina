@@ -4,6 +4,8 @@ export const candidates = [
     name: "Rohit Sharma",
     email: "rohit@gmail.com",
     password: "123456",
+    googleId: null,
+    githubId: null,
     location: "Mumbai, India",
   },
   {
@@ -11,6 +13,8 @@ export const candidates = [
     name: "Priya Patel",
     email: "priya@gmail.com",
     password: "123456",
+    googleId: null,
+    githubId: null,
     location: "Ahmedabad, India",
   },
   {
@@ -18,6 +22,8 @@ export const candidates = [
     name: "Arjun Mehta",
     email: "arjun@gmail.com",
     password: "123456",
+    googleId: null,
+    githubId: null,
     location: "Delhi, India",
   },
   {
@@ -25,6 +31,8 @@ export const candidates = [
     name: "Sneha Iyer",
     email: "sneha@gmail.com",
     password: "123456",
+    googleId: null,
+    githubId: null,
     location: "Bangalore, India",
   },
   {
@@ -32,6 +40,8 @@ export const candidates = [
     name: "Karan Singh",
     email: "karan@gmail.com",
     password: "123456",
+    googleId: null,
+    githubId: null,
     location: "Pune, India",
   },
 ];

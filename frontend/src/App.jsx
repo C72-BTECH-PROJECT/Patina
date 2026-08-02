@@ -10,6 +10,9 @@ import Login from './pages/Login';
 import Upload from './pages/Upload';
 import Processing from './pages/Processing';
 import CandidateDashboard from './pages/Dashboard';
+import CandidateLayout from './pages/candidate/layout/CandidateLayout';
+import CandidateProfile from './pages/candidate/CandidateProfile';
+import CandidateJobs from './pages/candidate/CandidateJobs';
 
 // recruiter flow
 import RecruiterLayout from './Recruiter/layout/RecruiterLayout';
@@ -18,40 +21,46 @@ import RecruiterDashboard from './Recruiter/Dashboard';
 import Jobs from './Recruiter/Jobs';
 import JobDetails from './Recruiter/JobDetails';
 import CreateJob from './Recruiter/CreateJob';
-import { recruiters } from './Recruiter/data/mockData';
+import { AuthProvider } from './context/AuthContext';
 
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen">
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen">
 
-        <Routes>
+          <Routes>
 
-          {/* 🌐 COMMON */}
-          <Route path="/" element={<Landing />} />
-          <Route path="/select-role" element={<RoleSelection />} />
-          <Route path="/login/:role" element={<Login />} />
+            {/* 🌐 COMMON */}
+            <Route path="/" element={<Landing />} />
+            <Route path="/select-role" element={<RoleSelection />} />
+            <Route path="/login/:role" element={<Login />} />
 
-          {/* 👤 CANDIDATE FLOW */}
-          <Route path="/candidate/upload" element={<Upload />} />
-          <Route path="/candidate/processing" element={<Processing />} />
-          <Route path="/candidate/dashboard" element={<CandidateDashboard />} />
+            {/* 👤 CANDIDATE FLOW */}
+            <Route path="/candidate/upload" element={<Upload />} />
+            <Route path="/candidate/processing" element={<Processing />} />
+            <Route path="/candidate" element={<CandidateLayout />}>
+              <Route path="dashboard" element={<CandidateDashboard />} />
+              <Route path="jobs" element={<CandidateJobs />} />
+              <Route path="profile" element={<CandidateProfile />} />
+            </Route>
 
-          {/* 🧑‍💼 RECRUITER FLOW (WITH LAYOUT) */}
-          <Route path="/recruiter" element={<RecruiterLayout />}>
+            {/* 🧑‍💼 RECRUITER FLOW (WITH LAYOUT) */}
+            <Route path="/recruiter" element={<RecruiterLayout />}>
 
-            <Route path="profile" element={<Profile recruiter={recruiters[0]} />} />
-            <Route path="dashboard" element={<RecruiterDashboard />} />
-            <Route path="jobs" element={<Jobs />} />
-            <Route path="jobs/:id" element={<JobDetails />} />
-            <Route path="create-job" element={<CreateJob />} />
+              <Route path="profile" element={<Profile />} />
+              <Route path="dashboard" element={<RecruiterDashboard />} />
+              <Route path="jobs" element={<Jobs />} />
+              <Route path="jobs/:id" element={<JobDetails />} />
+              <Route path="create-job" element={<CreateJob />} />
 
-          </Route>
+            </Route>
 
-        </Routes>
+          </Routes>
 
-      </div>
-    </Router>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 
