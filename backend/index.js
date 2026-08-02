@@ -12,10 +12,12 @@ import passport from './Config/passport.js';
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 app.use(session({
