@@ -14,19 +14,20 @@ const pool = new Pool({
 
 const initializeDatabase = async () => {
   const queryText = `
-    CREATE TABLE IF NOT EXISTS users (
+    CREATE TABLE users (
       id SERIAL PRIMARY KEY,
       name VARCHAR(100),
       email VARCHAR(100) UNIQUE NOT NULL,
       password VARCHAR(255),
       google_id VARCHAR(100) UNIQUE,
+      github_id VARCHAR(100) UNIQUE,
+      role VARCHAR(20) NOT NULL DEFAULT 'CANDIDATE',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS github_id VARCHAR(100) UNIQUE;
   `;
   try {
     await pool.query(queryText);
-    console.log('[PostgreSQL] Users table initialized successfully');
+    console.log('[PostgreSQL] Unified users table initialized successfully');
   } catch (error) {
     console.error('[PostgreSQL] Error initializing database:', error);
   }

@@ -11,15 +11,6 @@ const GithubIcon = ({ className }) => (
   </svg>
 );
 
-// Google Icon SVG Component
-const GoogleIcon = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      d="M21.35 11.1H12v2.96h5.38c-.23 1.49-1.75 4.38-5.38 4.38-3.24 0-5.88-2.68-5.88-5.98s2.64-5.98 5.88-5.98c1.85 0 3.08.79 3.79 1.47l2.58-2.5C16.72 3.9 14.58 3 12 3 7.03 3 3 7.03 3 12s4.03 9 9 9c5.19 0 8.63-3.65 8.63-8.79 0-.59-.06-1.04-.14-1.49Z"
-      fill="#fff"
-    />
-  </svg>
-);
 
 // Glow Orb Component
 const GlowOrb = ({ className }) => (
@@ -49,7 +40,6 @@ const AnimatedInput = ({ icon: Icon, label, type = 'text', value, onChange, plac
           value={value}
           onChange={onChange}
           placeholder={placeholder}
-          autoComplete={type === 'password' ? 'current-password' : type === 'email' ? 'email' : 'off'}
           autoComplete={type === 'password' ? 'current-password' : type === 'email' ? 'email' : 'off'}
           className="w-full px-5 py-4 pl-12 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all [&::-webkit-autofill]:text-white [&::-webkit-autofill]::selection:text-white"
         />
@@ -112,10 +102,6 @@ function Login() {
   // Handle GitHub OAuth redirect
   const handleGithubLogin = () => {
     window.location.href = `http://localhost:5001/api/auth/github?role=${role}`;
-  };
-
-  const handleGoogleLogin = () => {
-    window.location.href = `http://localhost:5001/api/auth/google?role=${role}`;
   };
 
   const handleSubmit = async (e) => {
@@ -401,17 +387,6 @@ function Login() {
                 Continue with GitHub
               </motion.button>
             </div>
-
-            <motion.button
-              type="button"
-              onClick={handleGoogleLogin}
-              className="mt-4 w-full py-4 rounded-xl font-semibold text-base relative overflow-hidden bg-[#4285F4]/80 hover:bg-[#4285F4] text-white border border-white/10 transition-all flex items-center justify-center gap-3"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <GoogleIcon className="w-5 h-5" />
-              Continue with Google
-            </motion.button>
 
             {/* Toggle Mode */}
             <div className="mt-8 text-center text-sm text-white/50">
