@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Building2, Zap, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
 
 // GitHub Icon SVG Component
 const GithubIcon = ({ className }) => (
@@ -9,6 +12,7 @@ const GithubIcon = ({ className }) => (
     <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
   </svg>
 );
+
 
 // Glow Orb Component
 const GlowOrb = ({ className }) => (
@@ -39,7 +43,6 @@ const AnimatedInput = ({ icon: Icon, label, type = 'text', value, onChange, plac
           onChange={onChange}
           placeholder={placeholder}
           autoComplete={type === 'password' ? 'current-password' : type === 'email' ? 'email' : 'off'}
-          style={{ WebkitBoxShadow: '0 0 0 1000px #0a0a0f inset', color: 'white' }}
           className="w-full px-5 py-4 pl-12 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all [&::-webkit-autofill]:text-white [&::-webkit-autofill]::selection:text-white"
         />
         <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
@@ -64,7 +67,6 @@ function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isLogin, setIsLogin] = useState(true);
-  const [showSignupFields, setShowSignupFields] = useState(false);
 
   // Form states
   const [email, setEmail] = useState('');
@@ -73,26 +75,43 @@ function Login() {
   const [companyName, setCompanyName] = useState('');
   const [verificationInfo, setVerificationInfo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login: loginWithSession, refreshUser, authFetch, user, loading: authLoading } = useAuth();
 
   const isRecruiter = role === 'recruiter';
+
+  // Where to send someone once they're authenticated, regardless of
+  // whether they arrived via local login, signup, or OAuth.
+  const getDashboardPath = (userRole) =>
+    userRole === 'RECRUITER' ? '/recruiter/dashboard' : '/candidate/dashboard';
+
+  // Already logged in? Skip the form entirely instead of showing it again.
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(getDashboardPath(user.role), { replace: true });
+    }
+  }, [authLoading, user, navigate]);
 
   // Handle GitHub OAuth callback
   useEffect(() => {
     const githubSuccess = searchParams.get('github_success');
+    const googleSuccess = searchParams.get('google_success');
     const userId = searchParams.get('user_id');
 
-    if (githubSuccess === 'true' && userId) {
-      if (isRecruiter) {
-        navigate('/recruiter/dashboard');
-      } else {
-        navigate('/candidate/upload');
-      }
+    if ((githubSuccess === 'true' || googleSuccess === 'true') && userId) {
+      refreshUser().finally(() => {
+        navigate(getDashboardPath(isRecruiter ? 'RECRUITER' : 'CANDIDATE'));
+      });
     }
-  }, [searchParams, isRecruiter, navigate]);
+  }, [searchParams, isRecruiter, navigate, refreshUser]);
+
+  // Handle Google OAuth redirect
+  const handleGoogleLogin = () => {
+    window.location.href = `${API_BASE_URL}/api/auth/google?role=${encodeURIComponent(role)}`;
+  };
 
   // Handle GitHub OAuth redirect
   const handleGithubLogin = () => {
-    window.location.href = `http://localhost:5001/api/auth/github?role=${role}`;
+    window.location.href = `${API_BASE_URL}/api/auth/github?role=${encodeURIComponent(role)}`;
   };
 
   const handleSubmit = async (e) => {
@@ -112,27 +131,28 @@ function Login() {
         }
       }
 
-      const res = await fetch(`http://localhost:5001/api/auth/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.message || 'Error occurred');
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (isRecruiter) {
-        navigate('/recruiter/dashboard');
+      if (isLogin) {
+        await loginWithSession(payload);
       } else {
-        navigate('/candidate/upload');
+        const res = await authFetch(`${API_BASE_URL}/api/auth/${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.message || 'Error occurred');
+          setIsSubmitting(false);
+          return;
+        }
       }
+
+      await refreshUser();
+      navigate(getDashboardPath(isRecruiter ? 'RECRUITER' : 'CANDIDATE'));
     } catch (err) {
-      alert('Failed to connect to server');
+      alert(err.message || 'Failed to connect to server');
       console.error(err);
       setIsSubmitting(false);
     }
@@ -154,7 +174,6 @@ function Login() {
 
   const toggleMode = () => {
     setIsLogin(!isLogin);
-    setShowSignupFields(!isLogin);
   };
 
   return (
@@ -344,17 +363,35 @@ function Login() {
               <div className="flex-1 h-px bg-white/10" />
             </div>
 
-            {/* GitHub OAuth Button */}
-            <motion.button
-              type="button"
-              onClick={handleGithubLogin}
-              className="mt-6 w-full py-4 rounded-xl font-semibold text-base relative overflow-hidden bg-[#24292e]/80 hover:bg-[#2d333b] text-white border border-white/10 transition-all flex items-center justify-center gap-3"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <GithubIcon className="w-5 h-5" />
-              Continue with GitHub
-            </motion.button>
+            {/* OAuth Buttons */}
+            <div className="mt-6 space-y-3">
+              <motion.button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="w-full py-4 rounded-xl font-semibold text-base relative overflow-hidden bg-white hover:bg-gray-100 text-black border border-white/10 transition-all flex items-center justify-center gap-3"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Continue with Google
+              </motion.button>
+
+              <motion.button
+                type="button"
+                onClick={handleGithubLogin}
+                className="w-full py-4 rounded-xl font-semibold text-base relative overflow-hidden bg-[#24292e]/80 hover:bg-[#2d333b] text-white border border-white/10 transition-all flex items-center justify-center gap-3"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <GithubIcon className="w-5 h-5" />
+                Continue with GitHub
+              </motion.button>
+            </div>
 
             {/* Toggle Mode */}
             <div className="mt-8 text-center text-sm text-white/50">

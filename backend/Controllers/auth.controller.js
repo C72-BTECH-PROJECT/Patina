@@ -1,160 +1,155 @@
-import { candidates } from "../Config/Candidate.js";
-import { recruiters } from "../Config/Recruiter.js";
+import crypto from "crypto";
+import pool from '../config/pg.js';
+import bcrypt from 'bcrypt';
+import passport from "passport";
 
-// GitHub OAuth Config
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || "your_github_client_id";
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "your_github_client_secret";
-const CALLBACK_URL = "http://localhost:5001/api/auth/github/callback";
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "your_google_client_id";
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "your_google_client_secret";
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5001";
+const GITHUB_CALLBACK_URL = `${BACKEND_URL}/api/auth/github/callback`;
+const GOOGLE_CALLBACK_URL = `${BACKEND_URL}/api/auth/google/callback`;
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
-// LOGIN
-export const login = (req, res) => {
-  const { role, email, password } = req.body;
+const SESSION_COOKIE_NAME = "patina_session";
 
-  let user = null;
+// Helper to ensure unified users table exists
+export const initAuthTables = async () => {
+  const createUsersTable = `
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255),
+      role VARCHAR(20) NOT NULL DEFAULT 'CANDIDATE' CHECK (role IN ('CANDIDATE', 'RECRUITER')),
+      google_id VARCHAR(255) UNIQUE,
+      github_id VARCHAR(255) UNIQUE,
+      github_access_token TEXT,
+      company_name VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
 
-  if (role === "candidate") {
-    user = candidates.find(c => c.email === email && c.password === password);
-  } else if (role === "recruiter") {
-    user = recruiters.find(r => r.email === email && r.password === password);
-  } else {
-    user = candidates.find(c => c.email === email && c.password === password) ||
-           recruiters.find(r => r.email === email && r.password === password);
+  try {
+    await pool.query(createUsersTable);
+  } catch (err) {
+    console.error("Error initializing users table:", err);
   }
-
-  if (!user) {
-    return res.status(401).json({ message: "Invalid credentials" });
-  }
-
-  const detectedRole = candidates.includes(user) ? "candidate" : "recruiter";
-
-  res.json({ message: "Login successful", user, role: detectedRole });
 };
 
-// SIGNUP
-export const signup = (req, res) => {
-  const { role, ...data } = req.body;
+// Initialize table on startup
+initAuthTables();
 
-  if (role === "candidate") {
-    candidates.push({
-      _id: `cand${candidates.length + 1}`,
-      ...data
+// Helper to remove sensitive fields
+const sanitizeUser = (user) => {
+  if (!user) return null;
+  const { password, github_access_token, ...safeUser } = user;
+  return safeUser;
+};
+
+const ALLOWED_ROLES = ["CANDIDATE", "RECRUITER"];
+
+// 1. Get Logged-in Session User (/api/auth/me)
+export const me = async (req, res) => {
+  if (!req.isAuthenticated || !req.isAuthenticated()) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+
+  return res.status(200).json({
+    user: sanitizeUser(req.user),
+  });
+};
+
+// 2. Logout (/api/auth/logout)
+export const logout = (req, res, next) => {
+  req.logout((err) => {
+    if (err) return next(err);
+    req.session.destroy((sessionErr) => {
+      if (sessionErr) {
+        return res.status(500).json({ message: "Could not log out session" });
+      }
+      res.clearCookie("patina_session");
+      return res.status(200).json({ message: "Logged out successfully" });
     });
-  } else if (role === "recruiter") {
-    recruiters.push({
-      _id: `rec${recruiters.length + 1}`,
-      ...data,
-      isVerified: data.isVerified || false
-    });
-  } else {
-     return res.status(400).json({ message: "Role is required" });
+  });
+};
+
+// 3. Local Registration (/api/auth/signup)
+export const signup = async (req, res) => {
+  const { role, email, password, name, companyName } = req.body;
+
+  if (!email || !password || !name) {
+    return res.status(400).json({ message: "Name, email, and password are required" });
   }
 
-  res.status(201).json({ message: "Signup successful" });
-};
+  const formattedRole = role ? role.toUpperCase() : "CANDIDATE";
 
-// GITHUB AUTH - Redirect to GitHub OAuth
-export const githubAuth = (req, res) => {
-  const scope = "read:user user:email";
-  const state = req.query.role || "candidate"; // Pass role through OAuth flow
-
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=${scope}&state=${state}`;
-
-  res.redirect(githubAuthUrl);
-};
-
-// GITHUB CALLBACK - Handle OAuth callback
-export const githubCallback = async (req, res) => {
-  const { code, state } = req.query;
-  const role = state || "candidate";
-
-  if (!code) {
-    return res.redirect("http://localhost:3000/login/candidate?error=no_code");
+  if (!ALLOWED_ROLES.includes(formattedRole)) {
+    return res.status(400).json({ message: "Invalid role" });
   }
 
   try {
-    // Exchange code for access token
-    const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json"
-      },
-      body: JSON.stringify({
-        client_id: GITHUB_CLIENT_ID,
-        client_secret: GITHUB_CLIENT_SECRET,
-        code
-      })
-    });
+    // Check existing email
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [email]
+    );
 
-    const tokenData = await tokenResponse.json();
-
-    if (tokenData.error) {
-      console.error("GitHub token error:", tokenData.error);
-      return res.redirect("http://localhost:3000/login/candidate?error=token_exchange_failed");
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({ message: "Account already exists with this email" });
     }
 
-    const accessToken = tokenData.access_token;
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Get user info from GitHub
-    const userResponse = await fetch("https://api.github.com/user", {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/json"
+    // Insert user
+    const newUser = await pool.query(
+      `INSERT INTO users (name, email, password, role, company_name) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING id, name, email, role, company_name, created_at`,
+      [name, email, hashedPassword, formattedRole, companyName || null]
+    );
+
+    const createdUser = newUser.rows[0];
+
+    // Establish session immediately
+    req.login(createdUser, (err) => {
+      if (err) {
+        return res.status(500).json({ message: "Account created, but failed to establish session" });
       }
+      return res.status(201).json({
+        message: "Signup successful",
+        user: sanitizeUser(createdUser),
+      });
     });
-
-    const githubUser = await userResponse.json();
-
-    // Get user emails
-    const emailsResponse = await fetch("https://api.github.com/user/emails", {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/json"
-      }
-    });
-
-    const emails = await emailsResponse.json();
-    const primaryEmail = emails.find(e => e.primary) || emails[0];
-
-    // Find or create user
-    let user = null;
-
-    if (role === "candidate") {
-      user = candidates.find(c => c.githubId === githubUser.id || c.email === primaryEmail?.email);
-
-      if (!user) {
-        user = {
-          _id: `cand${candidates.length + 1}`,
-          name: githubUser.name || githubUser.login,
-          email: primaryEmail?.email || `${githubUser.login}@github.nomail`,
-          githubId: githubUser.id,
-          avatar: githubUser.avatar_url,
-          githubUsername: githubUser.login
-        };
-        candidates.push(user);
-      }
-    } else {
-      user = recruiters.find(r => r.githubId === githubUser.id || r.email === primaryEmail?.email);
-
-      if (!user) {
-        user = {
-          _id: `rec${recruiters.length + 1}`,
-          name: githubUser.name || githubUser.login,
-          email: primaryEmail?.email || `${githubUser.login}@github.nomail`,
-          githubId: githubUser.id,
-          avatar: githubUser.avatar_url,
-          githubUsername: githubUser.login,
-          isVerified: false
-        };
-        recruiters.push(user);
-      }
-    }
-
-    // Redirect to frontend with success
-    res.redirect(`http://localhost:3000/login/${role}?github_success=true&user_id=${user._id}`);
-
-  } catch (error) {
-    console.error("GitHub OAuth error:", error);
-    res.redirect("http://localhost:3000/login/candidate?error=oauth_failed");
+  } catch (err) {
+    console.error("Signup error:", err);
+    return res.status(500).json({ message: "Internal server error during signup" });
   }
+};
+
+// 4. Local Login (/api/auth/login)
+export const login = (req, res, next) => {
+  passport.authenticate("local", (err, user, info) => {
+    if (err) {
+      return res.status(500).json({ message: "Internal server error during login" });
+    }
+
+    if (!user) {
+      return res.status(401).json({ message: info?.message || "Invalid credentials" });
+    }
+
+    req.login(user, (loginErr) => {
+      if (loginErr) {
+        return res.status(500).json({ message: "Failed to establish login session" });
+      }
+
+      return res.status(200).json({
+        message: "Login successful",
+        user: sanitizeUser(user),
+      });
+    });
+  })(req, res, next);
 };

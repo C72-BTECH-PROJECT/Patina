@@ -2,10 +2,11 @@ import mongoose from "mongoose";
 
 const candidateSchema = new mongoose.Schema(
   {
-    name: String,
-    email: String,
-    password: String,
-
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true, trim: true, lowercase: true },
+    password: { type: String, default: "" },
+    googleId: { type: String, default: null },
+    githubId: { type: String, default: null },
     location: String,
   },
   { timestamps: true }
