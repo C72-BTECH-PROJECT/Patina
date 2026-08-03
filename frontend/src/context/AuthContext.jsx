@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 const AuthContext = createContext(null);
-const API_BASE_URL = "http://localhost:5001";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
 
 const withCredentialsFetch = async (input, init = {}) => {
   const mergedInit = { ...init };
@@ -21,11 +21,18 @@ export function AuthProvider({ children }) {
     }
 
     const originalFetch = window.fetch.bind(window);
-    window.fetch = (input, init = {}) =>
-      originalFetch(input, {
-        credentials: "include",
-        ...init,
-      });
+    window.fetch = (input, init = {}) => {
+      const url = typeof input === "string" ? input : input?.url || "";
+      // Only force credentials on requests to our own API. Patching every
+      // fetch call app-wide would also attach credentials to third-party
+      // requests, which breaks outright for any API using
+      // Access-Control-Allow-Origin: "*" (incompatible with credentialed
+      // requests per the CORS spec — the browser rejects the response).
+      if (url.startsWith(API_BASE_URL)) {
+        return originalFetch(input, { credentials: "include", ...init });
+      }
+      return originalFetch(input, init);
+    };
     window.__patinaFetchWrapped = true;
   }, []);
 
@@ -84,8 +91,14 @@ export function AuthProvider({ children }) {
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.message || "Logout failed");
+      let message = "Logout failed";
+      try {
+        const data = await response.json();
+        message = data.message || message;
+      } catch {
+        // Response had no JSON body — keep the default message.
+      }
+      throw new Error(message);
     }
 
     setUser(null);

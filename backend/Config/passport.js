@@ -8,6 +8,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5001";
+const ALLOWED_ROLES = ["CANDIDATE", "RECRUITER"];
+
+// The role the user picked (candidate/recruiter) travels through OAuth as
+// the `state` query param set in auth.routes.js. Only used on first signup;
+// existing users keep whatever role they already have.
+function roleFromState(req) {
+  try {
+    const role = (JSON.parse(req.query.state || "{}").role || "candidate").toUpperCase();
+    return ALLOWED_ROLES.includes(role) ? role : "CANDIDATE";
+  } catch {
+    return "CANDIDATE";
+  }
+}
+
 // Serialize user
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -63,9 +78,10 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: '/api/auth/google/callback',
+      callbackURL: `${BACKEND_URL}/api/auth/google/callback`,
+      passReqToCallback: true,
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
         const email = profile.emails[0].value;
         const googleId = profile.id;
@@ -86,10 +102,11 @@ passport.use(
           }
           return done(null, user);
         } else {
-          // Create new user
+          // Create new user with the role they picked before starting OAuth
+          const role = roleFromState(req);
           const insertRes = await pool.query(
-            'INSERT INTO users (name, email, google_id) VALUES ($1, $2, $3) RETURNING *',
-            [name, email, googleId]
+            'INSERT INTO users (name, email, google_id, role) VALUES ($1, $2, $3, $4) RETURNING *',
+            [name, email, googleId, role]
           );
           return done(null, insertRes.rows[0]);
         }
@@ -106,9 +123,10 @@ passport.use(
     {
       clientID: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: '/api/auth/github/callback',
+      callbackURL: `${BACKEND_URL}/api/auth/github/callback`,
+      passReqToCallback: true,
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
         // GitHub might not return an email if it's private, but passport-github2 with user:email scope attempts to get it
         const email = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : `${profile.username}@github.nomail`;
@@ -129,10 +147,12 @@ passport.use(
           }
           return done(null, user);
         } else {
-          // Create new user
+          // Create new user, storing the OAuth access token and the role
+          // they picked before starting the flow
+          const role = roleFromState(req);
           const insertRes = await pool.query(
-            'INSERT INTO users (name, email, github_id) VALUES ($1, $2, $3) RETURNING *',
-            [name, email, githubId]
+            'INSERT INTO users (name, email, github_id, github_access_token, role) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [name, email, githubId, accessToken, role]
           );
           return done(null, insertRes.rows[0]);
         }

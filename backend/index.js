@@ -7,10 +7,19 @@ import analysisRoutes from './Routes/analysis.routes.js';
 import parseRoutes from './Routes/parse.routes.js';
 
 import session from 'express-session';
+import pgSessionFactory from 'connect-pg-simple';
 import passport from './Config/passport.js';
+import pool from './Config/pg.js';
+
+const pgSession = pgSessionFactory(session);
 
 const app = express();
 const PORT = process.env.PORT || 5001;
+
+if (!process.env.SESSION_SECRET) {
+  console.error('Missing SESSION_SECRET in environment. Refusing to start.');
+  process.exit(1);
+}
 
 app.use(
   cors({
@@ -21,10 +30,17 @@ app.use(
 app.use(express.json());
 
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'supersecret',
+  store: new pgSession({ pool, tableName: 'session' }),
+  name: 'patina_session', // must match res.clearCookie("patina_session") in auth.controller.js logout
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 1 day
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000, // 1 day
+  },
 }));
 
 app.use(passport.initialize());

@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Building2, Zap, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
+
 // GitHub Icon SVG Component
 const GithubIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -73,9 +75,21 @@ function Login() {
   const [companyName, setCompanyName] = useState('');
   const [verificationInfo, setVerificationInfo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login: loginWithSession, refreshUser, authFetch } = useAuth();
+  const { login: loginWithSession, refreshUser, authFetch, user, loading: authLoading } = useAuth();
 
   const isRecruiter = role === 'recruiter';
+
+  // Where to send someone once they're authenticated, regardless of
+  // whether they arrived via local login, signup, or OAuth.
+  const getDashboardPath = (userRole) =>
+    userRole === 'RECRUITER' ? '/recruiter/dashboard' : '/candidate/dashboard';
+
+  // Already logged in? Skip the form entirely instead of showing it again.
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(getDashboardPath(user.role), { replace: true });
+    }
+  }, [authLoading, user, navigate]);
 
   // Handle GitHub OAuth callback
   useEffect(() => {
@@ -85,23 +99,19 @@ function Login() {
 
     if ((githubSuccess === 'true' || googleSuccess === 'true') && userId) {
       refreshUser().finally(() => {
-        if (isRecruiter) {
-          navigate('/recruiter/dashboard');
-        } else {
-          navigate('/candidate/upload');
-        }
+        navigate(getDashboardPath(isRecruiter ? 'RECRUITER' : 'CANDIDATE'));
       });
     }
   }, [searchParams, isRecruiter, navigate, refreshUser]);
 
   // Handle Google OAuth redirect
   const handleGoogleLogin = () => {
-    window.location.href = `http://localhost:5001/api/auth/google?role=${role}`;
+    window.location.href = `${API_BASE_URL}/api/auth/google?role=${encodeURIComponent(role)}`;
   };
 
   // Handle GitHub OAuth redirect
   const handleGithubLogin = () => {
-    window.location.href = `http://localhost:5001/api/auth/github?role=${role}`;
+    window.location.href = `${API_BASE_URL}/api/auth/github?role=${encodeURIComponent(role)}`;
   };
 
   const handleSubmit = async (e) => {
@@ -124,7 +134,7 @@ function Login() {
       if (isLogin) {
         await loginWithSession(payload);
       } else {
-        const res = await authFetch(`http://localhost:5001/api/auth/${endpoint}`, {
+        const res = await authFetch(`${API_BASE_URL}/api/auth/${endpoint}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -140,12 +150,7 @@ function Login() {
       }
 
       await refreshUser();
-
-      if (isRecruiter) {
-        navigate('/recruiter/dashboard');
-      } else {
-        navigate('/candidate/upload');
-      }
+      navigate(getDashboardPath(isRecruiter ? 'RECRUITER' : 'CANDIDATE'));
     } catch (err) {
       alert(err.message || 'Failed to connect to server');
       console.error(err);

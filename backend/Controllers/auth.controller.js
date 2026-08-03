@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import pool from '../config/pg.js';
 import bcrypt from 'bcrypt';
+import passport from "passport";
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || "your_github_client_id";
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "your_github_client_secret";
@@ -13,96 +14,142 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
 const SESSION_COOKIE_NAME = "patina_session";
 
-const isValidRole = (role) => role === "candidate" || role === "recruiter";
-const isOAuthConfigured = (clientId, clientSecret) =>
-  !String(clientId).startsWith("your_") && !String(clientSecret).startsWith("your_");
+// Helper to ensure unified users table exists
+export const initAuthTables = async () => {
+  const createUsersTable = `
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255),
+      role VARCHAR(20) NOT NULL DEFAULT 'CANDIDATE' CHECK (role IN ('CANDIDATE', 'RECRUITER')),
+      google_id VARCHAR(255) UNIQUE,
+      github_id VARCHAR(255) UNIQUE,
+      github_access_token TEXT,
+      company_name VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
 
-
-const getStoreByRole = (role) => roleStores[role]?.list || null;
-
-const sanitizeUser = (user, role) => {
-  const { password, ...safeUser } = user;
-  return { ...safeUser, role };
-};
-
-export const me = (req, res) => {
-  // Passport automatically populates req.user if the session cookie is valid
-  if (!req.user) {
-    return res.status(401).json({ message: "Unauthorized" });
+  try {
+    await pool.query(createUsersTable);
+  } catch (err) {
+    console.error("Error initializing users table:", err);
   }
-  
-  // Sanitize password before sending to frontend
-  const { password, ...safeUser } = req.user;
-  return res.json({ user: safeUser });
 };
 
+// Initialize table on startup
+initAuthTables();
+
+// Helper to remove sensitive fields
+const sanitizeUser = (user) => {
+  if (!user) return null;
+  const { password, github_access_token, ...safeUser } = user;
+  return safeUser;
+};
+
+const ALLOWED_ROLES = ["CANDIDATE", "RECRUITER"];
+
+// 1. Get Logged-in Session User (/api/auth/me)
+export const me = async (req, res) => {
+  if (!req.isAuthenticated || !req.isAuthenticated()) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+
+  return res.status(200).json({
+    user: sanitizeUser(req.user),
+  });
+};
+
+// 2. Logout (/api/auth/logout)
 export const logout = (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
-    // express-session handles clearing the cookie
-    res.json({ message: "Logged out successfully" });
+    req.session.destroy((sessionErr) => {
+      if (sessionErr) {
+        return res.status(500).json({ message: "Could not log out session" });
+      }
+      res.clearCookie("patina_session");
+      return res.status(200).json({ message: "Logged out successfully" });
+    });
   });
 };
 
-export const login = (req, res) => {
-  const { role, email, password } = req.body;
-
-  if (!isValidRole(role)) {
-    return res.status(400).json({ message: "Role must be candidate or recruiter" });
-  }
-
-  if (!email || !password) {
-    return res.status(400).json({ message: "Email and password are required" });
-  }
-
-  const store = getStoreByRole(role);
-  const user = store.find((entry) => entry.email === email && entry.password === password);
-  if (!user) {
-    return res.status(401).json({ message: "Invalid credentials for selected role" });
-  }
-
-  createSession(res, user._id, role);
-  return res.json({
-    message: "Login successful",
-    user: sanitizeUser(user, role),
-  });
-};
-
+// 3. Local Registration (/api/auth/signup)
 export const signup = async (req, res) => {
-  const { role, email, password, name } = req.body;
-  const upperRole = role ? role.toUpperCase() : 'CANDIDATE';
+  const { role, email, password, name, companyName } = req.body;
 
   if (!email || !password || !name) {
-    return res.status(400).json({ message: "Name, email and password are required" });
+    return res.status(400).json({ message: "Name, email, and password are required" });
+  }
+
+  const formattedRole = role ? role.toUpperCase() : "CANDIDATE";
+
+  if (!ALLOWED_ROLES.includes(formattedRole)) {
+    return res.status(400).json({ message: "Invalid role" });
   }
 
   try {
-    // 1. Check if user exists
-    const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (existing.rows.length > 0) {
+    // Check existing email
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
       return res.status(409).json({ message: "Account already exists with this email" });
     }
 
-    // 2. Hash password
+    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 3. Insert into PostgreSQL
+    // Insert user
     const newUser = await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
-      [name, email, hashedPassword, upperRole]
+      `INSERT INTO users (name, email, password, role, company_name) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING id, name, email, role, company_name, created_at`,
+      [name, email, hashedPassword, formattedRole, companyName || null]
     );
 
-    // 4. Log the user in immediately after signup using Passport
-    req.login(newUser.rows[0], (err) => {
-      if (err) return res.status(500).json({ message: "Error establishing session" });
+    const createdUser = newUser.rows[0];
+
+    // Establish session immediately
+    req.login(createdUser, (err) => {
+      if (err) {
+        return res.status(500).json({ message: "Account created, but failed to establish session" });
+      }
       return res.status(201).json({
         message: "Signup successful",
-        user: newUser.rows[0],
+        user: sanitizeUser(createdUser),
       });
     });
-  } catch (error) {
-    console.error("Signup Error:", error);
-    return res.status(500).json({ message: "Internal server error" });
+  } catch (err) {
+    console.error("Signup error:", err);
+    return res.status(500).json({ message: "Internal server error during signup" });
   }
+};
+
+// 4. Local Login (/api/auth/login)
+export const login = (req, res, next) => {
+  passport.authenticate("local", (err, user, info) => {
+    if (err) {
+      return res.status(500).json({ message: "Internal server error during login" });
+    }
+
+    if (!user) {
+      return res.status(401).json({ message: info?.message || "Invalid credentials" });
+    }
+
+    req.login(user, (loginErr) => {
+      if (loginErr) {
+        return res.status(500).json({ message: "Failed to establish login session" });
+      }
+
+      return res.status(200).json({
+        message: "Login successful",
+        user: sanitizeUser(user),
+      });
+    });
+  })(req, res, next);
 };

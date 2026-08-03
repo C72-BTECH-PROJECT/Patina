@@ -4,6 +4,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// This file only owns the connection pool.
+// Table creation lives in auth.controller.js (initAuthTables) so there is
+// a single source of truth for the schema instead of two competing
+// CREATE TABLE statements racing on import.
 const pool = new Pool({
   user: process.env.PG_USER,
   host: process.env.PG_HOST,
@@ -11,28 +15,5 @@ const pool = new Pool({
   password: process.env.PG_PASSWORD,
   port: process.env.PG_PORT || 5432,
 });
-
-const initializeDatabase = async () => {
-  const queryText = `
-    CREATE TABLE users (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(100),
-      email VARCHAR(100) UNIQUE NOT NULL,
-      password VARCHAR(255),
-      google_id VARCHAR(100) UNIQUE,
-      github_id VARCHAR(100) UNIQUE,
-      role VARCHAR(20) NOT NULL DEFAULT 'CANDIDATE',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `;
-  try {
-    await pool.query(queryText);
-    console.log('[PostgreSQL] Unified users table initialized successfully');
-  } catch (error) {
-    console.error('[PostgreSQL] Error initializing database:', error);
-  }
-};
-
-initializeDatabase();
 
 export default pool;
