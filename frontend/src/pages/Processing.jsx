@@ -274,7 +274,7 @@ function Processing() {
         form.append('resume', file);
         form.append('jobId', String(jobId));
 
-        const resp = await fetch('http://localhost:5001/api/analyze', {
+        const resp = await fetch('http://localhost:5000/api/analyze', {
           method: 'POST',
           body: form,
         });

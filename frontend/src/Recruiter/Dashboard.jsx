@@ -214,7 +214,7 @@ function RecruiterDashboard() {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    fetch('http://localhost:5001/api/candidates')
+    fetch('http://localhost:5000/api/candidates')
       .then(res => res.json())
       .then(data => {
         // Map backend candidate schema to frontend expectation

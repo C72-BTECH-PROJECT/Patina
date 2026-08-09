@@ -266,7 +266,7 @@ function Dashboard() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch('http://localhost:5001/api/candidate-analysis')
+    fetch('http://localhost:5000/api/candidate-analysis')
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch candidate analysis');
         return res.json();
