@@ -378,7 +378,7 @@ const HeroSection = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
           >
-            <Link to="/select-role" className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl font-semibold overflow-hidden magnetic-btn">
+            <Link to="/login/candidate" className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl font-semibold overflow-hidden magnetic-btn">
               {/* Button Background */}
               <span className="absolute inset-0 bg-gradient-to-r from-accent-purple via-accent-cyan to-accent-purple bg-[length:200%_100%] animate-gradient-shift" />
               <span className="absolute inset-[2px] bg-background rounded-lg" />
@@ -565,7 +565,7 @@ function Landing() {
           </nav>
 
           <Link
-            to="/select-role"
+            to="/login/candidate"
             className="px-5 py-2.5 rounded-lg bg-white/5 border border-white/10 text-sm font-medium text-white hover:bg-white/10 transition-all"
           >
             Get Started

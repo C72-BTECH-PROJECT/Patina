@@ -35,6 +35,7 @@ function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/select-role" element={<RoleSelection />} />
             <Route path="/login/:role" element={<Login />} />
+            <Route path="/signup/:role" element={<Login />} />
 
             {/* 👤 CANDIDATE FLOW */}
             <Route path="/candidate/upload" element={<Upload />} />

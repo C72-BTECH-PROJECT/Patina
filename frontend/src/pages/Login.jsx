@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Building2, Zap, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -57,7 +57,10 @@ const AnimatedInput = ({ icon: Icon, label, type = 'text', value, onChange, plac
 function Login() {
   const { role } = useParams();
   const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(true);
+  const location = useLocation();
+  const isSignupPage = location.pathname.startsWith('/signup/');
+  const [isLogin, setIsLogin] = useState(!isSignupPage);
+  const [successMessage, setSuccessMessage] = useState(location.state?.message || '');
 
   // Form states
   const [email, setEmail] = useState('');
@@ -69,6 +72,11 @@ function Login() {
   const { login: loginWithSession, refreshUser, authFetch, user, loading: authLoading } = useAuth();
 
   const isRecruiter = role === 'recruiter';
+
+  useEffect(() => {
+    setIsLogin(!isSignupPage);
+    setSuccessMessage(location.state?.message || '');
+  }, [isSignupPage, location.state]);
 
   // Where to send someone once they're authenticated, regardless of
   // whether they arrived via local login, signup, or OAuth.
@@ -117,6 +125,17 @@ function Login() {
         }
       }
 
+      if (!isLogin) {
+        // Signup creates a session on the API, but this flow deliberately
+        // returns new users to sign in with their newly created account.
+        await authFetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST' });
+        navigate(`/login/${role}`, {
+          replace: true,
+          state: { message: 'Account created successfully. Please sign in to continue.' },
+        });
+        return;
+      }
+
       await refreshUser();
       navigate(getDashboardPath(isRecruiter ? 'RECRUITER' : 'CANDIDATE'));
     } catch (err) {
@@ -141,7 +160,7 @@ function Login() {
   };
 
   const toggleMode = () => {
-    setIsLogin(!isLogin);
+    navigate(`${isLogin ? '/signup/' : '/login/'}${role}`);
   };
 
   return (
@@ -203,6 +222,11 @@ function Login() {
                   ? `Sign in to your ${isRecruiter ? 'recruiter' : 'candidate'} account`
                   : `Sign up as a ${isRecruiter ? 'recruiter' : 'candidate'} to get started`}
               </p>
+              {successMessage && (
+                <p className="mt-4 rounded-lg border border-accent-emerald/30 bg-accent-emerald/10 px-3 py-2 text-sm text-accent-emerald">
+                  {successMessage}
+                </p>
+              )}
             </div>
 
             {/* Form */}
