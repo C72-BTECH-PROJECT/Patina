@@ -5,7 +5,7 @@ import { Briefcase, LayoutDashboard, User, Zap } from "lucide-react";
 
 function CandidateLayout() {
   const navItems = [
-    { to: "/candidate/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { to: "/candidate/dashboard", icon: LayoutDashboard, label: "About" },
     { to: "/candidate/jobs", icon: Briefcase, label: "Jobs" },
     { to: "/candidate/profile", icon: User, label: "Profile" },
   ];
