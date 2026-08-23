@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Briefcase, MapPin, Users, ChevronRight, Sparkles, Plus } from 'lucide-react';
-import { jobs, applications } from './data/mockData';
+import { jobs, applications } from '../../data/recruiter/mockData';
 
 // Glow Orb Component
 const GlowOrb = ({ className }) => (

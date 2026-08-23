@@ -2,25 +2,25 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 // common pages
-import Landing from './pages/Landing';
-import RoleSelection from './pages/RoleSelection';
-import Login from './pages/Login';
+import Landing from './pages/public/Landing';
+import RoleSelection from './pages/public/RoleSelection';
+import Login from './pages/public/Login';
 
 // candidate flow
-import Upload from './pages/Upload';
-import Processing from './pages/Processing';
-import CandidateDashboard from './pages/Dashboard';
-import CandidateLayout from './pages/candidate/layout/CandidateLayout';
+import Upload from './pages/candidate/Upload';
+import Processing from './pages/candidate/Processing';
+import CandidateDashboard from './pages/candidate/Dashboard';
+import CandidateLayout from './components/layouts/CandidateLayout';
 import CandidateProfile from './pages/candidate/CandidateProfile';
 import CandidateJobs from './pages/candidate/CandidateJobs';
 
 // recruiter flow
-import RecruiterLayout from './Recruiter/layout/RecruiterLayout';
-import Profile from './Recruiter/components/RecruiterProfileCard';
-import RecruiterDashboard from './Recruiter/Dashboard';
-import Jobs from './Recruiter/Jobs';
-import JobDetails from './Recruiter/JobDetails';
-import CreateJob from './Recruiter/CreateJob';
+import RecruiterLayout from './components/layouts/RecruiterLayout';
+import Profile from './pages/recruiter/Profile';
+import RecruiterDashboard from './pages/recruiter/Dashboard';
+import Jobs from './pages/recruiter/Jobs';
+import JobDetails from './pages/recruiter/JobDetails';
+import CreateJob from './pages/recruiter/CreateJob';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {

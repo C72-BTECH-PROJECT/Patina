@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Briefcase, MapPin, Filter, Users, ChevronRight, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { jobs, applications, candidates } from './data/mockData';
-import CandidateModal from './components/CandidateModal';
+import { jobs, applications, candidates } from '../../data/recruiter/mockData';
+import CandidateModal from '../../components/recruiter/CandidateModal';
 
 // Glow Orb Component
 const GlowOrb = ({ className }) => (
