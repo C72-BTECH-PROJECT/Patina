@@ -65,8 +65,9 @@ function Login() {
   // Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [verificationInfo, setVerificationInfo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login: loginWithSession, refreshUser, authFetch, user, loading: authLoading } = useAuth();
@@ -97,7 +98,7 @@ function Login() {
 
     try {
       const endpoint = isLogin ? 'login' : 'signup';
-      const payload = { role, email, password };
+      const payload = { role, email, password, username };
 
       if (!isLogin) {
         payload.name = name;
@@ -231,6 +232,16 @@ function Login() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
+              <AnimatedInput
+                icon={User}
+                label="Username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="johndoe"
+                required
+              />
+
               <AnimatePresence mode="wait">
                 {!isLogin && (
                   <motion.div
@@ -252,15 +263,17 @@ function Login() {
                 )}
               </AnimatePresence>
 
-              <AnimatedInput
-                icon={Mail}
-                label="Email Address"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-              />
+              {!isLogin && (
+                <AnimatedInput
+                  icon={Mail}
+                  label="Email Address"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                />
+              )}
 
               <AnimatedInput
                 icon={Lock}

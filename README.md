@@ -33,9 +33,10 @@ This section is the source of truth for the current repository. Update it whenev
 | Resume upload and analysis | Implemented locally | Express forwards a resume and job description to the FastAPI NLP service. |
 | Resume parsing and job matching | Implemented locally | The NLP service extracts text/entities and produces semantic matching signals. |
 | GitHub language lookup | Implemented | Used as an additional skill-verification signal when a GitHub account is available. |
-| Authentication and job creation | Prototype | Users and jobs are held in application memory; they do not persist across server restarts. |
+| Authentication | Implemented | Supabase Auth stores email/password credentials; an Auth-linked profile stores the role and username. The backend accepts username/password login and maintains an HTTP-only app session. |
+| Job creation | Prototype | Jobs are held in application memory; they do not persist across server restarts. |
 | Supabase connectivity | Verified | The backend has an authenticated Supabase client, but no tables or controller reads/writes are wired yet. |
-| Persistent data model | Next | Supabase tables, policies, and backend data access will replace in-memory stores. |
+| Persistent data model | Implemented for profiles | The Auth-linked profiles migration and RLS policy are applied in Supabase. Jobs and resume analyses still need persistent tables. |
 | LLM technical assessments | Planned | Not implemented in the current runtime. |
 
 ## Architecture
@@ -137,8 +138,8 @@ The frontend runs at `http://localhost:3000`, the API at `http://localhost:5000`
 
 | Method | Endpoint | Current behavior |
 | --- | --- | --- |
-| `POST` | `/api/auth/signup` | Creates an in-memory candidate or recruiter account and starts a session. |
-| `POST` | `/api/auth/login` | Authenticates a local prototype account and starts a session. |
+| `POST` | `/api/auth/signup` | Creates an email/password Supabase Auth account and linked candidate or recruiter profile. |
+| `POST` | `/api/auth/login` | Resolves a username and verifies its password through Supabase Auth before starting an app session. |
 | `GET` | `/api/auth/me` | Returns the authenticated session user. |
 | `POST` | `/api/auth/logout` | Ends the current session. |
 | `GET` | `/api/jobs` | Returns jobs from the in-memory job store. |
@@ -153,7 +154,7 @@ The frontend runs at `http://localhost:3000`, the API at `http://localhost:5000`
 
 The backend connector is `backend/Config/supabase.js`. It reads `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from `backend/.env`.
 
-The service-role key must never be exposed to the frontend or committed to Git. `backend/.env` is ignored; `backend/.env.example` is the safe, tracked template. Connectivity has been verified with a read-only Auth API request. Database tables, Row Level Security policies, and application queries have not yet been created.
+The service-role key must never be exposed to the frontend or committed to Git. `backend/.env` is ignored; `backend/.env.example` is the safe, tracked template. Connectivity and the Auth-linked `profiles` table have been verified. The profile table has an own-profile RLS read policy; future job and analysis tables still need their schema and RLS policies.
 
 ## Development notes
 
@@ -175,10 +176,11 @@ For a feature-sized commit, add a concise dated entry below.
 
 ### Change log
 
+- **2026-08-23** ? Added the versioned Supabase Auth profile migration with username uniqueness, an automatic profile trigger, and an own-profile RLS policy; awaiting execution in Supabase.
 - **2026-08-23** ? Added the Supabase backend client and environment template; verified server-side connectivity. Persistent tables and application queries are pending.
 - **2026-08-23** ? Reorganized frontend route screens into `pages/public`, `pages/candidate`, and `pages/recruiter`; moved reusable UI into `components`.
 - **2026-08-23** ? Removed the unused local PostgreSQL connector and `pg` dependency.
 
 ## Next milestone
 
-Design and create the Supabase schema, apply Row Level Security policies, and replace the backend's in-memory authentication, jobs, and analysis stores with Supabase-backed queries.
+Create persistent Supabase tables and Row Level Security policies for jobs, applications, and resume analyses, then replace the remaining in-memory job and analysis stores with Supabase-backed queries.

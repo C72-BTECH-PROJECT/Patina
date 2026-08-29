@@ -7,7 +7,6 @@ import analysisRoutes from './Routes/analysis.routes.js';
 import parseRoutes from './Routes/parse.routes.js';
 
 import session from 'express-session';
-import passport from './Config/passport.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,8 +32,6 @@ app.use(session({
   },
 }));
 
-app.use(passport.initialize());
-app.use(passport.session());
 
 // Debug routing (safe)
 app.use((req, _res, next) => {
