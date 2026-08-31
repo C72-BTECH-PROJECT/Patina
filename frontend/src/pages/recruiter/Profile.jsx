@@ -1,10 +1,21 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, AlertCircle, Briefcase, Users, Edit2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Briefcase, Users, Edit2, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 function RecruiterProfileCard() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/', { replace: true });
+    } catch (error) {
+      alert(error.message || 'Could not sign out.');
+    }
+  };
 
   if (loading) {
     return <div className="text-white/60">Loading profile...</div>;
@@ -116,7 +127,7 @@ function RecruiterProfileCard() {
       )}
 
       {/* Edit Profile Button */}
-      <motion.div className="mt-6 flex justify-end">
+      <motion.div className="mt-6 flex justify-end gap-3">
         <motion.button
           className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-medium flex items-center gap-2 hover:bg-white/10 transition-all"
           whileHover={{ scale: 1.05 }}
@@ -124,6 +135,16 @@ function RecruiterProfileCard() {
         >
           <Edit2 className="w-4 h-4" />
           Edit Profile
+        </motion.button>
+        <motion.button
+          type="button"
+          onClick={handleLogout}
+          className="px-4 py-2 rounded-xl border border-white/10 text-white/80 text-sm font-medium flex items-center gap-2 hover:bg-white/5 transition-all"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <LogOut className="w-4 h-4" />
+          Sign out
         </motion.button>
       </motion.div>
     </div>

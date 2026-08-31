@@ -1,10 +1,20 @@
 import React from "react";
-import { Link } from "react-router-dom";
-import { FileUp, Mail, MapPin, User } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { FileUp, LogOut, Mail, MapPin, User } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 function CandidateProfile() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/', { replace: true });
+    } catch (error) {
+      alert(error.message || 'Could not sign out.');
+    }
+  };
 
   if (loading) {
     return <div className="text-white/60">Loading profile...</div>;
@@ -43,6 +53,14 @@ function CandidateProfile() {
         <FileUp className="w-5 h-5" />
         Upload / Update Resume
       </Link>
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="ml-3 inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-white/10 text-white/80 font-semibold hover:bg-white/5 transition-all"
+      >
+        <LogOut className="w-5 h-5" />
+        Sign out
+      </button>
     </div>
   );
 }

@@ -1,13 +1,25 @@
 import React from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Zap, LayoutDashboard, Briefcase, Plus, Bell, Search, User } from 'lucide-react';
+import { Zap, LayoutDashboard, Briefcase, Plus, Bell, Search, LogOut } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 function RecruiterLayout() {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const navItems = [
     { to: '/recruiter/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/recruiter/jobs', icon: Briefcase, label: 'Jobs' },
   ];
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/', { replace: true });
+    } catch (error) {
+      alert(error.message || 'Could not sign out.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-white">
@@ -88,6 +100,14 @@ function RecruiterLayout() {
             >
               AV
             </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </button>
           </div>
         </div>
       </motion.nav>

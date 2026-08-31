@@ -2,6 +2,7 @@ import supabase from '../Config/supabase.js';
 
 const ALLOWED_ROLES = new Set(['candidate', 'recruiter']);
 const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,30}$/;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 const formatProfile = (profile, email) => ({
   id: profile.id,
@@ -74,6 +75,7 @@ export const signup = async (req, res) => {
     email: String(email).trim().toLowerCase(),
     password,
     options: {
+      emailRedirectTo: `${FRONTEND_URL}/email-confirmed`,
       data: {
         username: normalizedUsername,
         first_name: firstName,
@@ -118,6 +120,9 @@ export const login = async (req, res) => {
     email: authUser.user.email,
     password,
   });
+  if (signInError?.message?.toLowerCase().includes('email not confirmed')) {
+    return res.status(403).json({ message: 'Please confirm your email before signing in.' });
+  }
   if (signInError || !signInData.user) {
     return res.status(401).json({ message: 'Invalid username or password.' });
   }

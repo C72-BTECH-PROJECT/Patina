@@ -2,8 +2,7 @@ import multer from 'multer';
 import FormData from 'form-data';
 import fetch from 'node-fetch';
 
-import { jobs } from '../Config/Job.js';
-import { fetchGitHubLanguages } from './githubAggregator.js';
+import supabase from '../Config/supabase.js';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -28,8 +27,13 @@ export const analyzeResume = [upload.single('resume'), async (req, res) => {
       return res.status(400).json({ message: 'jobId is required' });
     }
 
-    const job = jobs.find((j) => String(j.id) === String(jobId) || String(j._id) === String(jobId));
-    if (!job) {
+    const { data: job, error: jobError } = await supabase
+      .from('jobs')
+      .select('id, title, description, experience_level, location')
+      .eq('id', String(jobId))
+      .eq('status', 'published')
+      .maybeSingle();
+    if (jobError || !job) {
       return res.status(404).json({ message: 'Job not found' });
     }
 
@@ -60,7 +64,10 @@ export const analyzeResume = [upload.single('resume'), async (req, res) => {
     // - entities.projects
     // - semantic_analysis.similarity_score
     // - semantic_analysis.match_level
-    const semanticSimilarity = Number(nlpJson?.semantic_analysis?.similarity_score ?? 0);
+    const semanticSimilarity = Math.max(
+      0,
+      Math.min(1, Number(nlpJson?.semantic_analysis?.similarity_score ?? 0) || 0)
+    );
     const match_level = nlpJson?.semantic_analysis?.match_level ?? safeMatchLevel(semanticSimilarity);
 
     const extractedSkills = Array.isArray(nlpJson?.entities?.skills) ? nlpJson.entities.skills : [];
@@ -72,27 +79,19 @@ export const analyzeResume = [upload.single('resume'), async (req, res) => {
     const github = nlpJson?.entities?.github || '';
     const linkedin = nlpJson?.entities?.linkedin || '';
 
-    // Fetch GitHub languages to verify skills
-    const githubLanguages = await fetchGitHubLanguages(github);
-
-
-    // Verify skills using GitHub data (or fallback to heuristic if no GitHub provided)
-    const verifiedSkills = extractedSkills.map((s, idx) => {
-      // If we have github data, verify by checking if the skill name is in the repo languages/topics
-      const isVerifiedByGithub = githubLanguages.length > 0 && githubLanguages.includes(s.toLowerCase());
-      
+    // GitHub verification is a later microservice. NLP extraction alone must
+    // never label a skill as externally verified.
+    const verifiedSkills = extractedSkills.map((s) => {
       return {
         name: s,
-        verified: githubLanguages.length > 0 ? isVerifiedByGithub : idx < 2, // Fallback to heuristic
-        level: idx === 0 ? 'Advanced' : 'Intermediate',
+        verified: false,
+        level: 'Unverified',
       };
     });
 
-
-    const credibilityScore = Math.max(
-      20,
-      Math.min(99, Math.round(semanticSimilarity * 100 * 0.85 + extractedSkills.length * 3))
-    );
+    // Interim score: 100% NLP semantic similarity. GitHub and assessment
+    // weights are intentionally added only when those services exist.
+    const credibilityScore = Math.round(semanticSimilarity * 100);
 
     const candidateNameFromFilename = (req.file.originalname || '')
       .replace(/\.[^/.]+$/, '')
@@ -108,7 +107,7 @@ export const analyzeResume = [upload.single('resume'), async (req, res) => {
         github,
         linkedin
       },
-      jobId: latestJob?.id || latestJob?._id,
+      jobId: latestJob?.id,
       jobTitle: latestJob?.title,
       matchPercentage: Math.round(semanticSimilarity * 100),
       extractedSkills,
@@ -116,7 +115,7 @@ export const analyzeResume = [upload.single('resume'), async (req, res) => {
       semantic_similarity: semanticSimilarity,
       match_level,
       verifiedSkills,
-      experienceLevel: job.experienceLevel,
+      experienceLevel: job.experience_level,
       credibilityScore,
       raw_text_preview: nlpJson?.raw_text_preview,
       appliedAt: new Date().toISOString()

@@ -5,6 +5,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Landing from './pages/public/Landing';
 import RoleSelection from './pages/public/RoleSelection';
 import Login from './pages/public/Login';
+import EmailConfirmed from './pages/public/EmailConfirmed';
 
 // candidate flow
 import Upload from './pages/candidate/Upload';
@@ -36,6 +37,7 @@ function App() {
             <Route path="/select-role" element={<RoleSelection />} />
             <Route path="/login/:role" element={<Login />} />
             <Route path="/signup/:role" element={<Login />} />
+            <Route path="/email-confirmed" element={<EmailConfirmed />} />
 
             {/* 👤 CANDIDATE FLOW */}
             <Route path="/candidate/upload" element={<Upload />} />

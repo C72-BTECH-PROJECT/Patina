@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Briefcase, MapPin, Users, ChevronRight, Sparkles, Plus } from 'lucide-react';
-import { jobs, applications } from '../../data/recruiter/mockData';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 // Glow Orb Component
 const GlowOrb = ({ className }) => (
@@ -35,7 +37,7 @@ const JobCard = ({ job, count, index }) => (
         </div>
 
         <div className="flex flex-wrap gap-2 mt-3">
-          {job.requiredSkills.map((skill, i) => (
+          {(job.requiredSkills || []).map((skill, i) => (
             <span
               key={i}
               className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/70 text-xs font-medium"
@@ -62,6 +64,28 @@ const JobCard = ({ job, count, index }) => (
 
 // Main Jobs Component
 function Jobs() {
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const { authFetch } = useAuth();
+
+  useEffect(() => {
+    const loadJobs = async () => {
+      try {
+        const response = await authFetch(`${API_BASE_URL}/api/jobs/mine`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Could not load your jobs.');
+        setJobs(data);
+      } catch (loadError) {
+        setError(loadError.message || 'Could not load your jobs.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadJobs();
+  }, [authFetch]);
+
   return (
     <div className="relative">
       {/* Background Effects */}
@@ -93,17 +117,17 @@ function Jobs() {
         </motion.div>
 
         {/* Jobs Grid */}
-        <div className="grid grid-cols-1 gap-6">
-          {jobs.map((job, index) => {
-            const count = applications.filter(a => a.job === job._id).length;
+        {loading && <p className="text-white/60">Loading your jobs...</p>}
+        {error && <p className="text-rose-300">{error}</p>}
+        {!loading && !error && (
+          <div className="grid grid-cols-1 gap-6">
+            {jobs.map((job, index) => (
+              <JobCard key={job.id} job={job} count={0} index={index} />
+            ))}
+          </div>
+        )}
 
-            return (
-              <JobCard key={job._id} job={job} count={count} index={index} />
-            );
-          })}
-        </div>
-
-        {jobs.length === 0 && (
+        {!loading && !error && jobs.length === 0 && (
           <motion.div
             className="glass-card p-12 text-center"
             initial={{ opacity: 0 }}
