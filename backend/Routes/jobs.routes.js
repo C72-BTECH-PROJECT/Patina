@@ -8,7 +8,7 @@ import { requireRole } from '../Middlewares/auth.Middleware.js';
 
 const router = express.Router();
 
-router.get('/', getAllJobs);
+router.get('/', requireRole('CANDIDATE', 'RECRUITER', 'ADMIN'), getAllJobs);
 router.get('/mine', requireRole('RECRUITER'), getMyJobs);
 router.post('/', requireRole('RECRUITER'), createJob);
 

@@ -1,11 +1,12 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // common pages
 import Landing from './pages/public/Landing';
 import RoleSelection from './pages/public/RoleSelection';
 import Login from './pages/public/Login';
 import EmailConfirmed from './pages/public/EmailConfirmed';
+import AdminDashboard from './pages/admin/Dashboard';
 
 // candidate flow
 import Upload from './pages/candidate/Upload';
@@ -23,6 +24,7 @@ import Jobs from './pages/recruiter/Jobs';
 import JobDetails from './pages/recruiter/JobDetails';
 import CreateJob from './pages/recruiter/CreateJob';
 import { AuthProvider } from './context/AuthContext';
+import RequireRole from './components/auth/RequireRole';
 
 function App() {
   return (
@@ -35,21 +37,25 @@ function App() {
             {/* 🌐 COMMON */}
             <Route path="/" element={<Landing />} />
             <Route path="/select-role" element={<RoleSelection />} />
-            <Route path="/login/:role" element={<Login />} />
-            <Route path="/signup/:role" element={<Login />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Login />} />
+            {/* Keep old links functional while using the shared authentication flow. */}
+            <Route path="/login/:role" element={<Navigate to="/login" replace />} />
+            <Route path="/signup/:role" element={<Navigate to="/signup" replace />} />
             <Route path="/email-confirmed" element={<EmailConfirmed />} />
+            <Route path="/admin/dashboard" element={<RequireRole role="ADMIN"><AdminDashboard /></RequireRole>} />
 
             {/* 👤 CANDIDATE FLOW */}
-            <Route path="/candidate/upload" element={<Upload />} />
-            <Route path="/candidate/processing" element={<Processing />} />
-            <Route path="/candidate" element={<CandidateLayout />}>
+            <Route path="/candidate/upload" element={<RequireRole role="CANDIDATE"><Upload /></RequireRole>} />
+            <Route path="/candidate/processing" element={<RequireRole role="CANDIDATE"><Processing /></RequireRole>} />
+            <Route path="/candidate" element={<RequireRole role="CANDIDATE"><CandidateLayout /></RequireRole>}>
               <Route path="dashboard" element={<CandidateDashboard />} />
               <Route path="jobs" element={<CandidateJobs />} />
               <Route path="profile" element={<CandidateProfile />} />
             </Route>
 
             {/* 🧑‍💼 RECRUITER FLOW (WITH LAYOUT) */}
-            <Route path="/recruiter" element={<RecruiterLayout />}>
+            <Route path="/recruiter" element={<RequireRole role="RECRUITER"><RecruiterLayout /></RequireRole>}>
 
               <Route path="profile" element={<Profile />} />
               <Route path="dashboard" element={<RecruiterDashboard />} />

@@ -12,7 +12,7 @@ function EmailConfirmed() {
           Your Patina account is verified. You can now sign in with your username and password.
         </p>
         <Link
-          to="/login/candidate"
+          to="/login"
           className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent-purple px-5 py-3 font-semibold text-white transition hover:brightness-110"
         >
           <Mail className="h-4 w-4" />

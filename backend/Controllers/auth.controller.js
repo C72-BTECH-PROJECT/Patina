@@ -103,16 +103,30 @@ export const login = async (req, res) => {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id')
+    .select('id, role, is_suspended')
     .ilike('username', String(username).trim())
     .maybeSingle();
 
   if (profileError || !profile) {
+    if (profileError) {
+      console.error('Login profile lookup failed:', profileError.message);
+      return res.status(503).json({
+        message: 'Authentication setup is incomplete. Apply the Supabase migrations and try again.',
+      });
+    }
     return res.status(401).json({ message: 'Invalid username or password.' });
+  }
+
+  if (profile.is_suspended) {
+    return res.status(403).json({
+      code: 'ACCOUNT_SUSPENDED',
+      message: 'Your account has been suspended. Please contact support for help restoring access.',
+    });
   }
 
   const { data: authUser, error: authUserError } = await supabase.auth.admin.getUserById(profile.id);
   if (authUserError || !authUser.user?.email) {
+    if (authUserError) console.error('Login auth-user lookup failed:', authUserError.message);
     return res.status(401).json({ message: 'Invalid username or password.' });
   }
 

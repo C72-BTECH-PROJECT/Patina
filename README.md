@@ -34,6 +34,7 @@ This section is the source of truth for the current repository. Update it whenev
 | Resume parsing and job matching | Implemented locally | The NLP service extracts text/entities and produces semantic matching signals. |
 | GitHub language lookup | Implemented | Used as an additional skill-verification signal when a GitHub account is available. |
 | Authentication | Implemented | Supabase Auth stores email/password credentials; an Auth-linked profile stores the role and username. The backend accepts username/password login and maintains an HTTP-only app session. |
+| Admin console | Implemented | An existing, promoted administrator can review candidate/recruiter accounts, dashboard metrics, and suspend or reactivate portal access. |
 | Job creation | Prototype | Jobs are held in application memory; they do not persist across server restarts. |
 | Supabase connectivity | Verified | The backend has an authenticated Supabase client, but no tables or controller reads/writes are wired yet. |
 | Persistent data model | Implemented for profiles | The Auth-linked profiles migration and RLS policy are applied in Supabase. Jobs and resume analyses still need persistent tables. |
@@ -142,6 +143,9 @@ The frontend runs at `http://localhost:3000`, the API at `http://localhost:5000`
 | `POST` | `/api/auth/login` | Resolves a username and verifies its password through Supabase Auth before starting an app session. |
 | `GET` | `/api/auth/me` | Returns the authenticated session user. |
 | `POST` | `/api/auth/logout` | Ends the current session. |
+| `GET` | `/api/admin/overview` | Returns administrator-only user, job, and suspension counts. |
+| `GET` | `/api/admin/users?role=candidate|recruiter` | Returns administrator-only account lists. |
+| `PATCH` | `/api/admin/users/:userId/suspension` | Suspends or reactivates a candidate/recruiter without deleting their data. |
 | `GET` | `/api/jobs` | Returns jobs from the in-memory job store. |
 | `POST` | `/api/jobs` | Creates a job in the in-memory job store. |
 | `POST` | `/api/analyze` | Sends an uploaded resume to the NLP service for the selected job. |
@@ -155,6 +159,14 @@ The frontend runs at `http://localhost:3000`, the API at `http://localhost:5000`
 The backend connector is `backend/Config/supabase.js`. It reads `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from `backend/.env`.
 
 The service-role key must never be exposed to the frontend or committed to Git. `backend/.env` is ignored; `backend/.env.example` is the safe, tracked template. Connectivity and the Auth-linked `profiles` table have been verified. The profile table has an own-profile RLS read policy; future job and analysis tables still need their schema and RLS policies.
+
+Before running the admin console, apply every SQL file in `supabase/migrations` through the Supabase SQL Editor, in filename order. To provision the one administrator, create a normal account, then promote it after applying `20260831_add_single_admin_role.sql`:
+
+```sql
+update public.profiles set role = 'admin' where username = 'your_admin_username';
+```
+
+Use that account at `/login/admin`. The `20260901_add_profile_suspension.sql` migration is required for login suspension checks and the access controls.
 
 ## Development notes
 
@@ -180,6 +192,7 @@ For a feature-sized commit, add a concise dated entry below.
 - **2026-08-23** ? Added the Supabase backend client and environment template; verified server-side connectivity. Persistent tables and application queries are pending.
 - **2026-08-23** ? Reorganized frontend route screens into `pages/public`, `pages/candidate`, and `pages/recruiter`; moved reusable UI into `components`.
 - **2026-08-23** ? Removed the unused local PostgreSQL connector and `pg` dependency.
+- **2026-09-01** — Added the administrator dashboard, account suspension/reactivation APIs, and persistent suspension state. Suspended users are denied at login and on authenticated requests.
 
 ## Next milestone
 

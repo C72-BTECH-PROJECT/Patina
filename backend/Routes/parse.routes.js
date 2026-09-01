@@ -4,6 +4,7 @@ import FormData from 'form-data';
 import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
+import { requireRole } from '../Middlewares/auth.Middleware.js';
 
 const router = express.Router();
 
@@ -13,7 +14,7 @@ const upload = multer({ dest: 'uploads/' });
 // POST /api/parse
 // receives resume + jd from React
 // forwards to FastAPI, returns result
-router.post('/', upload.single('resume'), async (req, res) => {
+router.post('/', requireRole('CANDIDATE'), upload.single('resume'), async (req, res) => {
     try {
         // check file was uploaded
         if (!req.file) {

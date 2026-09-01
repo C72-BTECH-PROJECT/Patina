@@ -78,7 +78,9 @@ export function AuthProvider({ children }) {
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.message || "Login failed");
+      const error = new Error(data.message || "Login failed");
+      error.code = data.code;
+      throw error;
     }
 
     setUser(data.user || null);

@@ -168,7 +168,7 @@ function RoleSelection() {
           {/* Role Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <RoleCard
-              to="/login/candidate"
+              to="/signup"
               icon={User}
               title="I'm a Candidate"
               description="Connect your GitHub, upload your resume, and verify your skills to stand out to top employers with AI-powered credibility scores."
@@ -177,7 +177,7 @@ function RoleSelection() {
             />
 
             <RoleCard
-              to="/login/recruiter"
+              to="/signup"
               icon={Building2}
               title="I'm a Recruiter"
               description="Review verified candidate profiles, credibility scores, and make data-driven hiring decisions with real-time analytics."

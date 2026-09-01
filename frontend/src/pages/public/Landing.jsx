@@ -378,7 +378,7 @@ const HeroSection = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
           >
-            <Link to="/login/candidate" className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl font-semibold overflow-hidden magnetic-btn">
+            <Link to="/signup" className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl font-semibold overflow-hidden magnetic-btn">
               {/* Button Background */}
               <span className="absolute inset-0 bg-gradient-to-r from-accent-purple via-accent-cyan to-accent-purple bg-[length:200%_100%] animate-gradient-shift" />
               <span className="absolute inset-[2px] bg-background rounded-lg" />
@@ -394,11 +394,10 @@ const HeroSection = () => {
             </Link>
 
             <Link
-              to="/candidate/dashboard"
+              to="/login"
               className="relative inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-semibold bg-white/5 border border-white/10 hover:border-white/20 transition-all group"
             >
-              <Star className="w-5 h-5 text-accent-amber" />
-              <span className="text-white">View Demo</span>
+              <span className="text-white">Log In</span>
             </Link>
           </motion.div>
 
@@ -559,17 +558,14 @@ function Landing() {
             <span className="font-extrabold text-2xl tracking-tight text-white">PATINA</span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8">
-            <Link to="/login/candidate" className="text-sm text-white/70 hover:text-white transition-colors animated-underline">For Candidates</Link>
-            <Link to="/login/recruiter" className="text-sm text-white/70 hover:text-white transition-colors animated-underline">For Recruiters</Link>
-          </nav>
-
-          <Link
-            to="/login/candidate"
-            className="px-5 py-2.5 rounded-lg bg-white/5 border border-white/10 text-sm font-medium text-white hover:bg-white/10 transition-all"
-          >
-            Get Started
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link to="/login" className="px-4 py-2.5 text-sm font-medium text-white/75 hover:text-white transition-colors">
+              Log In
+            </Link>
+            <Link to="/signup" className="px-5 py-2.5 rounded-lg bg-white/5 border border-white/10 text-sm font-medium text-white hover:bg-white/10 transition-all">
+              Get Started
+            </Link>
+          </div>
         </div>
       </motion.nav>
 

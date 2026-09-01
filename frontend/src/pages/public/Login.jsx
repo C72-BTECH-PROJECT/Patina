@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, Building2, Zap, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User, Building2, Zap, Eye, EyeOff, ArrowRight, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -55,12 +55,12 @@ const AnimatedInput = ({ icon: Icon, label, type = 'text', value, onChange, plac
 
 // Main Login Component
 function Login() {
-  const { role } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const isSignupPage = location.pathname.startsWith('/signup/');
+  const isSignupPage = location.pathname === '/signup';
   const [isLogin, setIsLogin] = useState(!isSignupPage);
   const [successMessage, setSuccessMessage] = useState(location.state?.message || '');
+  const [authError, setAuthError] = useState('');
 
   // Form states
   const [email, setEmail] = useState('');
@@ -69,10 +69,11 @@ function Login() {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [verificationInfo, setVerificationInfo] = useState('');
+  const [signupRole, setSignupRole] = useState('candidate');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login: loginWithSession, refreshUser, authFetch, user, loading: authLoading } = useAuth();
 
-  const isRecruiter = role === 'recruiter';
+  const isRecruiter = signupRole === 'recruiter';
 
   useEffect(() => {
     setIsLogin(!isSignupPage);
@@ -82,7 +83,11 @@ function Login() {
   // Where to send someone once they're authenticated, regardless of
   // whether they arrived via local login, signup, or OAuth.
   const getDashboardPath = (userRole) =>
-    userRole === 'RECRUITER' ? '/recruiter/dashboard' : '/candidate/dashboard';
+    userRole === 'ADMIN'
+      ? '/admin/dashboard'
+      : userRole === 'RECRUITER'
+        ? '/recruiter/dashboard'
+        : '/candidate/dashboard';
 
   // Already logged in? Skip the form entirely instead of showing it again.
   useEffect(() => {
@@ -94,13 +99,15 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    setAuthError('');
     setIsSubmitting(true);
 
     try {
       const endpoint = isLogin ? 'login' : 'signup';
-      const payload = { role, email, password, username };
+      const payload = { email, password, username };
 
       if (!isLogin) {
+        payload.role = signupRole;
         payload.name = name;
         if (isRecruiter) {
           payload.companyName = companyName;
@@ -109,7 +116,10 @@ function Login() {
       }
 
       if (isLogin) {
-        await loginWithSession(payload);
+        const loginResult = await loginWithSession(payload);
+        await refreshUser();
+        navigate(getDashboardPath(loginResult.user?.role));
+        return;
       } else {
         const res = await authFetch(`${API_BASE_URL}/api/auth/${endpoint}`, {
           method: 'POST',
@@ -130,17 +140,19 @@ function Login() {
         // Signup creates a session on the API, but this flow deliberately
         // returns new users to sign in with their newly created account.
         await authFetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST' });
-        navigate(`/login/${role}`, {
+        navigate('/login', {
           replace: true,
           state: { message: 'Account created successfully. Please sign in to continue.' },
         });
         return;
       }
 
-      await refreshUser();
-      navigate(getDashboardPath(isRecruiter ? 'RECRUITER' : 'CANDIDATE'));
     } catch (err) {
-      alert(err.message || 'Failed to connect to server');
+      if (err.code === 'ACCOUNT_SUSPENDED') {
+        setAuthError(err.message);
+      } else {
+        alert(err.message || 'Failed to connect to server');
+      }
       console.error(err);
       setIsSubmitting(false);
     }
@@ -161,7 +173,7 @@ function Login() {
   };
 
   const toggleMode = () => {
-    navigate(`${isLogin ? '/signup/' : '/login/'}${role}`);
+    navigate(isLogin ? '/signup' : '/login');
   };
 
   return (
@@ -220,7 +232,7 @@ function Login() {
               </motion.h1>
               <p className="text-white/50">
                 {isLogin
-                  ? `Sign in to your ${isRecruiter ? 'recruiter' : 'candidate'} account`
+                  ? 'Sign in to your account'
                   : `Sign up as a ${isRecruiter ? 'recruiter' : 'candidate'} to get started`}
               </p>
               {successMessage && (
@@ -228,10 +240,29 @@ function Login() {
                   {successMessage}
                 </p>
               )}
+              {authError && (
+                <div role="alert" className="mt-4 flex gap-3 rounded-xl border border-rose-400/30 bg-rose-500/10 p-4 text-left">
+                  <span className="mt-0.5 rounded-lg bg-rose-400/15 p-2 text-rose-300"><ShieldAlert className="h-5 w-5" /></span>
+                  <div>
+                    <p className="text-sm font-semibold text-rose-200">Account access paused</p>
+                    <p className="mt-1 text-sm leading-5 text-rose-100/75">{authError}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
+              {!isLogin && (
+                <div className="relative group">
+                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-white/80"><User className="h-4 w-4 text-accent-purple" /> Account type</label>
+                  <select value={signupRole} onChange={(e) => setSignupRole(e.target.value)} className="w-full rounded-xl border border-white/10 bg-[#14141c] px-5 py-4 text-white focus:outline-none focus:border-accent-purple/50">
+                    <option value="candidate">Candidate</option>
+                    <option value="recruiter">Recruiter</option>
+                  </select>
+                </div>
+              )}
+
               <AnimatedInput
                 icon={User}
                 label="Username"

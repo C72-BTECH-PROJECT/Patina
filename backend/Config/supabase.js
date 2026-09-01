@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
-dotenv.config();
+// Local Windows sessions can retain old SUPABASE_* system variables. In
+// development, the project-specific backend/.env must be authoritative so the
+// API and local verification queries always target the same Supabase project.
+dotenv.config({ override: process.env.NODE_ENV !== 'production' });
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { TrendingUp, Users, Briefcase, CheckCircle, Clock, AlertTriangle, ChevronRight, Star, Filter, Download, Plus, Zap, Eye, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 // Glow Orb Component
 const GlowOrb = ({ className }) => (
@@ -211,12 +214,19 @@ const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#ec4899'];
 // Main Dashboard Component
 function RecruiterDashboard() {
   const [applications, setApplications] = React.useState([]);
+  const [jobs, setJobs] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const { authFetch } = useAuth();
 
   React.useEffect(() => {
-    fetch('http://localhost:5000/api/candidates')
-      .then(res => res.json())
-      .then(data => {
+    const loadDashboard = async () => {
+      try {
+        const [candidateResponse, jobsResponse] = await Promise.all([
+          authFetch(`${API_BASE_URL}/api/candidates`),
+          authFetch(`${API_BASE_URL}/api/jobs/mine`),
+        ]);
+        const data = candidateResponse.ok ? await candidateResponse.json() : [];
+        const jobData = jobsResponse.ok ? await jobsResponse.json() : [];
         // Map backend candidate schema to frontend expectation
         const mappedData = data.map(c => ({
           _id: c.id || Math.random().toString(),
@@ -226,22 +236,15 @@ function RecruiterDashboard() {
           status: 'applied'
         }));
         setApplications(mappedData);
-        setLoading(false);
-      })
-      .catch(err => {
+        setJobs(jobData);
+      } catch (err) {
         console.error('Failed to fetch candidates:', err);
+      } finally {
         setLoading(false);
-      });
-  }, []);
-
-  // Mock data for jobs (can be wired up later)
-  const jobs = [
-    { _id: 'job1', title: 'Frontend Developer', description: 'Work on React-based UI', requiredSkills: ['React', 'JavaScript', 'CSS'], experienceLevel: '0-2 years' },
-    { _id: 'job2', title: 'Backend Developer', description: 'Node.js + API development', requiredSkills: ['Node.js', 'Express', 'MongoDB'], experienceLevel: '2-4 years' },
-    { _id: 'job3', title: 'Full Stack Developer', description: 'React + Node full stack role', requiredSkills: ['React', 'Node.js'], experienceLevel: '1-3 years' },
-    { _id: 'job4', title: 'Machine Learning Engineer', description: 'ML models + data pipelines', requiredSkills: ['Python', 'Machine Learning'], experienceLevel: '2-5 years' },
-    { _id: 'job5', title: 'DevOps Engineer', description: 'CI/CD and cloud infra', requiredSkills: ['Docker', 'AWS', 'Kubernetes'], experienceLevel: '3-6 years' },
-  ];
+      }
+    };
+    loadDashboard();
+  }, [authFetch]);
 
   const topCandidates = [...applications].sort((a, b) => b.credibilityScore - a.credibilityScore);
   const shortlistedCount = applications.filter(a => a.status === 'shortlisted').length;
