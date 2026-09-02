@@ -92,9 +92,9 @@ const CredibilityDemo = () => {
       {/* Center Content */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {score === 0 ? (
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin text-foreground" />
-            <span className="text-xs text-muted-foreground uppercase tracking-widest">Calculating score...</span>
+          <div className="relative flex items-center justify-center">
+            <div className="w-20 h-20 border-2 border-border border-t-primary rounded-full animate-spin" />
+            <span className="absolute text-xs text-muted-foreground uppercase tracking-widest">Loading</span>
           </div>
         ) : (
           <>
@@ -128,6 +128,8 @@ const CredibilityDemo = () => {
             >
           ✓ Verified
         </motion.div>
+          </>
+        )}
       </div>
     </motion.div>
   );
