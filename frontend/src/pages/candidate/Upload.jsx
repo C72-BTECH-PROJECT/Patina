@@ -1,10 +1,33 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload as UploadIcon, FileText, X, Sparkles, CheckCircle, AlertCircle, Zap, ChevronDown } from 'lucide-react';
+import {
+  Upload as UploadIcon,
+  FileText,
+  X,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  ArrowLeft,
+  RefreshCw,
+} from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
+const isResumeFile = (file) => {
+  const name = (file.name || '').toLowerCase();
+  return (
+    file.type === 'application/pdf' ||
+    name.endsWith('.pdf') ||
+    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    name.endsWith('.docx')
+  );
+};
 
 const DocumentPreview = ({ file, onRemove }) => {
   const fileSize = (file.size / 1024).toFixed(1);
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
   return (
     <motion.div
@@ -13,48 +36,32 @@ const DocumentPreview = ({ file, onRemove }) => {
       exit={{ opacity: 0, scale: 0.9 }}
       className="flex items-center justify-between p-6 rounded-xl bg-muted border border-border"
     >
-      <div className="flex items-center gap-4">
-        <motion.div
-          className="relative"
-          animate={{ rotate: [0, 5, -5, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        >
-          <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center">
-            <FileText className="w-7 h-7 text-foreground" />
-          </div>
-        </motion.div>
-
-        <div>
-          <p className="font-semibold text-foreground mb-1">{file.name}</p>
-          <p className="text-sm text-muted-foreground">{fileSize} KB • PDF Document</p>
+      <div className="flex items-center gap-4 min-w-0">
+        <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+          <FileText className="w-6 h-6 text-foreground" />
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-foreground mb-1 truncate">{file.name}</p>
+          <p className="text-sm text-muted-foreground">
+            {fileSize} KB • {isPdf ? 'PDF' : 'DOCX'}
+          </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <motion.span
-          className="px-3 py-1 rounded-full bg-success/10 border border-border text-success text-sm font-medium"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          Ready
-        </motion.span>
-
-        <motion.button
-          onClick={onRemove}
-          className="w-10 h-10 rounded-full bg-muted border border-border hover:bg-destructive/10 hover:border-destructive/30 flex items-center justify-center transition-all"
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <X className="w-5 h-5 text-muted-foreground" />
-        </motion.button>
-      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="w-10 h-10 rounded-full bg-muted border border-border hover:bg-destructive/10 hover:border-destructive/30 flex items-center justify-center transition-all flex-shrink-0"
+      >
+        <X className="w-5 h-5 text-muted-foreground" />
+      </button>
     </motion.div>
   );
 };
 
 const DropZone = ({ onDrop, onDragOver, onDragLeave, isDragging, children }) => (
   <motion.div
-    className={`relative p-12 rounded-xl border-2 border-dashed transition-all duration-300 cursor-pointer ${
+    className={`relative p-10 rounded-xl border-2 border-dashed transition-all duration-300 cursor-pointer ${
       isDragging
         ? 'border-foreground bg-muted'
         : 'border-border bg-background hover:border-foreground/30'
@@ -68,76 +75,46 @@ const DropZone = ({ onDrop, onDragOver, onDragLeave, isDragging, children }) => 
   </motion.div>
 );
 
-const SkillsSelector = ({ selectedSkills, onToggle }) => {
-  const suggestedSkills = ['Python', 'React', 'Node.js', 'AWS', 'TypeScript', 'Django', 'Machine Learning', 'Docker', 'MongoDB', 'SQL'];
-
-  return (
-    <div className="space-y-4">
-      <label className="block text-sm font-medium text-foreground">Suggested Skills</label>
-      <div className="flex flex-wrap gap-2">
-        {suggestedSkills.map((skill, i) => {
-          const isSelected = selectedSkills.includes(skill);
-          return (
-            <motion.button
-              key={skill}
-              type="button"
-              onClick={() => onToggle(skill)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                isSelected
-                  ? 'bg-foreground text-primary-foreground'
-                  : 'bg-muted border border-border text-foreground hover:bg-muted/80'
-              }`}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {isSelected && <CheckCircle className="w-3 h-3 inline mr-1" />}
-              {skill}
-            </motion.button>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
 function Upload() {
+  const { authFetch } = useAuth();
+
   const [file, setFile] = useState(null);
-  const [jd, setJd] = useState('');
   const [isDragging, setIsDragging] = useState(false);
-  const [jobs, setJobs] = useState([]);
-  const [jobId, setJobId] = useState('');
-  const [loadingJobs, setLoadingJobs] = useState(true);
-  const [jobsError, setJobsError] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [success, setSuccess] = useState(false);
+
+  const [hasResume, setHasResume] = useState(false);
+  const [currentFileName, setCurrentFileName] = useState('');
+  const [statusLoading, setStatusLoading] = useState(true);
+  // While true the dropzone is revealed so the candidate can pick a new file.
+  // Only reachable from the "Update" button once a resume already exists.
+  const [isUpdating, setIsUpdating] = useState(false);
+
   const dropZoneRef = useRef(null);
 
   useEffect(() => {
-    const loadJobs = async () => {
+    let cancelled = false;
+    const loadStatus = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/jobs');
-        if (!res.ok) throw new Error('Failed to fetch jobs');
+        const res = await authFetch(`${API_BASE_URL}/api/resume/status`);
         const data = await res.json();
-        setJobs(data || []);
-        setJobId(
-          data && data[0] && String(data[0].id || data[0]._id)
-            ? String(data[0].id || data[0]._id)
-            : ''
-        );
-      } catch (e) {
-        setJobsError(e.message || 'Failed to load jobs');
+        if (!cancelled) {
+          setHasResume(Boolean(data.hasResume));
+          setCurrentFileName(data.fileName || '');
+        }
+      } catch {
+        // Network issue - still allow the candidate to try uploading.
       } finally {
-        setLoadingJobs(false);
+        if (!cancelled) setStatusLoading(false);
       }
     };
-    loadJobs();
-  }, []);
-
-  const handleDragOver = (e) => {
+    loadStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [authFetch]);
+const handleDragOver = (e) => {
     e.preventDefault();
     setIsDragging(true);
   };
@@ -153,12 +130,7 @@ function Upload() {
     e.preventDefault();
     setIsDragging(false);
     const droppedFile = e.dataTransfer.files[0];
-    if (
-      droppedFile &&
-      (droppedFile.type === 'application/pdf' || droppedFile.name.endsWith('.docx'))
-    ) {
-      setFile(droppedFile);
-    }
+    if (droppedFile) setFile(droppedFile);
   };
 
   const handleFileChange = (e) => {
@@ -166,31 +138,39 @@ function Upload() {
     if (selectedFile) setFile(selectedFile);
   };
 
-  const handleAnalyze = async () => {
+  const handleUpload = async () => {
+    if (!file || uploading) return;
+
+    if (!isResumeFile(file)) {
+      setError('Please upload a PDF or DOCX resume.');
+      return;
+    }
+
+    setUploading(true);
+    setError('');
+    setSuccess(false);
+
+    const form = new FormData();
+    form.append('resume', file);
+
     try {
-      if (!jobId) {
-        setError('Select a job position first.');
-        return;
-      }
-      if (!file) {
-        setError('Upload a PDF resume first.');
-        return;
-      }
-      if (!jd.trim()) {
-        setError('Please add a job description to continue');
-        return;
-      }
-
-      setIsLoading(true);
-      setError('');
-
-      navigate('/candidate/processing', { state: { file, jobId, jd } });
+      const res = await authFetch(`${API_BASE_URL}/api/resume/upload`, {
+        method: 'POST',
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Upload failed. Please try again.');
+      setHasResume(true);
+      setCurrentFileName(file.name);
+      setSuccess(true);
+      setFile(null);
+      setIsUpdating(false);
+    } catch (uploadError) {
+      setError(uploadError.message || 'Upload failed. Please try again.');
     } finally {
-      setIsLoading(false);
+      setUploading(false);
     }
   };
-
-  const isReady = file && jd.trim();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -200,40 +180,34 @@ function Upload() {
         animate={{ opacity: 1, y: 0 }}
       >
         <Link
-          to="/"
+          to="/candidate/dashboard"
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors no-underline"
         >
-          <motion.span
-            animate={{ x: [0, -5, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-          >
-            ←
-          </motion.span>
-          <span className="font-medium">Back</span>
+          <ArrowLeft className="w-4 h-4" />
+          <span className="hidden sm:inline text-sm font-medium">Back to dashboard</span>
         </Link>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <div className="w-8 h-8 flex items-center justify-center bg-primary rounded-md">
-            <Zap className="w-4 h-4 text-primary-foreground" />
+            <UploadIcon className="w-4 h-4 text-primary-foreground" />
           </div>
           <span className="font-bold text-lg tracking-tight">PATINA</span>
         </div>
 
         <div className="w-[60px]" />
       </motion.header>
-
-      <main className="max-w-3xl mx-auto px-6 py-12">
+<main className="max-w-2xl mx-auto px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="text-center mb-12"
+          className="text-center mb-10"
         >
           <h1 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">
-            Upload Your <span className="text-foreground">Resume</span>
+            Upload <span className="text-foreground">Resume</span>
           </h1>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Upload your resume and paste a job description to start the AI-powered skill verification process
+            Keep one latest resume on your profile. It is used for every job you apply to.
           </p>
         </motion.div>
 
@@ -243,51 +217,59 @@ function Upload() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
         >
-          <div className="mb-8">
-            <label className="block text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              Select Position
-            </label>
-
-            {loadingJobs ? (
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <motion.div
-                  className="w-5 h-5 border-2 border-foreground/30 border-t-foreground rounded-full"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                />
-                <span>Loading positions...</span>
+          {/* Current resume on file */}
+          {statusLoading ? (
+            <p className="text-sm text-muted-foreground mb-6">Checking your resume...</p>
+          ) : hasResume ? (
+            <div className="mb-6 p-4 rounded-xl bg-muted border border-border flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 text-success" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {currentFileName || 'Resume on file'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Current resume — applies to all jobs</p>
+                </div>
               </div>
-            ) : jobsError ? (
-              <div className="flex items-center gap-3 text-destructive">
-                <AlertCircle className="w-5 h-5" />
-                <span>{jobsError}</span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="px-3 py-1 rounded-full bg-success/10 text-success text-xs font-medium">
+                  Uploaded
+                </span>
+                {!isUpdating && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUpdating(true);
+                      setSuccess(false);
+                      setError('');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-muted transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Update
+                  </button>
+                )}
               </div>
-            ) : (
-              <div className="relative">
-                <select
-                  value={jobId}
-                  onChange={(e) => setJobId(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-body-sm text-foreground appearance-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {jobs.map((j) => (
-                    <option key={j.id || j._id} value={String(j.id || j._id)}>
-                      {j.title}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            </div>
+          ) : (
+            <div className="mb-6 p-4 rounded-xl bg-muted border border-border flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-muted-foreground" />
               </div>
-            )}
-            <p className="text-xs text-muted-foreground mt-3">Choose the role you're applying for. We'll match your resume to this job.</p>
-          </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">No resume uploaded yet</p>
+                <p className="text-xs text-muted-foreground">
+                  You need a resume before you can apply to jobs.
+                </p>
+              </div>
+            </div>
+          )}
 
-          <div className="mb-8" ref={dropZoneRef}>
-            <label className="block text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Resume File
-            </label>
-
+          {/* DropZone / Browse — hidden once a resume exists unless updating */}
+          {!statusLoading && (!hasResume || isUpdating) && (
+          <div ref={dropZoneRef}>
             <DropZone
               onDrop={handleDrop}
               onDragOver={handleDragOver}
@@ -296,75 +278,45 @@ function Upload() {
             >
               <AnimatePresence mode="wait">
                 {file ? (
-                  <DocumentPreview
-                    key="document"
-                    file={file}
-                    onRemove={() => setFile(null)}
-                  />
+                  <DocumentPreview key="file" file={file} onRemove={() => setFile(null)} />
                 ) : (
                   <motion.div
-                    key="upload"
-                    className="flex flex-col items-center justify-center text-center"
+                    key="empty"
+                    className="text-center"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
                   >
-                    <motion.div
-                      className="relative mb-6"
-                      animate={isDragging ? { scale: 1.2, rotate: 5 } : { scale: 1, rotate: 0 }}
-                      transition={{ type: 'spring', stiffness: 300 }}
-                    >
-                      <div className="w-20 h-20 rounded-xl bg-muted flex items-center justify-center">
-                        <UploadIcon className="w-10 h-10 text-foreground" />
-                      </div>
-                    </motion.div>
-
-                    <p className="text-lg text-foreground mb-2">
-                      <span className="font-semibold">Browse</span> your files or drag and drop
-                    </p>
-                    <p className="text-sm text-muted-foreground">Supports PDF and DOCX files</p>
-
-                    <input
-                      type="file"
-                      accept=".pdf,.docx"
-                      onChange={handleFileChange}
-                      className="hidden"
-                      id="file-upload"
-                    />
-                    <label htmlFor="file-upload" className="mt-4 px-6 py-2.5 rounded-md bg-muted border border-border text-sm text-foreground hover:bg-muted/80 cursor-pointer transition-all inline-block">
-                      Choose File
+                    <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
+                      <FileText className="w-8 h-8 text-foreground" />
+                    </div>
+                    <p className="text-foreground font-medium">Drag & drop your resume here</p>
+                    <p className="text-sm text-muted-foreground mt-1">or</p>
+                    <label className="mt-3 inline-flex cursor-pointer items-center justify-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                      <UploadIcon className="w-4 h-4" />
+                      Browse Files
+                      <input
+                        type="file"
+                        accept=".pdf,.docx"
+                        className="hidden"
+                        onChange={handleFileChange}
+                      />
                     </label>
+                    <p className="text-xs text-muted-foreground mt-3">PDF or DOCX</p>
                   </motion.div>
                 )}
               </AnimatePresence>
             </DropZone>
           </div>
+          )}
 
-          <div className="mb-8">
-            <label className="block text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              Job Description <span className="text-destructive">*</span>
-            </label>
-            <div className="relative">
-              <textarea
-                className="flex w-full h-44 rounded-md border border-input bg-background px-3 py-2 text-body-sm text-foreground placeholder:text-muted-foreground resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder="Paste the job description here... e.g. We are looking for a Python developer with experience in React, MongoDB and REST APIs..."
-                value={jd}
-                onChange={(e) => setJd(e.target.value)}
-              />
-              <div className="absolute bottom-3 right-3 text-xs text-muted-foreground">
-                {jd.length} characters
-              </div>
-            </div>
-          </div>
-
+          {/* Error */}
           <AnimatePresence>
             {error && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="mb-6 p-4 rounded-md bg-destructive/10 border border-border text-destructive text-sm flex items-center gap-3"
+                exit={{ opacity: 0 }}
+                className="mt-5 p-4 rounded-md bg-destructive/10 border border-border text-destructive text-sm flex items-center gap-3"
               >
                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
                 {error}
@@ -372,55 +324,75 @@ function Upload() {
             )}
           </AnimatePresence>
 
-          <motion.button
-            onClick={handleAnalyze}
-            disabled={!isReady || isLoading}
-            className={`w-full h-10 rounded-md font-medium text-body-sm transition-all ${
-              isReady
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                : 'bg-muted text-muted-foreground cursor-not-allowed'
-            }`}
-            whileHover={isReady ? { scale: 1.01 } : {}}
-            whileTap={isReady ? { scale: 0.99 } : {}}
-          >
-            <span className="flex items-center justify-center gap-2">
-              {isLoading ? (
-                <>
-                  <motion.div
-                    className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                  />
-                  Preparing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Analyze Resume
-                </>
-              )}
-            </span>
-          </motion.button>
+          {/* Success */}
+          <AnimatePresence>
+            {success && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mt-5 p-4 rounded-md bg-success/10 border border-success/30 text-success text-sm flex items-center gap-3"
+              >
+                <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                Resume uploaded successfully! It will be used for all your job applications.
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {!jd.trim() && file && (
-            <motion.p
-              className="text-sm text-warning mt-3 text-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              Please add a job description to continue
-            </motion.p>
+          {/* Upload button — only when no resume yet or while updating */}
+          {!statusLoading && (!hasResume || isUpdating) && (
+            <>
+              <motion.button
+                type="button"
+                onClick={handleUpload}
+                disabled={!file || uploading}
+                className={`mt-6 w-full h-12 rounded-md font-medium text-body-sm flex items-center justify-center gap-2 transition-all ${
+                  file && !uploading
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'bg-muted text-muted-foreground cursor-not-allowed'
+                }`}
+                whileHover={file && !uploading ? { scale: 1.01 } : {}}
+                whileTap={file && !uploading ? { scale: 0.99 } : {}}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <UploadIcon className="w-4 h-4" />
+                    {hasResume ? 'Save New Resume' : 'Upload Resume'}
+                  </>
+                )}
+              </motion.button>
+
+              {isUpdating && !uploading && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUpdating(false);
+                    setFile(null);
+                    setError('');
+                  }}
+                  className="mt-3 w-full h-10 rounded-md text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </>
           )}
         </motion.div>
 
+        {/* Footer note */}
         <motion.div
           className="mt-8 flex items-center justify-center gap-2 text-sm text-muted-foreground"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.5 }}
         >
           <CheckCircle className="w-4 h-4 text-success" />
-          <span>Your data is encrypted and processed securely</span>
+          <span>Your resume is stored securely and associated with your profile.</span>
         </motion.div>
       </main>
     </div>

@@ -1,4 +1,5 @@
 import supabase from '../Config/supabase.js';
+import supabaseAuth from '../Config/supabaseAuth.js';
 
 const ALLOWED_ROLES = new Set(['candidate', 'recruiter']);
 const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,30}$/;
@@ -54,7 +55,7 @@ export const resendConfirmation = async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ message: 'Email is required.' });
 
-  const { error } = await supabase.auth.resend({
+  const { error } = await supabaseAuth.auth.resend({
     type: 'signup',
     email: String(email).trim().toLowerCase(),
     options: { emailRedirectTo: `${FRONTEND_URL}/email-confirmed` },
@@ -145,7 +146,7 @@ export const signup = async (req, res) => {
     return res.status(400).json({ message: 'Password must be at least 8 characters.' });
   }
 
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await supabaseAuth.auth.signUp({
     email: String(email).trim().toLowerCase(),
     password,
     options: {
@@ -227,7 +228,11 @@ export const login = async (req, res) => {
     return res.status(401).json({ message: 'Invalid username or password.' });
   }
 
-  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+  // IMPORTANT: sign in on the anon auth client, never on the shared
+  // service-role client. A sign-in stores the user's JWT in that client's
+  // in-memory session, which would make every later request (Storage uploads,
+  // admin queries) run as the logged-in user and fail RLS.
+  const { data: signInData, error: signInError } = await supabaseAuth.auth.signInWithPassword({
     email: authUser.user.email,
     password,
   });
