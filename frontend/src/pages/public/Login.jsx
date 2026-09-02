@@ -6,13 +6,6 @@ import { useAuth } from '../../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-// Glow Orb Component
-const GlowOrb = ({ className }) => (
-  <div className={`absolute w-96 h-96 rounded-full filter blur-3xl opacity-20 ${className}`}>
-    <div className={`w-full h-full rounded-full bg-gradient-to-br from-accent-purple/40 to-accent-pink/30 animate-glow-pulse`} />
-  </div>
-);
-
 // Animated Input Component
 const AnimatedInput = ({ icon: Icon, label, type = 'text', value, onChange, placeholder, required }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -23,8 +16,8 @@ const AnimatedInput = ({ icon: Icon, label, type = 'text', value, onChange, plac
       className="relative group"
       whileFocusWithin={{ scale: 1.01 }}
     >
-      <label className="block text-sm font-medium text-white/80 mb-2 flex items-center gap-2">
-        <Icon className="w-4 h-4 text-accent-purple" />
+      <label className="block text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+        <Icon className="w-4 h-4 text-muted-foreground" />
         {label}
       </label>
       <div className="relative">
@@ -35,15 +28,15 @@ const AnimatedInput = ({ icon: Icon, label, type = 'text', value, onChange, plac
           onChange={onChange}
           placeholder={placeholder}
           autoComplete={type === 'password' ? 'current-password' : type === 'email' ? 'email' : 'off'}
-          className="w-full px-5 py-4 pl-12 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all [&::-webkit-autofill]:text-white [&::-webkit-autofill]::selection:text-white"
+          className="w-full px-5 py-4 pl-12 bg-background border border-input rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-all"
         />
-        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
 
         {isPassword && (
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
           >
             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
           </button>
@@ -71,6 +64,7 @@ function Login() {
   const [verificationInfo, setVerificationInfo] = useState('');
   const [signupRole, setSignupRole] = useState('candidate');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resendingConfirmation, setResendingConfirmation] = useState(false);
   const { login: loginWithSession, refreshUser, authFetch, user, loading: authLoading } = useAuth();
 
   const isRecruiter = signupRole === 'recruiter';
@@ -176,87 +170,109 @@ function Login() {
     navigate(isLogin ? '/signup' : '/login');
   };
 
+  const handleResendConfirmation = async () => {
+    setResendingConfirmation(true);
+    try {
+      const res = await authFetch(`${API_BASE_URL}/api/auth/resend-confirmation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data.message || 'Failed to resend confirmation email.');
+      } else {
+        setAuthError('Confirmation email sent. Check your inbox and spam folder.');
+      }
+    } catch (err) {
+      setAuthError('Failed to resend confirmation email.');
+    } finally {
+      setResendingConfirmation(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background text-white relative overflow-hidden">
-      {/* Noise Overlay */}
-      <div className="noise-overlay" />
-
-      {/* Background Effects */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-20" />
-      <GlowOrb className="top-[-10%] right-[-10%]" />
-      <GlowOrb className="bottom-[-10%] left-[-10%]" />
-
-      {/* Header */}
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
       <motion.header
-        className="relative z-10 flex justify-between items-center py-6 px-8"
-        initial={{ opacity: 0, y: -20 }}
+        className="flex justify-between items-center py-4 px-6 border-b border-border"
+        initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <Link to="/" className="flex items-center gap-3 no-underline group">
-          <span className="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-accent-purple to-accent-cyan rounded-xl group-hover:shadow-glow-purple transition-shadow">
-            <Zap className="w-5 h-5 text-white" />
-          </span>
-          <span className="font-extrabold tracking-tight text-2xl">PATINA</span>
+        <Link to="/" className="flex items-center gap-2.5 no-underline">
+          <div className="w-8 h-8 flex items-center justify-center bg-primary rounded-md">
+            <Zap className="w-4 h-4 text-primary-foreground" />
+          </div>
+          <span className="font-bold text-lg tracking-tight text-foreground">PATINA</span>
         </Link>
 
         <Link
           to="/select-role"
-          className="text-sm text-white/60 hover:text-white transition-colors flex items-center gap-2"
+          className="text-body-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           ← Back
         </Link>
       </motion.header>
 
-      {/* Main Content */}
-      <main className="relative z-10 flex-1 flex justify-center items-center min-h-[calc(100vh-80px)] py-12 px-6">
+      <main className="flex-1 flex justify-center items-center py-8 px-6">
         <motion.div
           className="w-full max-w-md"
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.4 }}
         >
-          {/* Form Card */}
-          <div className="glass-card p-8 md:p-10 relative">
-            <div className="corner-decoration top-left" />
-            <div className="corner-decoration bottom-right" />
-
-            {/* Header */}
+          <div className="card p-8">
             <div className="text-center mb-8">
               <motion.h1
-                className="text-3xl font-bold text-white mb-2"
+                className="text-h2 text-foreground mb-1"
                 key={isLogin}
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
               >
                 {isLogin ? 'Welcome Back' : 'Create an Account'}
               </motion.h1>
-              <p className="text-white/50">
+              <p className="text-body-sm text-muted-foreground">
                 {isLogin
                   ? 'Sign in to your account'
                   : `Sign up as a ${isRecruiter ? 'recruiter' : 'candidate'} to get started`}
               </p>
               {successMessage && (
-                <p className="mt-4 rounded-lg border border-accent-emerald/30 bg-accent-emerald/10 px-3 py-2 text-sm text-accent-emerald">
+                <p className="mt-4 rounded-md bg-success/10 border border-success/20 px-3 py-2 text-body-sm text-success">
                   {successMessage}
                 </p>
               )}
               {authError && (
-                <div role="alert" className="mt-4 flex gap-3 rounded-xl border border-rose-400/30 bg-rose-500/10 p-4 text-left">
-                  <span className="mt-0.5 rounded-lg bg-rose-400/15 p-2 text-rose-300"><ShieldAlert className="h-5 w-5" /></span>
+                <div role="alert" className="mt-4 flex gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-left">
+                  <span className="mt-0.5 rounded-md bg-destructive/15 p-2 text-destructive"><ShieldAlert className="h-5 w-5" /></span>
                   <div>
-                    <p className="text-sm font-semibold text-rose-200">Account access paused</p>
-                    <p className="mt-1 text-sm leading-5 text-rose-100/75">{authError}</p>
+                    <p className="text-sm font-semibold text-destructive">Account access paused</p>
+                    <p className="mt-1 text-sm leading-5 text-destructive/75">{authError}</p>
+                    {isLogin && (
+                      <button
+                        type="button"
+                        onClick={handleResendConfirmation}
+                        disabled={resendingConfirmation}
+                        className="mt-2 text-xs font-medium text-destructive underline underline-offset-2 disabled:opacity-60"
+                      >
+                        {resendingConfirmation ? 'Sending...' : 'Resend confirmation email'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (
-                <div className="relative group">
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-white/80"><User className="h-4 w-4 text-accent-purple" /> Account type</label>
-                  <select value={signupRole} onChange={(e) => setSignupRole(e.target.value)} className="w-full rounded-xl border border-white/10 bg-[#14141c] px-5 py-4 text-white focus:outline-none focus:border-accent-purple/50">
+                <div>
+                  <label className="block text-body-sm font-medium text-foreground mb-1.5 flex items-center gap-2">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    Account type
+                  </label>
+                  <select
+                    value={signupRole}
+                    onChange={(e) => setSignupRole(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-body-sm text-foreground appearance-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
                     <option value="candidate">Candidate</option>
                     <option value="recruiter">Recruiter</option>
                   </select>
@@ -273,7 +289,7 @@ function Login() {
                 required
               />
 
-              <AnimatePresence mode="wait">
+              <AnimatePresence>
                 {!isLogin && (
                   <motion.div
                     key="nameField"
@@ -320,16 +336,16 @@ function Login() {
               <AnimatePresence>
                 {!isLogin && isRecruiter && (
                   <motion.div
-                    className="pt-4 mt-2 space-y-4"
+                    className="pt-2 space-y-4"
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                   >
-                    <div className="border-t border-white/5 pt-4">
-                      <h3 className="text-sm font-semibold text-white/60 mb-3 flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-accent-purple" />
+                    <div className="border-t border-border pt-4">
+                      <p className="text-body-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                        <Building2 className="w-4 h-4" />
                         Verification Details (Optional)
-                      </h3>
+                      </p>
 
                       <div className="space-y-4">
                         <AnimatedInput
@@ -359,45 +375,51 @@ function Login() {
               <motion.button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-4 rounded-xl font-bold text-lg relative overflow-hidden bg-gradient-to-r from-accent-purple to-accent-cyan text-white disabled:opacity-50 cursor-pointer"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                className="w-full h-10 rounded-md bg-primary text-primary-foreground font-medium text-body-sm hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 mt-2"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
               >
-                <span className="relative z-10 flex items-center justify-center gap-2">
-                  {isSubmitting ? (
-                    <motion.div
-                      className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                    />
-                  ) : (
-                    <>
-                      {isLogin ? 'Sign In' : 'Create Account'}
-                      <ArrowRight className="w-5 h-5" />
-                    </>
-                  )}
-                </span>
+                {isSubmitting ? (
+                  <motion.div
+                    className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  />
+                ) : (
+                  <>
+                    {isLogin ? 'Sign In' : 'Create Account'}
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </motion.button>
 
               {!isLogin && isRecruiter && (
                 <motion.button
                   type="button"
                   onClick={handleSkipVerification}
-                  className="w-full py-3 rounded-xl font-medium bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 transition-all"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  className="w-full h-10 rounded-md border border-input bg-background text-muted-foreground font-medium text-body-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                 >
                   Skip Verification & Continue
                 </motion.button>
               )}
             </form>
 
+            {isLogin && (
+              <div className="mt-4 text-center">
+                <Link to="/reset-password" className="text-body-sm text-foreground font-medium hover:text-foreground/80 transition-colors">
+                  Forgot password?
+                </Link>
+              </div>
+            )}
+
             {/* Toggle Mode */}
-            <div className="mt-8 text-center text-sm text-white/50">
+            <div className="mt-6 text-center text-body-sm text-muted-foreground">
               {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
               <button
                 onClick={toggleMode}
-                className="text-accent-purple font-semibold hover:text-accent-cyan transition-colors bg-transparent border-none cursor-pointer"
+                className="text-foreground font-medium hover:text-foreground/80 transition-colors bg-transparent border-none cursor-pointer"
               >
                 {isLogin ? 'Sign Up' : 'Log In'}
               </button>
