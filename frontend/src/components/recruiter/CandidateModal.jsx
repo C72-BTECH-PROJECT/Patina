@@ -83,7 +83,7 @@ function CandidateModal({ candidate, onClose }) {
 
       {/* Modal Content */}
       <motion.div
-        className="bg-background rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden relative border border-white/10"
+        className="bg-background rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden relative border border-border"
         initial={{ opacity: 0, scale: 0.9, y: 40 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 40 }}
@@ -92,7 +92,7 @@ function CandidateModal({ candidate, onClose }) {
         {/* Close Button */}
         <motion.button
           onClick={onClose}
-          className="absolute top-6 right-6 w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all z-10"
+          className="absolute top-6 right-6 w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all z-10"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
         >
@@ -106,13 +106,13 @@ function CandidateModal({ candidate, onClose }) {
             <div className="flex flex-col md:flex-row justify-between items-start gap-6 mb-6">
               <div className="flex items-center gap-4">
                 {/* Avatar */}
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent-purple to-accent-cyan flex items-center justify-center font-bold text-2xl text-white">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent-purple to-accent-cyan flex items-center justify-center font-bold text-2xl text-foreground">
                   {candidate.name?.charAt(0) || '?'}
                 </div>
 
                 <div>
-                  <h2 className="text-3xl font-extrabold text-white mb-2">{candidate.name}</h2>
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-white/50">
+                  <h2 className="text-3xl font-extrabold text-foreground mb-2">{candidate.name}</h2>
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                     {candidate.location && (
                       <span className="flex items-center gap-1">
                         <MapPin className="w-4 h-4" />
@@ -131,14 +131,14 @@ function CandidateModal({ candidate, onClose }) {
 
               <div className="flex flex-col items-center">
                 <ScoreCircle score={candidate.credibilityScore} />
-                <span className="text-sm text-white/40 mt-2">Credibility Score</span>
+                <span className="text-sm text-muted-foreground mt-2">Credibility Score</span>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3 border-t border-white/5 pt-6 pb-8">
+            <div className="flex flex-wrap gap-3 border-t border-border pt-6 pb-8">
               <motion.button
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-accent-purple to-accent-cyan text-white font-semibold flex items-center gap-2"
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-accent-purple to-accent-cyan text-foreground font-semibold flex items-center gap-2"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -146,7 +146,7 @@ function CandidateModal({ candidate, onClose }) {
                 Send Offer
               </motion.button>
               <motion.button
-                className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-semibold flex items-center gap-2"
+                className="px-6 py-3 rounded-xl bg-muted border border-border text-foreground font-semibold flex items-center gap-2"
                 whileHover={{ scale: 1.02, backgroundColor: 'rgba(255,255,255,0.1)' }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -169,7 +169,7 @@ function CandidateModal({ candidate, onClose }) {
                 <div className="corner-decoration top-left" />
                 <div className="corner-decoration bottom-right" />
 
-                <h3 className="font-bold text-white text-lg mb-4 flex items-center gap-2">
+                <h3 className="font-bold text-foreground text-lg mb-4 flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-accent-emerald" />
                   Verified Skills
                 </h3>
@@ -178,11 +178,11 @@ function CandidateModal({ candidate, onClose }) {
                   {candidate.skills?.map((skill, index) => (
                     <div
                       key={index}
-                      className="flex justify-between items-center p-3 rounded-xl bg-white/[0.03] border border-white/5"
+                      className="flex justify-between items-center p-3 rounded-xl bg-muted border border-border"
                     >
-                      <span className="font-medium text-white">{skill.name}</span>
+                      <span className="font-medium text-foreground">{skill.name}</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded-lg">
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-lg">
                           {skill.level}
                         </span>
                         {skill.verified ? (
@@ -206,33 +206,33 @@ function CandidateModal({ candidate, onClose }) {
                 <div className="corner-decoration top-left" />
                 <div className="corner-decoration bottom-right" />
 
-                <h3 className="font-bold text-white text-lg mb-4 flex items-center gap-2">
+                <h3 className="font-bold text-foreground text-lg mb-4 flex items-center gap-2">
                   <GithubIcon className="w-5 h-5 text-accent-cyan" />
                   GitHub Analysis
                 </h3>
 
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 text-center">
+                  <div className="p-4 rounded-xl bg-muted border border-border text-center">
                     <div className="flex items-center justify-center gap-1 mb-1">
                       <GitCommit className="w-4 h-4 text-accent-purple" />
                     </div>
-                    <span className="block text-2xl font-extrabold text-white">
+                    <span className="block text-2xl font-extrabold text-foreground">
                       {candidate.github?.commits || 0}
                     </span>
-                    <span className="text-xs text-white/40 uppercase tracking-wider">Commits</span>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">Commits</span>
                   </div>
-                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 text-center">
+                  <div className="p-4 rounded-xl bg-muted border border-border text-center">
                     <div className="flex items-center justify-center gap-1 mb-1">
                       <Folder className="w-4 h-4 text-accent-cyan" />
                     </div>
-                    <span className="block text-2xl font-extrabold text-white">
+                    <span className="block text-2xl font-extrabold text-foreground">
                       {candidate.github?.repos || 0}
                     </span>
-                    <span className="text-xs text-white/40 uppercase tracking-wider">Repos</span>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">Repos</span>
                   </div>
                 </div>
 
-                <p className="text-sm text-white/40 mb-2">Top Languages:</p>
+                <p className="text-sm text-muted-foreground mb-2">Top Languages:</p>
                 <div className="flex flex-wrap gap-2">
                   {candidate.github?.languages?.map((l, i) => (
                     <span
@@ -258,7 +258,7 @@ function CandidateModal({ candidate, onClose }) {
                 <div className="corner-decoration bottom-right" />
 
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-bold text-white text-lg flex items-center gap-2">
+                  <h3 className="font-bold text-foreground text-lg flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-accent-amber" />
                     AI Assessment
                   </h3>
@@ -271,10 +271,10 @@ function CandidateModal({ candidate, onClose }) {
                   {candidate.assessment.categories?.map((cat, index) => (
                     <div key={index} className="flex flex-col">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-white/70">{cat.name}</span>
-                        <span className="text-sm font-bold text-white">{cat.score}%</span>
+                        <span className="text-sm font-medium text-foreground">{cat.name}</span>
+                        <span className="text-sm font-bold text-foreground">{cat.score}%</span>
                       </div>
-                      <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                         <motion.div
                           className="h-full rounded-full bg-gradient-to-r from-accent-purple to-accent-cyan"
                           initial={{ width: 0 }}
@@ -305,13 +305,13 @@ function CandidateModal({ candidate, onClose }) {
                   {candidate.flaggedInconsistencies.map((flag, index) => (
                     <div
                       key={index}
-                      className="p-4 rounded-xl bg-background border border-white/10"
+                      className="p-4 rounded-xl bg-background border border-border"
                     >
-                      <p className="text-sm text-white/70 font-medium">{flag.description}</p>
+                      <p className="text-sm text-foreground font-medium">{flag.description}</p>
                       <span className={`text-xs mt-1 inline-block px-2 py-0.5 rounded-full ${
                         flag.severity === 'high' ? 'bg-accent-rose/20 text-accent-rose' :
                         flag.severity === 'medium' ? 'bg-accent-amber/20 text-accent-amber' :
-                        'bg-white/5 text-white/40'
+                        'bg-muted text-muted-foreground'
                       }`}>
                         {flag.severity} severity
                       </span>

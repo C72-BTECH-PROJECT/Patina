@@ -6,6 +6,7 @@ import Landing from './pages/public/Landing';
 import RoleSelection from './pages/public/RoleSelection';
 import Login from './pages/public/Login';
 import EmailConfirmed from './pages/public/EmailConfirmed';
+import ResetPassword from './pages/public/ResetPassword';
 import AdminDashboard from './pages/admin/Dashboard';
 
 // candidate flow
@@ -43,6 +44,7 @@ function App() {
             <Route path="/login/:role" element={<Navigate to="/login" replace />} />
             <Route path="/signup/:role" element={<Navigate to="/signup" replace />} />
             <Route path="/email-confirmed" element={<EmailConfirmed />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/admin/dashboard" element={<RequireRole role="ADMIN"><AdminDashboard /></RequireRole>} />
 
             {/* 👤 CANDIDATE FLOW */}

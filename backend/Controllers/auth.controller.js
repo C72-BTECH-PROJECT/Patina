@@ -50,6 +50,80 @@ export const logout = (req, res) => {
   });
 };
 
+export const resendConfirmation = async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ message: 'Email is required.' });
+
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: String(email).trim().toLowerCase(),
+    options: { emailRedirectTo: `${FRONTEND_URL}/email-confirmed` },
+  });
+
+  if (error) return res.status(400).json({ message: error.message });
+  return res.status(200).json({ message: 'Confirmation email sent. Check your inbox and spam folder.' });
+};
+
+export const updatePassword = async (req, res) => {
+  const { username, newPassword } = req.body || {};
+  if (!username || !newPassword) {
+    return res.status(400).json({ message: 'Username and new password are required.' });
+  }
+
+  const trimmedUsername = String(username).trim();
+
+  let profile = null;
+  let profileError = null;
+
+  try {
+    const profileResult = await supabase
+      .from('profiles')
+      .select('id, email')
+      .ilike('username', trimmedUsername)
+      .maybeSingle();
+    profile = profileResult.data;
+    profileError = profileResult.error;
+  } catch (e) {
+    profileError = e;
+  }
+
+  if (!profile && !profileError) {
+    const { data: authUsersList } = await supabase.auth.admin.listUsers();
+    const matchedAuthUser = (authUsersList?.users || []).find((u) => {
+      const metaUsername = u.user_metadata?.username || u.raw_user_meta_data?.username;
+      return String(metaUsername || '').toLowerCase() === trimmedUsername.toLowerCase();
+    });
+
+    if (matchedAuthUser) {
+      profile = {
+        id: matchedAuthUser.id,
+        email: matchedAuthUser.email,
+      };
+    }
+  }
+
+  if (!profile) {
+    return res.status(404).json({ message: 'User not found.' });
+  }
+
+  const authEmail = profile.email;
+  if (!authEmail) {
+    return res.status(400).json({ message: 'Auth email not found for this user.' });
+  }
+
+  const { error: updateError } = await supabase.auth.admin.updateUserById(profile.id, {
+    password: newPassword,
+    email_confirm: true,
+  });
+
+  if (updateError) {
+    console.error('Password update failed:', updateError.message);
+    return res.status(400).json({ message: updateError.message });
+  }
+
+  return res.status(200).json({ message: 'Password updated successfully. You can now log in.' });
+};
+
 export const signup = async (req, res) => {
   const { role, email, password, name, username, companyName, verificationInfo } = req.body || {};
   const normalizedRole = String(role || 'candidate').toLowerCase();
@@ -90,6 +164,20 @@ export const signup = async (req, res) => {
   if (error) return res.status(400).json({ message: error.message });
   if (!data.user) return res.status(500).json({ message: 'Account creation did not return a user.' });
 
+  const { error: profileError } = await supabase.from('profiles').insert({
+    id: data.user.id,
+    username: normalizedUsername,
+    first_name: firstName,
+    last_name: lastName,
+    role: normalizedRole,
+    company_name: companyName || '',
+    verification_info: verificationInfo || '',
+  });
+
+  if (profileError) {
+    console.error('Signup profile insert failed:', profileError.message);
+  }
+
   return res.status(201).json({
     message: data.session ? 'Account created successfully.' : 'Account created. Check your email to confirm the account before signing in.',
   });
@@ -101,19 +189,24 @@ export const login = async (req, res) => {
     return res.status(400).json({ message: 'Username and password are required.' });
   }
 
+  const trimmedUsername = String(username).trim();
+  console.log(`Login attempt for username: ${trimmedUsername}`);
+
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('id, role, is_suspended')
-    .ilike('username', String(username).trim())
+    .ilike('username', trimmedUsername)
     .maybeSingle();
 
-  if (profileError || !profile) {
-    if (profileError) {
-      console.error('Login profile lookup failed:', profileError.message);
-      return res.status(503).json({
-        message: 'Authentication setup is incomplete. Apply the Supabase migrations and try again.',
-      });
-    }
+  if (profileError) {
+    console.error('Login profile lookup failed:', profileError.message);
+    return res.status(503).json({
+      message: 'Authentication setup is incomplete. Apply the Supabase migrations and try again.',
+    });
+  }
+
+  if (!profile) {
+    console.log(`No profile found for username: ${trimmedUsername}`);
     return res.status(401).json({ message: 'Invalid username or password.' });
   }
 
@@ -125,8 +218,12 @@ export const login = async (req, res) => {
   }
 
   const { data: authUser, error: authUserError } = await supabase.auth.admin.getUserById(profile.id);
-  if (authUserError || !authUser.user?.email) {
-    if (authUserError) console.error('Login auth-user lookup failed:', authUserError.message);
+  if (authUserError) {
+    console.error('Login auth-user lookup failed:', authUserError.message);
+    return res.status(401).json({ message: 'Invalid username or password.' });
+  }
+  if (!authUser.user?.email) {
+    console.error('Auth user has no email for profile:', profile.id);
     return res.status(401).json({ message: 'Invalid username or password.' });
   }
 
@@ -138,7 +235,8 @@ export const login = async (req, res) => {
     return res.status(403).json({ message: 'Please confirm your email before signing in.' });
   }
   if (signInError || !signInData.user) {
-    return res.status(401).json({ message: 'Invalid username or password.' });
+    console.error('Login signInWithPassword failed:', signInError?.message);
+    return res.status(401).json({ message: 'Invalid username or password. If you just signed up, confirm your email first.' });
   }
 
   const fullProfile = await loadProfile(signInData.user.id);

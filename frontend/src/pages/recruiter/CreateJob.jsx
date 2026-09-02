@@ -24,13 +24,13 @@ const AnimatedInput = ({ label, icon: Icon, ...props }) => (
     className="relative group"
     whileFocusWithin={{ scale: 1.01 }}
   >
-    <label className="block text-sm font-medium text-white/80 mb-2 flex items-center gap-2">
+    <label className="block text-sm font-medium text-foreground mb-2 flex items-center gap-2">
       <Icon className="w-4 h-4 text-accent-purple" />
       {label}
     </label>
     <input
       {...props}
-      className="w-full px-5 py-4 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all"
+      className="w-full px-5 py-4 bg-muted border border-border rounded-xl text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all"
     />
     {/* Focus Glow Effect */}
     <motion.div
@@ -47,13 +47,13 @@ const AnimatedTextarea = ({ label, icon: Icon, ...props }) => (
     className="relative group"
     whileFocusWithin={{ scale: 1.01 }}
   >
-    <label className="block text-sm font-medium text-white/80 mb-2 flex items-center gap-2">
+    <label className="block text-sm font-medium text-foreground mb-2 flex items-center gap-2">
       <Icon className="w-4 h-4 text-accent-purple" />
       {label}
     </label>
     <textarea
       {...props}
-      className="w-full px-5 py-4 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder:text-white/20 resize-none focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all"
+      className="w-full px-5 py-4 bg-muted border border-border rounded-xl text-foreground placeholder:text-foreground/20 resize-none focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all"
     />
   </motion.div>
 );
@@ -65,8 +65,8 @@ const SkillTag = ({ skill, selected, onClick, index }) => (
     onClick={onClick}
     className={`relative px-4 py-2 rounded-xl text-sm font-medium transition-all overflow-hidden ${
       selected
-        ? 'bg-accent-purple/30 border border-accent-purple/50 text-white'
-        : 'bg-white/5 border border-white/10 text-white/60 hover:border-white/20'
+        ? 'bg-accent-purple/30 border border-accent-purple/50 text-foreground'
+        : 'bg-muted border border-border text-foreground/60 hover:border-foreground/30'
     }`}
     initial={{ opacity: 0, scale: 0.8 }}
     animate={{ opacity: 1, scale: 1 }}
@@ -95,10 +95,10 @@ const FormProgress = ({ currentStep }) => (
         <motion.div
           className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
             step < currentStep
-              ? 'bg-accent-emerald text-white'
+              ? 'bg-accent-emerald text-foreground'
               : step === currentStep
-              ? 'bg-accent-purple text-white'
-              : 'bg-white/10 text-white/40'
+              ? 'bg-accent-purple text-foreground'
+              : 'bg-muted text-foreground/40'
           }`}
           animate={step === currentStep ? { scale: [1, 1.1, 1] } : {}}
           transition={{ duration: 1, repeat: step === currentStep ? Infinity : 0 }}
@@ -106,9 +106,9 @@ const FormProgress = ({ currentStep }) => (
           {step < currentStep ? <Check className="w-4 h-4" /> : step}
         </motion.div>
         {step < 3 && (
-          <div className="w-12 h-0.5 bg-white/10">
+          <div className="w-12 h-0.5 bg-muted">
             <motion.div
-              className="h-full bg-gradient-to-r from-accent-purple to-accent-cyan"
+              className="h-full bg-gradient-to-r bg-primary"
               initial={{ width: '0%' }}
               animate={{ width: step < currentStep ? '100%' : '0%' }}
               transition={{ duration: 0.5 }}
@@ -136,7 +136,7 @@ const AISuggestion = ({ text, onAccept, onDismiss }) => (
         <div className="flex items-center gap-2 mb-1">
           <span className="text-sm font-medium text-accent-cyan">AI Suggestion</span>
         </div>
-        <p className="text-sm text-white/60 mb-2">{text}</p>
+        <p className="text-sm text-foreground/60 mb-2">{text}</p>
         <div className="flex gap-2">
           <button
             onClick={onAccept}
@@ -146,7 +146,7 @@ const AISuggestion = ({ text, onAccept, onDismiss }) => (
           </button>
           <button
             onClick={onDismiss}
-            className="px-3 py-1.5 rounded-lg bg-white/5 text-white/40 text-xs font-medium hover:bg-white/10 transition-all"
+            className="px-3 py-1.5 rounded-lg bg-muted text-foreground/40 text-xs font-medium hover:bg-muted transition-all"
           >
             Dismiss
           </button>
@@ -235,7 +235,7 @@ function CreateJob() {
   }, [description]);
 
   return (
-    <div className="min-h-screen bg-background text-white relative overflow-hidden">
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
       {/* Noise Overlay */}
       <div className="noise-overlay" />
 
@@ -252,7 +252,7 @@ function CreateJob() {
       >
         <Link
           to="/recruiter/dashboard"
-          className="flex items-center gap-2 text-white/60 hover:text-white transition-colors no-underline group"
+          className="flex items-center gap-2 text-foreground/60 hover:text-foreground transition-colors no-underline group"
         >
           <motion.span
             animate={{ x: [0, -5, 0] }}
@@ -273,10 +273,10 @@ function CreateJob() {
           animate={{ opacity: 1, y: 0 }}
         >
           <h1 className="text-4xl font-extrabold mb-4">
-            <span className="text-white">Create New </span>
-            <span className="gradient-text">Job Listing</span>
+            <span className="text-foreground">Create New </span>
+            <span className="text-foreground">Job Listing</span>
           </h1>
-          <p className="text-white/50 max-w-xl mx-auto">
+          <p className="text-foreground/50 max-w-xl mx-auto">
             Fill out the details below to start receiving vetted candidates powered by AI skill verification.
           </p>
         </motion.div>
@@ -287,7 +287,7 @@ function CreateJob() {
         {/* Form Card */}
         <motion.form
           onSubmit={handleCreate}
-          className="glass-card p-8 md:p-10 relative"
+          className="card p-8 md:p-10 relative"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -326,7 +326,7 @@ function CreateJob() {
                 />
 
                 <div>
-                  <label className="block text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
+                  <label className="block text-sm font-medium text-foreground mb-3 flex items-center gap-2">
                     <Clock className="w-4 h-4 text-accent-purple" />
                     Experience Level
                   </label>
@@ -334,14 +334,14 @@ function CreateJob() {
                     <select
                       value={experience}
                       onChange={(e) => setExperience(e.target.value)}
-                      className="w-full px-5 py-4 bg-white/[0.03] border border-white/10 rounded-xl text-white appearance-none cursor-pointer focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all"
+                      className="w-full px-5 py-4 bg-muted border border-border rounded-xl text-foreground appearance-none cursor-pointer focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all"
                     >
                       <option value="" className="bg-background">Select Level...</option>
                       <option value="0-2 years" className="bg-background">0-2 years (Entry Level)</option>
                       <option value="2-5 years" className="bg-background">2-5 years (Mid Level)</option>
                       <option value="5+ years" className="bg-background">5+ years (Senior Level)</option>
                     </select>
-                    <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 pointer-events-none" />
+                    <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 pointer-events-none" />
                   </div>
                 </div>
 
@@ -352,8 +352,8 @@ function CreateJob() {
                     disabled={!title || !experience || !location}
                     className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${
                       title && experience && location
-                        ? 'bg-gradient-to-r from-accent-purple to-accent-cyan text-white cursor-pointer'
-                        : 'bg-white/10 text-white/40 cursor-not-allowed'
+                        ? 'bg-gradient-to-r bg-primary text-foreground cursor-pointer'
+                        : 'bg-muted text-foreground/40 cursor-not-allowed'
                     }`}
                     whileHover={title && experience && location ? { scale: 1.02 } : {}}
                     whileTap={title && experience && location ? { scale: 0.98 } : {}}
@@ -374,12 +374,12 @@ function CreateJob() {
                 className="space-y-6"
               >
                 <div>
-                  <label className="block text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
+                  <label className="block text-sm font-medium text-foreground mb-3 flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-accent-purple" />
                     Required Skills
-                    <span className="text-xs text-white/40 ml-auto">{skills.length} selected</span>
+                    <span className="text-xs text-foreground/40 ml-auto">{skills.length} selected</span>
                   </label>
-                  <p className="text-xs text-white/30 mb-4">Select the core skills required for this position.</p>
+                  <p className="text-xs text-foreground/30 mb-4">Select the core skills required for this position.</p>
                   <div className="flex flex-wrap gap-2">
                     {SUGGESTED_SKILLS.map((skill, i) => (
                       <SkillTag
@@ -407,7 +407,7 @@ function CreateJob() {
                   <motion.button
                     type="button"
                     onClick={prevStep}
-                    className="px-6 py-3 rounded-xl font-medium bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
+                    className="px-6 py-3 rounded-xl font-medium bg-muted border border-border text-foreground hover:bg-muted transition-all"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -420,8 +420,8 @@ function CreateJob() {
                     disabled={skills.length === 0}
                     className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${
                       skills.length > 0
-                        ? 'bg-gradient-to-r from-accent-purple to-accent-cyan text-white cursor-pointer'
-                        : 'bg-white/10 text-white/40 cursor-not-allowed'
+                        ? 'bg-gradient-to-r bg-primary text-foreground cursor-pointer'
+                        : 'bg-muted text-foreground/40 cursor-not-allowed'
                     }`}
                     whileHover={skills.length > 0 ? { scale: 1.02 } : {}}
                     whileTap={skills.length > 0 ? { scale: 0.98 } : {}}
@@ -442,7 +442,7 @@ function CreateJob() {
                 className="space-y-6"
               >
                 <div>
-                  <label className="block text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
+                  <label className="block text-sm font-medium text-foreground mb-3 flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-accent-purple" />
                     Job Description
                   </label>
@@ -472,7 +472,7 @@ function CreateJob() {
                 {/* Selected Skills Preview */}
                 {skills.length > 0 && (
                   <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                    <div className="text-xs text-white/40 mb-2">Selected Skills</div>
+                    <div className="text-xs text-foreground/40 mb-2">Selected Skills</div>
                     <div className="flex flex-wrap gap-2">
                       {skills.map((skill) => (
                         <span
@@ -490,7 +490,7 @@ function CreateJob() {
                   <motion.button
                     type="button"
                     onClick={prevStep}
-                    className="px-6 py-3 rounded-xl font-medium bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
+                    className="px-6 py-3 rounded-xl font-medium bg-muted border border-border text-foreground hover:bg-muted transition-all"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -502,8 +502,8 @@ function CreateJob() {
                     disabled={!description.trim() || isSubmitting}
                     className={`px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all ${
                       description.trim() && !isSubmitting
-                        ? 'bg-gradient-to-r from-accent-purple to-accent-cyan text-white cursor-pointer shadow-glow-purple'
-                        : 'bg-white/10 text-white/40 cursor-not-allowed'
+                        ? 'bg-gradient-to-r bg-primary text-foreground cursor-pointer '
+                        : 'bg-muted text-foreground/40 cursor-not-allowed'
                     }`}
                     whileHover={description.trim() && !isSubmitting ? { scale: 1.02 } : {}}
                     whileTap={description.trim() && !isSubmitting ? { scale: 0.98 } : {}}
@@ -532,7 +532,7 @@ function CreateJob() {
 
         {/* Tips */}
         <motion.div
-          className="mt-8 text-center text-sm text-white/30"
+          className="mt-8 text-center text-sm text-foreground/30"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}

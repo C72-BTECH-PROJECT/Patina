@@ -23,52 +23,49 @@ function CandidateLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-white">
-      <div className="noise-overlay" />
-      <div className="fixed inset-0 bg-grid-pattern opacity-10 pointer-events-none" />
-
+    <div className="min-h-screen bg-background text-foreground">
       <motion.nav
-        className="fixed top-0 left-0 right-0 z-50 px-6 py-4 border-b border-white/5 backdrop-blur-xl bg-background/80"
+        className="fixed top-0 left-0 right-0 z-50 px-6 py-3 border-b border-border bg-background/80 backdrop-blur-md"
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        transition={{ duration: 0.6 }}
+        transition={{ duration: 0.4 }}
       >
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link to="/candidate/dashboard" className="flex items-center gap-3 no-underline group">
-            <span className="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-accent-purple to-accent-cyan rounded-xl group-hover:shadow-glow-purple transition-shadow">
-              <Zap className="w-5 h-5 text-white" />
-            </span>
-            <span className="font-extrabold text-xl tracking-tight text-white">PATINA</span>
-            <span className="text-xs text-white/40 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <Link to="/candidate/dashboard" className="flex items-center gap-2.5 no-underline">
+            <div className="w-7 h-7 flex items-center justify-center bg-primary rounded-md">
+              <Zap className="w-3.5 h-3.5 text-primary-foreground" />
+            </div>
+            <span className="font-bold text-base tracking-tight text-foreground">PATINA</span>
+            <span className="text-xs font-medium text-muted-foreground px-2 py-0.5 rounded-full bg-muted">
               Candidate
             </span>
           </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {navItems.map((item) => (
               <Link
                 key={item.to}
                 to={item.to}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all no-underline"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-all no-underline"
               >
                 <item.icon className="w-4 h-4" />
-                {item.label}
+                <span className="hidden sm:inline">{item.label}</span>
               </Link>
             ))}
             <button
               type="button"
               onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
             >
               <LogOut className="w-4 h-4" />
-              Sign out
+              <span className="hidden sm:inline">Sign out</span>
             </button>
           </div>
         </div>
       </motion.nav>
 
-      <main className="pt-24 pb-12 px-6">
-        <div className="max-w-7xl mx-auto">
+      <main className="pt-20 pb-12 px-6">
+        <div className="max-w-6xl mx-auto">
           <Outlet />
         </div>
       </main>

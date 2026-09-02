@@ -17,50 +17,49 @@ function CandidateProfile() {
   };
 
   if (loading) {
-    return <div className="text-white/60">Loading profile...</div>;
+    return <div className="text-muted-foreground">Loading profile...</div>;
   }
 
   if (!user) {
-    return <div className="text-white/60">Please sign in to view your profile.</div>;
+    return <div className="text-muted-foreground">Please sign in to view your profile.</div>;
   }
 
   return (
-    <div className="glass-card p-8 relative overflow-hidden">
-      <div className="corner-decoration top-left" />
-      <div className="corner-decoration bottom-right" />
-
-      <h1 className="text-2xl font-bold text-white mb-6">My Profile</h1>
+    <div className="card p-8">
+      <h1 className="text-2xl font-bold text-foreground mb-6">My Profile</h1>
 
       <div className="space-y-4 mb-8">
-        <div className="flex items-center gap-3 text-white/80">
-          <User className="w-5 h-5 text-accent-purple" />
+        <div className="flex items-center gap-3 text-foreground">
+          <User className="w-5 h-5" />
           <span>{user.name || "Unnamed Candidate"}</span>
         </div>
-        <div className="flex items-center gap-3 text-white/80">
-          <Mail className="w-5 h-5 text-accent-cyan" />
+        <div className="flex items-center gap-3 text-foreground">
+          <Mail className="w-5 h-5" />
           <span>{user.email}</span>
         </div>
-        <div className="flex items-center gap-3 text-white/80">
-          <MapPin className="w-5 h-5 text-accent-emerald" />
+        <div className="flex items-center gap-3 text-foreground">
+          <MapPin className="w-5 h-5" />
           <span>{user.location || "Location not set"}</span>
         </div>
       </div>
 
-      <Link
-        to="/candidate/upload"
-        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-accent-purple to-accent-cyan text-white font-semibold no-underline hover:shadow-glow-purple transition-all"
-      >
-        <FileUp className="w-5 h-5" />
-        Upload / Update Resume
-      </Link>
-      <button
-        type="button"
-        onClick={handleLogout}
-        className="ml-3 inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-white/10 text-white/80 font-semibold hover:bg-white/5 transition-all"
-      >
-        <LogOut className="w-5 h-5" />
-        Sign out
-      </button>
+      <div className="flex items-center gap-3">
+        <Link
+          to="/candidate/upload"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground font-medium text-body-sm hover:bg-primary/90 transition-colors no-underline"
+        >
+          <FileUp className="w-4 h-4" />
+          Upload / Update Resume
+        </Link>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background text-foreground font-medium text-body-sm hover:bg-accent transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign out
+        </button>
+      </div>
     </div>
   );
 }

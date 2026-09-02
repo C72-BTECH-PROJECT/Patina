@@ -1,20 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { TrendingUp, Users, Briefcase, CheckCircle, Clock, AlertTriangle, ChevronRight, Star, Filter, Download, Plus, Zap, Eye, Calendar } from 'lucide-react';
+import { TrendingUp, Users, Briefcase, CheckCircle, Clock, AlertTriangle, ChevronRight, Star, Filter, Download, Plus, Eye, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-// Glow Orb Component
-const GlowOrb = ({ className }) => (
-  <div className={`absolute w-96 h-96 rounded-full filter blur-3xl opacity-20 ${className}`}>
-    <div className={`w-full h-full rounded-full bg-gradient-to-br from-accent-purple/40 to-accent-cyan/30 animate-glow-pulse`} />
-  </div>
-);
-
-// Animated Counter
 const AnimatedCounter = ({ end, suffix = '', duration = 1.5 }) => {
   const [count, setCount] = React.useState(0);
 
@@ -32,112 +24,95 @@ const AnimatedCounter = ({ end, suffix = '', duration = 1.5 }) => {
   return <span>{count}{suffix}</span>;
 };
 
-// Stat Card Component
 const StatCard = ({ icon: Icon, label, value, trend, color, delay }) => (
   <motion.div
-    className="glass-card p-6 relative overflow-hidden group"
+    className="card p-6 relative overflow-hidden group"
     initial={{ opacity: 0, y: 30 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay }}
     whileHover={{ y: -4 }}
   >
-    <div className="corner-decoration top-left" />
-    <div className="corner-decoration bottom-right" />
-
-    {/* Background Glow */}
-    <div className={`absolute -top-20 -right-20 w-40 h-40 rounded-full bg-${color}/10 filter blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-
     <div className="relative z-10">
       <div className="flex items-center justify-between mb-4">
-        <div className={`w-12 h-12 rounded-xl bg-${color}/20 flex items-center justify-center`}>
-          <Icon className={`w-6 h-6 text-${color}`} />
+        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+          <Icon className="w-6 h-6 text-foreground" />
         </div>
         {trend && (
           <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-            trend > 0 ? 'bg-accent-emerald/20 text-accent-emerald' : 'bg-accent-rose/20 text-accent-rose'
+            trend > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
           }`}>
             {trend > 0 ? '+' : ''}{trend}%
           </span>
         )}
       </div>
 
-      <div className="text-3xl font-extrabold text-white mb-1">
+      <div className="text-3xl font-extrabold text-foreground mb-1">
         <AnimatedCounter end={value} />
       </div>
-      <div className="text-sm text-white/40">{label}</div>
+      <div className="text-sm text-muted-foreground">{label}</div>
     </div>
   </motion.div>
 );
 
-// Candidate Card Component
 const CandidateCard = ({ candidate, rank }) => {
-  const scoreColor = candidate.credibilityScore >= 80 ? 'accent-emerald' :
-                     candidate.credibilityScore >= 60 ? 'accent-amber' : 'accent-rose';
+  const scoreColor = candidate.credibilityScore >= 80 ? 'text-success' :
+                     candidate.credibilityScore >= 60 ? 'text-warning' : 'text-destructive';
 
   return (
     <motion.div
-      className="glass-card p-5 relative group cursor-pointer"
+      className="card p-5 relative group cursor-pointer"
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      whileHover={{ scale: 1.02, x: 4 }}
+      whileHover={{ scale: 1.01, x: 2 }}
       transition={{ type: 'spring', stiffness: 300 }}
     >
-      <div className="corner-decoration top-left" />
-      <div className="corner-decoration bottom-right" />
-
       <div className="flex items-center gap-4">
-        {/* Rank */}
-        <div className={`w-10 h-10 rounded-xl ${
-          rank === 1 ? 'bg-accent-amber/20' : rank === 2 ? 'bg-white/10' : rank === 3 ? 'bg-accent-amber/10' : 'bg-white/5'
-        } flex items-center justify-center font-bold text-white/70`}>
+        <div className={`w-10 h-10 rounded-lg ${
+          rank === 1 ? 'bg-warning/10' : rank === 2 ? 'bg-muted' : rank === 3 ? 'bg-warning/5' : 'bg-muted'
+        } flex items-center justify-center font-bold text-foreground`}>
           #{rank}
         </div>
 
-        {/* Avatar */}
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-purple/30 to-accent-cyan/30 flex items-center justify-center">
-          <span className="font-bold text-white">
+        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+          <span className="font-bold text-foreground">
             {candidate.candidateInfo?.name?.split(' ').map(n => n[0]).join('') || 'UN'}
           </span>
         </div>
 
-        {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-white truncate">
+          <div className="font-semibold text-foreground truncate">
             {candidate.candidateInfo?.name || 'Unknown'}
           </div>
-          <div className="text-sm text-white/40 truncate">
+          <div className="text-sm text-muted-foreground truncate">
             {candidate.candidateInfo?.location || 'Location unknown'}
           </div>
         </div>
 
-        {/* Score */}
         <div className="text-right">
-          <div className={`text-2xl font-extrabold text-${scoreColor}`}>
+          <div className={`text-2xl font-extrabold ${scoreColor}`}>
             {candidate.credibilityScore}
           </div>
-          <div className="text-xs text-white/30">Score</div>
+          <div className="text-xs text-muted-foreground">Score</div>
         </div>
 
-        {/* View Button */}
-        <ChevronRight className="w-5 h-5 text-white/30 group-hover:text-white/70 transition-colors" />
+        <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
       </div>
 
-      {/* Skills Tags */}
       <div className="flex gap-2 mt-3 flex-wrap">
         {candidate.skills?.slice(0, 3).map((skill, i) => (
           <span
             key={i}
             className={`px-2 py-0.5 rounded-full text-xs ${
               skill.verified
-                ? 'bg-accent-emerald/20 text-accent-emerald'
-                : 'bg-accent-amber/20 text-accent-amber'
+                ? 'bg-success/10 text-success'
+                : 'bg-warning/10 text-warning'
             }`}
           >
             {skill.name}
           </span>
         ))}
         {candidate.skills?.length > 3 && (
-          <span className="px-2 py-0.5 rounded-full text-xs bg-white/5 text-white/40">
+          <span className="px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">
             +{candidate.skills.length - 3}
           </span>
         )}
@@ -146,39 +121,35 @@ const CandidateCard = ({ candidate, rank }) => {
   );
 };
 
-// Job Card Component
 const JobCard = ({ job, index }) => (
   <motion.div
-    className="glass-card p-5 relative group cursor-pointer"
+    className="card p-5 relative group cursor-pointer"
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay: index * 0.1 }}
-    whileHover={{ scale: 1.02 }}
+    whileHover={{ scale: 1.01 }}
   >
-    <div className="corner-decoration top-left" />
-    <div className="corner-decoration bottom-right" />
-
     <div className="flex items-center justify-between mb-3">
-      <h3 className="font-bold text-white">{job.title}</h3>
+      <h3 className="font-bold text-foreground">{job.title}</h3>
       <Link
         to={`/recruiter/jobs/${job._id}`}
-        className="px-3 py-1.5 rounded-lg bg-accent-purple/20 border border-accent-purple/30 text-accent-purple text-xs font-medium hover:bg-accent-purple/30 transition-all"
+        className="px-3 py-1.5 rounded-md bg-muted border border-border text-foreground text-xs font-medium hover:bg-muted/80 transition-all no-underline"
       >
         View →
       </Link>
     </div>
 
-    <p className="text-sm text-white/40 line-clamp-1 mb-3">{job.description}</p>
+    <p className="text-sm text-muted-foreground line-clamp-1 mb-3">{job.description}</p>
 
     <div className="flex items-center gap-2 flex-wrap">
       {job.requiredSkills?.map((skill, i) => (
-        <span key={i} className="px-2 py-0.5 rounded-full bg-white/5 text-white/60 text-xs">
+        <span key={i} className="px-2 py-0.5 rounded-full bg-muted text-foreground text-xs">
           {skill}
         </span>
       ))}
     </div>
 
-    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/5 text-xs text-white/30">
+    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
       <span className="flex items-center gap-1">
         <Clock className="w-3 h-3" />
         {job.experienceLevel || 'Any'}
@@ -191,12 +162,11 @@ const JobCard = ({ job, index }) => (
   </motion.div>
 );
 
-// Chart Data
 const skillsDistribution = [
-  { name: 'React', value: 35, color: '#8b5cf6' },
-  { name: 'Node.js', value: 25, color: '#06b6d4' },
-  { name: 'Python', value: 20, color: '#10b981' },
-  { name: 'Other', value: 20, color: '#ec4899' },
+  { name: 'React', value: 35, color: '#0a0a0a' },
+  { name: 'Node.js', value: 25, color: '#525252' },
+  { name: 'Python', value: 20, color: '#737373' },
+  { name: 'Other', value: 20, color: '#a3a3a3' },
 ];
 
 const weeklyApplications = [
@@ -209,9 +179,8 @@ const weeklyApplications = [
   { day: 'Sun', applications: 5 },
 ];
 
-const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#ec4899'];
+const COLORS = ['#0a0a0a', '#525252', '#737373', '#a3a3a3'];
 
-// Main Dashboard Component
 function RecruiterDashboard() {
   const [applications, setApplications] = React.useState([]);
   const [jobs, setJobs] = React.useState([]);
@@ -227,7 +196,6 @@ function RecruiterDashboard() {
         ]);
         const data = candidateResponse.ok ? await candidateResponse.json() : [];
         const jobData = jobsResponse.ok ? await jobsResponse.json() : [];
-        // Map backend candidate schema to frontend expectation
         const mappedData = data.map(c => ({
           _id: c.id || Math.random().toString(),
           candidateInfo: c.candidate,
@@ -252,24 +220,23 @@ function RecruiterDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <motion.div
         className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
         <div>
-          <h1 className="text-3xl font-extrabold text-white mb-2">
+          <h1 className="text-3xl font-extrabold text-foreground mb-2">
             Recruiter Dashboard
           </h1>
-          <p className="text-white/50">
-            Welcome back, <span className="text-accent-purple">Amit</span>. Here's your hiring overview.
+          <p className="text-muted-foreground">
+            Welcome back, <span className="text-foreground font-medium">Amit</span>. Here's your hiring overview.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <motion.button
-            className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-medium flex items-center gap-2 hover:bg-white/10 transition-all"
+            className="px-4 py-2 rounded-md border border-input bg-background text-foreground text-sm font-medium flex items-center gap-2 hover:bg-accent transition-all"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
@@ -279,7 +246,7 @@ function RecruiterDashboard() {
 
           <Link
             to="/recruiter/create-job"
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-accent-purple to-accent-cyan text-white text-sm font-medium flex items-center gap-2 hover:shadow-glow-purple transition-all no-underline"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors no-underline"
           >
             <Plus className="w-4 h-4" />
             Create New Job
@@ -287,7 +254,6 @@ function RecruiterDashboard() {
         </div>
       </motion.div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={Briefcase} label="Active Jobs" value={jobs.length} color="accent-purple" delay={0.1} />
         <StatCard icon={Users} label="Total Candidates" value={applications.length} trend={12} color="accent-cyan" delay={0.2} />
@@ -295,66 +261,50 @@ function RecruiterDashboard() {
         <StatCard icon={Clock} label="Pending Review" value={pendingCount} color="accent-amber" delay={0.4} />
       </div>
 
-      {/* Charts Row */}
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Weekly Applications Chart */}
         <motion.div
-          className="glass-card p-6 lg:col-span-2 relative"
+          className="card p-6 lg:col-span-2 relative"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
         >
-          <div className="corner-decoration top-left" />
-          <div className="corner-decoration bottom-right" />
-
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-accent-purple" />
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
               Weekly Applications
             </h3>
             <div className="flex gap-2">
-              <button className="px-3 py-1.5 rounded-lg bg-accent-purple/20 text-accent-purple text-xs font-medium">Week</button>
-              <button className="px-3 py-1.5 rounded-lg bg-white/5 text-white/50 text-xs font-medium hover:bg-white/10">Month</button>
+              <button className="px-3 py-1.5 rounded-md bg-muted text-foreground text-xs font-medium">Week</button>
+              <button className="px-3 py-1.5 rounded-md bg-background text-muted-foreground text-xs font-medium hover:bg-accent">Month</button>
             </div>
           </div>
 
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={weeklyApplications}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="day" stroke="rgba(255,255,255,0.3)" fontSize={12} />
-              <YAxis stroke="rgba(255,255,255,0.3)" fontSize={12} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'rgba(10,10,15,0.9)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '12px',
-                  backdropFilter: 'blur(20px)',
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px',
                 }}
-                itemStyle={{ color: '#fff' }}
+                itemStyle={{ color: 'hsl(var(--foreground))' }}
               />
-              <Bar dataKey="applications" fill="url(#barGradient)" radius={[8, 8, 0, 0]} />
-              <defs>
-                <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#8b5cf6" />
-                  <stop offset="100%" stopColor="#06b6d4" />
-                </linearGradient>
-              </defs>
+              <Bar dataKey="applications" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
 
-        {/* Skills Distribution */}
         <motion.div
-          className="glass-card p-6 relative"
+          className="card p-6 relative"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
         >
-          <div className="corner-decoration top-left" />
-          <div className="corner-decoration bottom-right" />
-
-          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-            <Star className="w-5 h-5 text-accent-amber" />
+          <h3 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
+            <Star className="w-5 h-5" />
             Top Skills
           </h3>
 
@@ -376,9 +326,9 @@ function RecruiterDashboard() {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: 'rgba(10,10,15,0.9)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '12px',
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
                   }}
                 />
               </PieChart>
@@ -388,7 +338,7 @@ function RecruiterDashboard() {
               {skillsDistribution.map((skill, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: skill.color }} />
-                  <span className="text-xs text-white/60">{skill.name}</span>
+                  <span className="text-xs text-muted-foreground">{skill.name}</span>
                 </div>
               ))}
             </div>
@@ -396,26 +346,21 @@ function RecruiterDashboard() {
         </motion.div>
       </div>
 
-      {/* Two Column Layout */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Top Candidates */}
         <motion.div
-          className="glass-card p-6 relative"
+          className="card p-6 relative"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
         >
-          <div className="corner-decoration top-left" />
-          <div className="corner-decoration bottom-right" />
-
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Eye className="w-5 h-5 text-accent-cyan" />
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Eye className="w-5 h-5" />
               Top Candidates
             </h3>
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-white/40" />
-              <select className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 focus:outline-none focus:border-accent-purple/50">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <select className="bg-background border border-input rounded-md px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="all">All</option>
                 <option value="high">High Score</option>
                 <option value="shortlisted">Shortlisted</option>
@@ -431,31 +376,27 @@ function RecruiterDashboard() {
 
           <Link
             to="/recruiter/jobs"
-            className="mt-4 flex items-center justify-center gap-2 text-sm text-accent-purple hover:text-accent-cyan transition-colors"
+            className="mt-4 flex items-center justify-center gap-2 text-sm text-foreground hover:text-foreground/80 transition-colors"
           >
             View all candidates
             <ChevronRight className="w-4 h-4" />
           </Link>
         </motion.div>
 
-        {/* Recent Jobs */}
         <motion.div
-          className="glass-card p-6 relative"
+          className="card p-6 relative"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
         >
-          <div className="corner-decoration top-left" />
-          <div className="corner-decoration bottom-right" />
-
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-accent-purple" />
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Briefcase className="w-5 h-5" />
               Recent Jobs
             </h3>
             <Link
               to="/recruiter/create-job"
-              className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/70 text-xs font-medium hover:bg-white/10 transition-all no-underline"
+              className="px-3 py-1.5 rounded-md bg-muted border border-border text-foreground text-xs font-medium hover:bg-muted/80 transition-all no-underline"
             >
               + Add New
             </Link>
@@ -469,7 +410,7 @@ function RecruiterDashboard() {
 
           <Link
             to="/recruiter/jobs"
-            className="mt-4 flex items-center justify-center gap-2 text-sm text-accent-purple hover:text-accent-cyan transition-colors"
+            className="mt-4 flex items-center justify-center gap-2 text-sm text-foreground hover:text-foreground/80 transition-colors"
           >
             View all jobs
             <ChevronRight className="w-4 h-4" />
@@ -477,36 +418,32 @@ function RecruiterDashboard() {
         </motion.div>
       </div>
 
-      {/* Alerts Section */}
       <motion.div
-        className="glass-card p-6 relative"
+        className="card p-6 relative"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.9 }}
       >
-        <div className="corner-decoration top-left" />
-        <div className="corner-decoration bottom-right" />
-
         <div className="flex items-center gap-3 mb-4">
-          <AlertTriangle className="w-5 h-5 text-accent-amber" />
-          <h3 className="text-lg font-bold text-white">Attention Required</h3>
+          <AlertTriangle className="w-5 h-5 text-warning" />
+          <h3 className="text-lg font-bold text-foreground">Attention Required</h3>
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl bg-accent-amber/5 border border-accent-amber/20">
+          <div className="p-4 rounded-xl bg-muted border border-border">
             <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-4 h-4 text-accent-amber" />
-              <span className="font-medium text-accent-amber">3 Pending Reviews</span>
+              <Clock className="w-4 h-4 text-warning" />
+              <span className="font-medium text-warning">3 Pending Reviews</span>
             </div>
-            <p className="text-sm text-white/50">Candidates waiting for your review since last week</p>
+            <p className="text-sm text-muted-foreground">Candidates waiting for your review since last week</p>
           </div>
 
-          <div className="p-4 rounded-xl bg-accent-rose/5 border border-accent-rose/20">
+          <div className="p-4 rounded-xl bg-destructive/5 border border-border">
             <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-accent-rose" />
-              <span className="font-medium text-accent-rose">2 Flagged Applications</span>
+              <AlertTriangle className="w-4 h-4 text-destructive" />
+              <span className="font-medium text-destructive">2 Flagged Applications</span>
             </div>
-            <p className="text-sm text-white/50">Potential inconsistencies detected in skill claims</p>
+            <p className="text-sm text-muted-foreground">Potential inconsistencies detected in skill claims</p>
           </div>
         </div>
       </motion.div>

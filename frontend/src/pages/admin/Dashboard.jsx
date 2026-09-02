@@ -5,10 +5,10 @@ import { useAuth } from '../../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 const cards = [
-  ['candidates', 'Candidates', Users, 'text-accent-cyan'],
-  ['recruiters', 'Recruiters', UserRoundCheck, 'text-accent-purple'],
-  ['jobs', 'Jobs posted', BriefcaseBusiness, 'text-accent-emerald'],
-  ['suspended', 'Access suspended', ShieldOff, 'text-rose-300'],
+  ['candidates', 'Candidates', Users, 'text-foreground'],
+  ['recruiters', 'Recruiters', UserRoundCheck, 'text-foreground'],
+  ['jobs', 'Jobs posted', BriefcaseBusiness, 'text-foreground'],
+  ['suspended', 'Access suspended', ShieldOff, 'text-destructive'],
 ];
 
 function AdminDashboard() {
@@ -67,11 +67,69 @@ function AdminDashboard() {
   const signOut = async () => { await logout(); navigate('/login', { replace: true }); };
   if (loading || user?.role !== 'ADMIN') return null;
 
-  return <main className="min-h-screen bg-background px-5 py-7 text-white sm:px-8"><div className="mx-auto max-w-6xl">
-    <header className="flex items-center justify-between gap-4 border-b border-white/10 pb-6"><Link to="/" className="flex items-center gap-2 text-xl font-extrabold no-underline text-white"><Zap className="h-5 w-5 text-accent-cyan" /> PATINA</Link><div className="flex items-center gap-4"><span className="hidden text-sm text-white/50 sm:block">{user.username}</span><button onClick={signOut} className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Sign out</button></div></header>
-    <section className="py-10"><p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent-cyan">Platform control</p><h1 className="mt-2 text-3xl font-bold sm:text-4xl">Administrator dashboard</h1><p className="mt-2 text-white/55">Monitor activity and manage access without deleting accounts.</p>{syncInfo && <p className="mt-3 text-xs text-white/35">Live sync: {syncInfo.source} · {syncInfo.project} · recruiter records received: {syncInfo.recruitersReceived}{syncInfo.generatedAt ? ` · ${new Date(syncInfo.generatedAt).toLocaleTimeString()}` : ''}</p>}</section>
-    <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{cards.map(([key, label, Icon, color]) => <div key={key} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"><Icon className={`h-5 w-5 ${color}`} /><p className="mt-5 text-3xl font-bold">{overview?.[key] ?? '—'}</p><p className="mt-1 text-sm text-white/50">{label}</p></div>)}</section>
-    <section className="mt-9 rounded-2xl border border-white/10 bg-white/[0.03]"><div className="flex flex-col justify-between gap-4 border-b border-white/10 p-5 sm:flex-row sm:items-center"><div><h2 className="text-xl font-bold">Account access</h2><p className="mt-1 text-sm text-white/50">Suspended accounts stay in the database and can be reactivated any time.</p></div><ShieldCheck className="h-6 w-6 text-accent-emerald" /></div><div className="flex gap-2 border-b border-white/10 px-5 pt-4">{['candidate', 'recruiter'].map((role) => <button key={role} onClick={() => selectTab(role)} className={`border-b-2 px-4 pb-3 text-sm font-semibold capitalize ${tab === role ? 'border-accent-cyan text-white' : 'border-transparent text-white/45 hover:text-white/75'}`}>{role}s</button>)}</div>{notice && <div className="mx-5 mt-5 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/75">{notice}</div>}<div className="divide-y divide-white/8">{busy ? <p className="p-6 text-sm text-white/50">Loading accounts…</p> : accounts.length === 0 ? <p className="p-6 text-sm text-white/50">No {tab}s have registered yet.</p> : accounts.map((account) => <div key={account.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><p className="font-semibold">{account.username}</p>{account.isSuspended && <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-xs font-semibold text-rose-200">Suspended</span>}</div><p className="mt-1 text-sm text-white/50">{account.name || 'No name'}{account.companyName ? ` · ${account.companyName}` : ''}</p></div><button disabled={savingId === account.id} onClick={() => updateAccess(account)} className={`rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 ${account.isSuspended ? 'bg-accent-emerald/15 text-accent-emerald hover:bg-accent-emerald/25' : 'bg-rose-500/15 text-rose-200 hover:bg-rose-500/25'}`}>{savingId === account.id ? 'Saving…' : account.isSuspended ? 'Reactivate access' : 'Suspend access'}</button></div>)}</div></section>
-  </div></main>;
+  return (
+    <main className="min-h-screen bg-background px-5 py-7 text-foreground sm:px-8">
+      <div className="mx-auto max-w-6xl">
+        <header className="flex items-center justify-between gap-4 border-b border-border pb-6">
+          <Link to="/" className="flex items-center gap-2 text-xl font-extrabold no-underline text-foreground">
+            <Zap className="h-5 w-5" /> PATINA
+          </Link>
+          <div className="flex items-center gap-4">
+            <span className="hidden text-sm text-muted-foreground sm:block">{user.username}</span>
+            <button onClick={signOut} className="rounded-md border border-input bg-background px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors">Sign out</button>
+          </div>
+        </header>
+        <section className="py-10">
+          <p className="text-sm font-semibold uppercase tracking-widest text-foreground">Platform control</p>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl text-foreground">Administrator dashboard</h1>
+          <p className="mt-2 text-muted-foreground">Monitor activity and manage access without deleting accounts.</p>
+          {syncInfo && <p className="mt-3 text-xs text-muted-foreground">Live sync: {syncInfo.source} · {syncInfo.project} · recruiter records received: {syncInfo.recruitersReceived}{syncInfo.generatedAt ? ` · ${new Date(syncInfo.generatedAt).toLocaleTimeString()}` : ''}</p>}
+        </section>
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {cards.map(([key, label, Icon, color]) => (
+            <div key={key} className="card p-5">
+              <Icon className={`h-5 w-5 ${color}`} />
+              <p className="mt-5 text-3xl font-bold text-foreground">{overview?.[key] ?? '—'}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{label}</p>
+            </div>
+          ))}
+        </section>
+        <section className="mt-9 card">
+          <div className="flex flex-col justify-between gap-4 border-b border-border p-5 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Account access</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Suspended accounts stay in the database and can be reactivated any time.</p>
+            </div>
+            <ShieldCheck className="h-6 w-6 text-success" />
+          </div>
+          <div className="flex gap-2 border-b border-border px-5 pt-4">
+            {['candidate', 'recruiter'].map((role) => (
+              <button key={role} onClick={() => selectTab(role)} className={`border-b-2 px-4 pb-3 text-sm font-semibold capitalize ${tab === role ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+                {role}s
+              </button>
+            ))}
+          </div>
+          {notice && <div className="mx-5 mt-5 rounded-md border border-border bg-muted px-4 py-3 text-sm text-foreground">{notice}</div>}
+          <div className="divide-y divide-border">
+            {busy ? <p className="p-6 text-sm text-muted-foreground">Loading accounts…</p> : accounts.length === 0 ? <p className="p-6 text-sm text-muted-foreground">No {tab}s have registered yet.</p> : accounts.map((account) => (
+              <div key={account.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-foreground">{account.username}</p>
+                    {account.isSuspended && <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">Suspended</span>}
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">{account.name || 'No name'}{account.companyName ? ` · ${account.companyName}` : ''}</p>
+                </div>
+                <button disabled={savingId === account.id} onClick={() => updateAccess(account)} className={`rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50 ${account.isSuspended ? 'bg-success/10 text-success hover:bg-success/20' : 'bg-destructive/10 text-destructive hover:bg-destructive/20'}`}>
+                  {savingId === account.id ? 'Saving…' : account.isSuspended ? 'Reactivate' : 'Suspend'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
 }
+
 export default AdminDashboard;
