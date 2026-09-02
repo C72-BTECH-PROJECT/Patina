@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 
 function RecruiterLayout() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navItems = [
     { to: '/recruiter/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/recruiter/jobs', icon: Briefcase, label: 'Jobs' },
@@ -14,7 +14,7 @@ function RecruiterLayout() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/', { replace: true });
+    window.location.href = '/login';
   };
 
   return (
@@ -76,7 +76,14 @@ function RecruiterLayout() {
               to="/recruiter/profile"
               className="w-8 h-8 rounded-md bg-muted flex items-center justify-center font-semibold text-xs text-foreground border border-border hover:bg-muted/80 transition-all"
             >
-              AV
+              {(() => {
+                const fullName = user?.name || user?.email || '';
+                const parts = fullName.split(' ').filter(Boolean);
+                const initials = parts.length >= 2
+                  ? `${parts[0][0]}${parts[1][0]}`
+                  : fullName.slice(0, 2);
+                return initials.toUpperCase();
+              })()}
             </Link>
             <button
               type="button"

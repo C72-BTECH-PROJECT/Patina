@@ -19,12 +19,19 @@ def extract_from_docx(file_path: str) -> str:
             text += paragraph.text + "\n"
     return text.strip()
 
+def extract_from_txt(file_path: str) -> str:
+    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+        return f.read().strip()
+
+
 def extract_text(file_path: str) -> str:
     ext = os.path.splitext(file_path)[1].lower()
     if ext == ".pdf":
         return extract_from_pdf(file_path)
     elif ext == ".docx":
         return extract_from_docx(file_path)
+    elif ext == ".txt":
+        return extract_from_txt(file_path)
     else:
         raise ValueError(f"Unsupported file type: {ext}")
 

@@ -186,7 +186,7 @@ function RecruiterDashboard() {
   const [applications, setApplications] = React.useState([]);
   const [jobs, setJobs] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
-  const { authFetch } = useAuth();
+  const { authFetch, user } = useAuth();
 
   React.useEffect(() => {
     const loadDashboard = async () => {
@@ -240,7 +240,7 @@ function RecruiterDashboard() {
             Recruiter Dashboard
           </h1>
           <p className="text-muted-foreground">
-            Welcome back, <span className="text-foreground font-medium">Amit</span>. Here's your hiring overview.
+            Welcome back, <span className="text-foreground font-medium">{user?.name || 'Recruiter'}</span>. Here's your hiring overview.
           </p>
         </div>
 

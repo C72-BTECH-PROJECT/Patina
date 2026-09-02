@@ -40,6 +40,19 @@ const Building = ({ className }) => (
   </svg>
 );
 
+// Floating Particle Component
+const FloatingParticle = ({ delay = 0, x = 0, y = 0 }) => (
+  <motion.div
+    className="absolute w-1.5 h-1.5 bg-foreground rounded-full"
+    style={{ left: x, top: y }}
+    animate={{
+      y: [0, -14, 0],
+      opacity: [0.15, 0.6, 0.15],
+    }}
+    transition={{ duration: 3.5, repeat: Infinity, delay }}
+  />
+);
+
 // Credential Score Demo Component
 const CredibilityDemo = () => {
   const [score, setScore] = useState(0);
@@ -55,10 +68,17 @@ const CredibilityDemo = () => {
   return (
     <motion.div
       className="relative w-80 h-80 mx-auto"
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.85 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.6, delay: 0.3 }}
+      transition={{ duration: 0.8, delay: 0.5 }}
     >
+      {/* Outer subtle ring */}
+      <motion.div
+        className="absolute inset-0 rounded-full border border-border"
+        animate={{ opacity: [0.4, 0.9, 0.4] }}
+        transition={{ duration: 3, repeat: Infinity }}
+      />
+
       {/* Main Circle SVG */}
       <svg className="w-full h-full -rotate-90" viewBox="0 0 260 260">
         {/* Background Circle */}
@@ -71,66 +91,76 @@ const CredibilityDemo = () => {
           strokeWidth="8"
         />
         {/* Progress Circle */}
-        {score > 0 && (
-          <motion.circle
-            cx="130"
-            cy="130"
-            r="120"
-            fill="none"
-            stroke="hsl(var(--primary))"
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            initial={{ strokeDashoffset: circumference }}
-            animate={{ strokeDashoffset }}
-            transition={{ duration: 1.5, delay: 0.5, ease: 'easeOut' }}
-          />
-        )}
+        <motion.circle
+          cx="130"
+          cy="130"
+          r="120"
+          fill="none"
+          stroke="hsl(var(--primary))"
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset }}
+          transition={{ duration: 2, delay: 0.5, ease: 'easeOut' }}
+        />
       </svg>
 
       {/* Center Content */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        {score === 0 ? (
-          <div className="relative flex items-center justify-center">
-            <div className="w-20 h-20 border-2 border-border border-t-primary rounded-full animate-spin" />
-            <span className="absolute text-xs text-muted-foreground uppercase tracking-widest">Loading</span>
-          </div>
-        ) : (
-          <>
-            <motion.span
-              className="text-6xl font-bold text-foreground"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
+        <motion.span
+          className="text-7xl font-extrabold text-foreground"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1 }}
+        >
+          {score === 0 ? <AnimatedCounter end={82} /> : score}
+        </motion.span>
+        <motion.span
+          className="text-xs text-muted-foreground mt-2 uppercase tracking-widest"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+        >
+          Credibility Score
+        </motion.span>
+        <motion.div
+          className="flex gap-2 mt-4"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.4 }}
+        >
+          {['Python', 'React', 'Node'].map((skill, i) => (
+            <span
+              key={skill}
+              className="px-3 py-1 text-xs rounded-full bg-muted text-muted-foreground"
             >
-              {score}
-            </motion.span>
-            <span className="text-xs text-muted-foreground mt-1 uppercase tracking-widest">Credibility Score</span>
-            <div className="flex gap-2 mt-3">
-              {['Python', 'React', 'Node'].map((skill, i) => (
-                <motion.span
-                  key={skill}
-                  className="px-2.5 py-1 text-xs rounded-full bg-muted text-muted-foreground"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 + i * 0.1 }}
-                >
-                  {skill}
-                </motion.span>
-              ))}
-            </div>
-            <motion.div
-              className="mt-3 px-3 py-1 rounded-full bg-success/10 text-success text-xs font-medium"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.9 }}
-            >
+              {skill}
+            </span>
+          ))}
+        </motion.div>
+        <motion.div
+          className="mt-4 px-4 py-1.5 rounded-full bg-success/10 text-success text-xs font-medium border border-success/20"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 1.6 }}
+        >
           ✓ Verified
         </motion.div>
-          </>
-        )}
       </div>
+
+      {/* Floating Elements */}
+      {[
+        { left: '12%', top: '18%', delay: 0 },
+        { left: '82%', top: '14%', delay: 0.6 },
+        { left: '8%', top: '68%', delay: 1.2 },
+        { left: '86%', top: '62%', delay: 1.8 },
+        { left: '48%', top: '6%', delay: 2.4 },
+        { left: '42%', top: '91%', delay: 3 },
+      ].map((pos, i) => (
+        <FloatingParticle key={i} delay={pos.delay} x={pos.left} y={pos.top} />
+      ))}
     </motion.div>
   );
 };

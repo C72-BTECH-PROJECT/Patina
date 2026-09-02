@@ -15,7 +15,7 @@ function CandidateLayout() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/', { replace: true });
+    window.location.href = '/login';
   };
 
   return (
