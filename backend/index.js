@@ -9,6 +9,13 @@ import adminRoutes from './Routes/admin.routes.js';
 
 import session from 'express-session';
 
+if (!process.env.SESSION_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET environment variable must be set in production.');
+  }
+  console.warn('[WARNING] SESSION_SECRET is not set. Using an insecure default — set SESSION_SECRET in backend/.env before deploying.');
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 

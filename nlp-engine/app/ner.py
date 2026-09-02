@@ -25,6 +25,7 @@ SKILL_KEYWORDS = [
     "github", "gitlab", "bitbucket", "linux", "terraform", "ansible",
     "nginx", "apache", "heroku", "vercel", "netlify", "cloudflare",
     "digitalocean", "circleci", "tomcat", "grunt", "maven",
+    "devops", "ci/cd", "mern stack",
 
     # data science and ml
     "tensorflow", "pytorch", "keras", "scikit-learn", "pandas", "numpy",
@@ -38,7 +39,7 @@ SKILL_KEYWORDS = [
     "expo",
 
     # general tech
-    "html", "css", "sass", "rest", "api", "microservices", "agile",
+    "html", "css", "sass", "microservices",
     "scrum", "sql", "nosql", "json", "xml", "yaml", "jwt", "oauth",
     "websocket", "grpc", "kafka", "rabbitmq", "celery",
 
@@ -52,9 +53,90 @@ SKILL_KEYWORDS = [
     "typescript", "exponentjs",
 ]
 
+# Store one canonical value for variants that appear frequently in resumes and
+# job descriptions.  This improves recall without changing the API response.
+SKILL_ALIASES = {
+    "javascript": ("javascript", "java script", "js"),
+    "typescript": ("typescript", "type script", "ts"),
+    "nodejs": ("nodejs", "node.js", "node js"),
+    "nextjs": ("nextjs", "next.js", "next js"),
+    "nuxtjs": ("nuxtjs", "nuxt.js", "nuxt js"),
+    "react": ("react", "react.js", "reactjs"),
+    "vue": ("vue", "vue.js", "vuejs"),
+    "angular": ("angular", "angularjs", "angular.js"),
+    "postgresql": ("postgresql", "postgres", "postgre sql"),
+    "mongodb": ("mongodb", "mongo db", "mongo"),
+    "scikit-learn": ("scikit-learn", "scikit learn", "sklearn"),
+    "pytorch": ("pytorch", "py torch"),
+    "c#": ("c#", "c sharp", "csharp"),
+    "c++": ("c++", "cpp", "c plus plus"),
+    ".net": (".net", "dotnet", "dot net"),
+}
+
+# These words occur in ordinary prose, so only accept clear technical forms.
+GENERIC_SKILL_PATTERNS = {
+    "rest": r"(?<![a-z])rest(?:ful)?\s*(?:api|apis|service|services)(?![a-z])",
+    "api": r"\bapis?\b",
+    "agile": r"\bagile\s*(?:methodology|development|team|environment|practices?)\b",
+    "scrum": r"\b(?:scrum|scrum master|sprint planning)\b",
+    "oop": r"\b(?:oop|object[ -]oriented programming)\b",
+}
+
+
+def extract_skills(text: str) -> list:
+    """Return ordered, canonical skills found in text."""
+    text_lower = text.lower()
+    found_skills = []
+
+    for skill in SKILL_KEYWORDS:
+        aliases = SKILL_ALIASES.get(skill, (skill,))
+        if any(re.search(r'(?<!\w)' + re.escape(alias) + r'(?!\w)', text_lower) for alias in aliases):
+            found_skills.append(skill)
+
+    for skill, pattern in GENERIC_SKILL_PATTERNS.items():
+        if re.search(pattern, text_lower) and skill not in found_skills:
+            found_skills.append(skill)
+
+    # Skills supported by aliases but not yet present in the original catalog.
+    for skill, aliases in SKILL_ALIASES.items():
+        if skill not in found_skills and any(
+            re.search(r'(?<!\w)' + re.escape(alias) + r'(?!\w)', text_lower)
+            for alias in aliases
+        ):
+            found_skills.append(skill)
+
+    return found_skills
+
+
+def is_plausible_organisation(value: str) -> bool:
+    """Reject resume headings, skills and qualifications mislabeled as ORG."""
+    normalized = " ".join(value.split()).strip()
+    lowered = normalized.lower()
+    non_organisation_terms = {
+        *SKILL_KEYWORDS,
+        *SKILL_ALIASES.keys(),
+        "phone", "email", "linkedin", "github", "concepts", "skills",
+        "technical skills", "cloud & devops", "computer engineering",
+        "bachelor of technology", "b.tech", "master of technology", "m.tech",
+        "college name", "university name", "education", "experience",
+        "projects", "certifications", "maven concepts", "mern", "mern stack",
+        "crud", "ec2", "vpc", "ecr", "eks", "ci",
+    }
+
+    # Multi-line entities commonly span neighbouring resume headings/bullets,
+    # rather than being a company name.
+    if "\n" in value or lowered in non_organisation_terms:
+        return False
+    if any(term in lowered for term in ("data structures", "algorithms", "database design", "system design")):
+        return False
+    if lowered in {alias for aliases in SKILL_ALIASES.values() for alias in aliases}:
+        return False
+    if lowered in extract_skills(normalized):
+        return False
+    return len(normalized) >= 2
+
 def extract_entities(text: str) -> dict:
     doc = nlp(text)
-    text_lower = text.lower()
 
     # ── 0. CANDIDATE NAME ────────────────────────────────
     candidate_name = None
@@ -67,21 +149,21 @@ def extract_entities(text: str) -> dict:
                  break
 
     # ── 1. SKILLS — word boundary matching ──────────────
-    found_skills = []
-    for skill in SKILL_KEYWORDS:
-        pattern = r'\b' + re.escape(skill) + r'\b'
-        if re.search(pattern, text_lower, re.IGNORECASE):
-            if skill not in found_skills:
-                found_skills.append(skill)
+    found_skills = extract_skills(text)
 
     # ── 2. EXPERIENCE ────────────────────────────────────
     experience = []
+    seen_organisations = set()
     for ent in doc.ents:
         if ent.label_ == "ORG":
-            experience.append({
-                "type": "organisation",
-                "value": ent.text.strip()
-            })
+            value = ent.text.strip()
+            key = " ".join(value.lower().split())
+            if is_plausible_organisation(value) and key not in seen_organisations:
+                experience.append({
+                    "type": "organisation",
+                    "value": value
+                })
+                seen_organisations.add(key)
         elif ent.label_ == "DATE":
             experience.append({
                 "type": "date",
@@ -108,18 +190,27 @@ def extract_entities(text: str) -> dict:
                 break
 
     # ── 4. PROJECTS ──────────────────────────────────────
-    project_keywords = [
-        "project", "built", "developed", "created", "implemented",
-        "designed", "deployed", "worked on", "contributed",
-        "architected", "launched", "led"
-    ]
     projects = []
+    in_projects_section = False
     
     i = 0
     while i < len(lines):
         line = lines[i]
         line_lower = line.lower()
-        is_project = any(keyword in line_lower for keyword in project_keywords)
+        # Action verbs alone are not project evidence: employment bullets also
+        # contain "developed" and "implemented".  Require a Projects heading
+        # or an explicit project reference instead.
+        looks_like_heading = len(line.split()) <= 5 and (
+            line.isupper() or line.endswith(":")
+        )
+        if looks_like_heading:
+            in_projects_section = "project" in line_lower
+            i += 1
+            continue
+
+        is_project = in_projects_section or bool(
+            re.search(r'\b(?:project|capstone|personal project)\b', line_lower)
+        )
         
         if is_project:
             # Clean bullet points from title
@@ -131,7 +222,7 @@ def extract_entities(text: str) -> dict:
             while j < len(lines) and j < i + 4:
                 desc_line = lines[j]
                 # Break if next line looks like a new section heading
-                if len(desc_line.split()) < 3 and desc_line.isupper():
+                if len(desc_line.split()) < 3 and (desc_line.isupper() or desc_line.endswith(":")):
                     break
                 clean_desc = re.sub(r'^[\W_]+', '', desc_line).strip()
                 if clean_desc:

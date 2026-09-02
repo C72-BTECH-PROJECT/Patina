@@ -1,10 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Local Windows sessions can retain old SUPABASE_* system variables. In
-// development, the project-specific backend/.env must be authoritative so the
-// API and local verification queries always target the same Supabase project.
-dotenv.config({ override: process.env.NODE_ENV !== 'production' });
+const configDirectory = path.dirname(fileURLToPath(import.meta.url));
+const envPath = path.resolve(configDirectory, '../.env');
+
+// The local API must use this project's credentials. Inherited Windows/VS Code
+// variables can otherwise supply an old anon key: public jobs still load, but
+// RLS hides profiles and makes the admin dashboard show zero users.
+dotenv.config({ path: envPath, override: true });
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
