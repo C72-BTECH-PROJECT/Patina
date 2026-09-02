@@ -8,14 +8,20 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 const RESET_REDIRECT_URL = `${FRONTEND_URL}/reset-password`;
 const MIN_PASSWORD_LENGTH = 8;
 
-// A short-lived client that carries only the public anon key. Password changes
-// must run AS THE USER, authorised by the recovery token from the reset email —
-// never with the service-role key. `supabase.auth.admin.updateUserById` is
-// deliberately not used anywhere in the reset flow.
+// A short-lived client carrying only the public anon key, for every GoTrue
+// operation that establishes or uses a user session (login, signup, password
+// recovery, resend-confirmation).
+//
+// These must NEVER run on the shared service-role client in Config/supabase.js:
+// supabase-js caches the returned session in memory, and from then on every
+// query on that singleton is sent with the user's JWT instead of the
+// service-role key — so all RLS-bypassing writes (resumes, scores, storage
+// uploads) start failing process-wide with "new row violates row-level
+// security policy" until the server restarts.
 const createUserScopedClient = () => {
   const anonKey = process.env.SUPABASE_ANON_KEY;
   if (!anonKey) {
-    throw new Error('SUPABASE_ANON_KEY is not configured — required for the password reset flow.');
+    throw new Error('SUPABASE_ANON_KEY is not configured — required for auth flows.');
   }
   return createClient(process.env.SUPABASE_URL, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -72,7 +78,15 @@ export const resendConfirmation = async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ message: 'Email is required.' });
 
-  const { error } = await supabase.auth.resend({
+  let authClient;
+  try {
+    authClient = createUserScopedClient();
+  } catch (err) {
+    console.error('resendConfirmation misconfigured:', err?.message || err);
+    return res.status(500).json({ message: 'Email confirmation is not available right now.' });
+  }
+
+  const { error } = await authClient.auth.resend({
     type: 'signup',
     email: String(email).trim().toLowerCase(),
     options: { emailRedirectTo: `${FRONTEND_URL}/email-confirmed` },
@@ -210,7 +224,17 @@ export const signup = async (req, res) => {
     return res.status(400).json({ message: 'Password must be at least 8 characters.' });
   }
 
-  const { data, error } = await supabase.auth.signUp({
+  let authClient;
+  try {
+    authClient = createUserScopedClient();
+  } catch (err) {
+    console.error('signup misconfigured:', err?.message || err);
+    return res.status(500).json({ message: 'Account creation is not available right now.' });
+  }
+
+  // Runs on the anon client, not the shared service-role singleton — signUp can
+  // return a session and would otherwise poison every later service-role query.
+  const { data, error } = await authClient.auth.signUp({
     email: String(email).trim().toLowerCase(),
     password,
     options: {
@@ -225,6 +249,9 @@ export const signup = async (req, res) => {
       },
     },
   });
+
+  // Drop any session signUp may have opened on the throwaway client.
+  await authClient.auth.signOut().catch(() => {});
 
   if (error) return res.status(400).json({ message: error.message });
   if (!data.user) return res.status(500).json({ message: 'Account creation did not return a user.' });
@@ -292,10 +319,25 @@ export const login = async (req, res) => {
     return res.status(401).json({ message: 'Invalid username or password.' });
   }
 
-  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+  let authClient;
+  try {
+    authClient = createUserScopedClient();
+  } catch (err) {
+    console.error('Login misconfigured:', err?.message || err);
+    return res.status(500).json({
+      message: 'Authentication is not configured correctly. Set SUPABASE_ANON_KEY in backend/.env.',
+    });
+  }
+
+  // Verify the password on the anon client, never the shared service-role one
+  // (see createUserScopedClient). Discard the session immediately — the app's
+  // own Express session is the source of truth from here on.
+  const { data: signInData, error: signInError } = await authClient.auth.signInWithPassword({
     email: authUser.user.email,
     password,
   });
+  await authClient.auth.signOut().catch(() => {});
+
   if (signInError?.message?.toLowerCase().includes('email not confirmed')) {
     return res.status(403).json({ message: 'Please confirm your email before signing in.' });
   }

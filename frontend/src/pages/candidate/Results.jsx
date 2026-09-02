@@ -220,15 +220,33 @@ function Results() {
             icon={Wrench}
             title="Experience"
             count={experience.length}
-            empty="No experience entries were detected."
+            empty="No experience section was found in your résumé."
           >
-            <ul className="space-y-1.5">
+            <ul className="space-y-4">
               {experience.map((item, i) => (
-                <li key={i} className="text-body-sm text-foreground flex items-center gap-2">
-                  <span className="text-caption uppercase tracking-wide text-muted-foreground w-24 flex-shrink-0">
-                    {item.type || 'entry'}
-                  </span>
-                  <span>{item.value}</span>
+                <li key={i}>
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-body-sm font-medium text-foreground">
+                      {item.title || item.organisation || 'Role'}
+                    </span>
+                    {item.organisation && item.title && (
+                      <span className="text-body-sm text-muted-foreground">
+                        · {item.organisation}
+                      </span>
+                    )}
+                    {item.dates && (
+                      <span className="text-caption text-muted-foreground">{item.dates}</span>
+                    )}
+                  </div>
+                  {Array.isArray(item.highlights) && item.highlights.length > 0 && (
+                    <ul className="mt-1 space-y-0.5 list-disc pl-5">
+                      {item.highlights.map((h, j) => (
+                        <li key={j} className="text-caption text-muted-foreground leading-relaxed">
+                          {h}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>

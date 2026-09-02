@@ -148,6 +148,17 @@ export const buildParsingSubScore = (semanticAnalysis) => {
   const matchedSkills = asArray(sa.matched_skills);
   const missingSkills = asArray(sa.missing_skills);
 
+  // Which job-skill source the parser used (CHECKLIST 4.3). The stored job's
+  // structured `required_skills`/`preferred_skills` are authoritative; the
+  // markdown description is only scraped when no structured list exists.
+  const jdSource = sa.jd_source || (jdSkills.length ? 'parsed_description' : null);
+  const jdSourceNote =
+    jdSource === 'structured_skills'
+      ? " Job skills are taken from the role's listed required and preferred skills."
+      : jdSource === 'parsed_description'
+        ? ' Job skills were parsed from the job-description text because the role has no structured skill list.'
+        : '';
+
   // Emitted by the NLP service (embedder.SKILL_COVERAGE_WEIGHT /
   // SEMANTIC_SCORE_WEIGHT). The fallback matches an older service build.
   const componentWeights = sa.component_weights || {
@@ -183,7 +194,9 @@ export const buildParsingSubScore = (semanticAnalysis) => {
       display: `${matchedSkills.length} of ${jdSkills.length} job skills (${asPercent(skillCoverage)})`,
       direction: skillCoverage >= 0.5 ? 'positive' : 'negative',
       weight_within_factor: Number(componentWeights.skill_coverage) || 0,
-      note: 'Share of the technical skills named in the job description that also appear in the résumé.',
+      note:
+        'Share of the technical skills the job asks for that also appear in the résumé.' +
+        jdSourceNote,
     });
   }
   if (semanticScore != null) {
@@ -232,6 +245,7 @@ export const buildParsingSubScore = (semanticAnalysis) => {
     reason: null,
     components: {
       similarity_score: similarity,
+      jd_source: jdSource,
       semantic_score: semanticScore,
       skill_coverage: skillCoverage,
       focused_score: sa.focused_score ?? null,

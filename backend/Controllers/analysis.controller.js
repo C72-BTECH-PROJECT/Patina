@@ -12,6 +12,53 @@ const upload = multer({ storage: multer.memoryStorage() });
 const NLP_PARSE_URL = process.env.NLP_PARSE_URL || 'http://localhost:8000/parse';
 const PARSER_VERSION = 'nlp-engine@1.0.0';
 
+// The `resumes` storage bucket is created with an `allowed_mime_types`
+// allow-list (application/pdf + the DOCX type). Browsers and multer frequently
+// report an upload part as `application/octet-stream` — for DOCX especially, and
+// for PDFs on some OS/browser combos — which the bucket then rejects with a 415.
+// Trust the file extension first so the common case actually stores the file.
+const MIME_BY_EXT = {
+  '.pdf': 'application/pdf',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
+
+const resolveContentType = (file) => {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  if (MIME_BY_EXT[ext]) return MIME_BY_EXT[ext];
+  if (file.mimetype && file.mimetype !== 'application/octet-stream') return file.mimetype;
+  return 'application/octet-stream';
+};
+
+// Supabase hands back two different error shapes: a PostgrestError
+// (`code`/`message`/`details`/`hint`) from the database, and a StorageApiError
+// (`name`/`status`/`statusCode`/`message`) from storage. The bare `.message`
+// drops the code and hint, which are exactly what makes a failure diagnosable.
+const describeSupabaseError = (error) => {
+  if (!error) return 'unknown error';
+  const parts = [];
+  const code = error.code ?? error.statusCode;
+  if (code != null) parts.push(`code=${code}`);
+  if (error.status != null) parts.push(`status=${error.status}`);
+  if (error.message) parts.push(`message=${error.message}`);
+  if (error.details) parts.push(`details=${error.details}`);
+  if (error.hint) parts.push(`hint=${error.hint}`);
+  return parts.join(' | ') || String(error);
+};
+
+const isRlsError = (error) =>
+  error?.code === '42501' || /row-level security/i.test(error?.message || '');
+
+const RLS_HINT =
+  'Postgres row-level security rejected this write. The backend must talk to Supabase with the ' +
+  'service-role key: check SUPABASE_SERVICE_ROLE_KEY in backend/.env (it must decode to role ' +
+  '"service_role") and restart the server. If the key is correct, confirm the migration ' +
+  'supabase/migrations/20260903_create_resumes_and_scores.sql has been applied to this project.';
+
+const logPersistenceError = (context, error) => {
+  console.error(`[analyze] ${context} failed: ${describeSupabaseError(error)}`);
+  if (isRlsError(error)) console.error(`[analyze] ${RLS_HINT}`);
+};
+
 // Shape a persisted score (+ its resume, job and candidate profile) into the
 // object the recruiter dashboard and candidate view consume.
 //
@@ -88,7 +135,7 @@ export const analyzeResume = [
 
       const { data: job, error: jobError } = await supabase
         .from('jobs')
-        .select('id, title, description, experience_level, location')
+        .select('id, title, description, required_skills, preferred_skills, experience_level, location')
         .eq('id', String(jobId))
         .eq('status', 'published')
         .maybeSingle();
@@ -96,10 +143,15 @@ export const analyzeResume = [
         return res.status(404).json({ message: 'Job not found' });
       }
 
-      // FastAPI expects: resume (UploadFile) + jd (Form)
+      // FastAPI expects: resume (UploadFile) + jd (Form). The stored job is the
+      // sole authoritative JD — a candidate-supplied description is never sent.
+      // The structured skill lists are the primary job-skill source; `jd` (the
+      // markdown description) is only the text for semantic similarity.
       const form = new FormData();
       form.append('resume', req.file.buffer, req.file.originalname);
       form.append('jd', job.description);
+      form.append('required_skills', JSON.stringify(job.required_skills ?? []));
+      form.append('preferred_skills', JSON.stringify(job.preferred_skills ?? []));
 
       const response = await fetch(NLP_PARSE_URL, { method: 'POST', body: form });
       if (!response.ok) {
@@ -119,16 +171,16 @@ export const analyzeResume = [
         const { error: uploadError } = await supabase.storage
           .from('resumes')
           .upload(objectPath, req.file.buffer, {
-            contentType: req.file.mimetype || 'application/octet-stream',
+            contentType: resolveContentType(req.file),
             upsert: false,
           });
         if (uploadError) {
-          console.error('Resume file upload failed:', uploadError.message);
+          logPersistenceError('resume file storage upload', uploadError);
         } else {
           fileRef = objectPath;
         }
       } catch (uploadErr) {
-        console.error('Resume file upload threw:', uploadErr?.message || uploadErr);
+        console.error('[analyze] resume file storage upload threw:', uploadErr);
       }
 
       const entities = nlpJson?.entities || {};
@@ -161,9 +213,12 @@ export const analyzeResume = [
         .select()
         .single();
       if (resumeError) {
-        return res
-          .status(500)
-          .json({ message: 'Failed to persist parsed resume', error: resumeError.message });
+        logPersistenceError('resumes insert', resumeError);
+        return res.status(500).json({
+          message: 'Failed to persist parsed resume',
+          error: resumeError.message,
+          code: resumeError.code ?? null,
+        });
       }
 
       const score = buildScoreRecord(nlpJson);
@@ -182,15 +237,19 @@ export const analyzeResume = [
         .select()
         .single();
       if (scoreError) {
-        return res
-          .status(500)
-          .json({ message: 'Failed to persist score', error: scoreError.message });
+        logPersistenceError('scores insert', scoreError);
+        return res.status(500).json({
+          message: 'Failed to persist score',
+          error: scoreError.message,
+          code: scoreError.code ?? null,
+        });
       }
 
       return res.json(
         serializeCandidate({ score: scoreRow, resume: resumeRow, job, profile: null })
       );
     } catch (err) {
+      console.error('[analyze] unhandled failure:', err);
       return res.status(500).json({ message: 'Analyze failed', error: String(err?.message || err) });
     }
   },
