@@ -3,6 +3,7 @@ import path from 'path';
 import multer from 'multer';
 import FormData from 'form-data';
 import fetch from 'node-fetch';
+import path from 'path';
 
 import supabase from '../Config/supabase.js';
 
@@ -12,6 +13,115 @@ const NLP_PARSE_URL = process.env.NLP_PARSE_URL || 'http://localhost:8000/parse'
 const PARSER_VERSION = 'nlp-engine@1.0.0';
 
 const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));
+
+// Removes every other resume file from the candidate's folder, keeping only
+// the one just uploaded. This guarantees each profile has exactly one resume
+// even when the new file has a different extension than the old one.
+const pruneOldResumes = async (userId, keepName) => {
+  const { data: files } = await supabase.storage
+    .from('resumes')
+    .list(`candidates/${userId}`, { limit: 100 });
+
+  const stale = (Array.isArray(files) ? files : [])
+    .map((f) => f.name)
+    .filter((name) => name !== keepName);
+
+  if (stale.length === 0) return;
+
+  const { error } = await supabase.storage
+    .from('resumes')
+    .remove(stale.map((name) => `candidates/${userId}/${name}`));
+
+  if (error) console.error('Old resume cleanup failed:', error.message);
+};
+
+// Persist a candidate's resume to Supabase Storage ("resumes" bucket) so the
+// Apply action can later verify the candidate actually uploaded one. The resume
+// is saved once per candidate (upsert), reused for every job they apply to.
+const saveResumeToStorage = async (userId, file) => {
+  const ext = path.extname(file.originalname || '') || '.pdf';
+  const storagePath = `candidates/${userId}/resume${ext}`;
+
+  const { error } = await supabase.storage
+    .from('resumes')
+    .upload(storagePath, file.buffer, {
+      contentType: file.mimetype || 'application/pdf',
+      upsert: true,
+    });
+
+  if (error) {
+    console.error(
+      'Resume storage upload failed:',
+      JSON.stringify({ message: error.message, status: error.status ?? null, path: storagePath })
+    );
+    return false;
+  }
+
+  // Only after the new resume is safely stored, delete the old one(s).
+  await pruneOldResumes(userId, `resume${ext}`);
+  return true;
+};
+
+// Returns whether the current candidate has a resume in Supabase Storage.
+export const getMyResumeStatus = async (req, res) => {
+  const { data: files } = await supabase.storage
+    .from('resumes')
+    .list(`candidates/${req.session.userId}`, { limit: 100 });
+
+  const resumeFile = Array.isArray(files)
+    ? files.find((f) => f.name.startsWith('resume'))
+    : null;
+
+  return res.json({
+    hasResume: Boolean(resumeFile),
+    fileName: resumeFile?.name || null,
+    updatedAt: resumeFile?.updated_at || null,
+  });
+};
+
+// Dedicated endpoint for uploading / replacing the candidate's single resume.
+// Each candidate profile has exactly one resume, stored at a fixed path, so a
+// re-upload simply overwrites the previous one (upsert).
+export const uploadResume = [
+  upload.single('resume'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No resume file uploaded' });
+      }
+
+      const isPdf =
+        req.file.mimetype === 'application/pdf' ||
+        (req.file.originalname || '').toLowerCase().endsWith('.pdf');
+      const isDocx =
+        req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        (req.file.originalname || '').toLowerCase().endsWith('.docx');
+
+      if (!isPdf && !isDocx) {
+        return res.status(400).json({ message: 'Only PDF or DOCX resumes are supported.' });
+      }
+
+      const saved = await saveResumeToStorage(req.session.userId, req.file);
+      if (!saved) {
+        return res.status(500).json({ message: 'Could not save your resume. Please try again.' });
+      }
+
+      return res.status(200).json({
+        message: 'Resume uploaded successfully',
+        fileName: req.file.originalname,
+        size: req.file.size,
+      });
+    } catch (error) {
+      console.error('Resume upload failed:', error.message);
+      return res.status(500).json({ message: 'Could not upload your resume.' });
+    }
+  },
+];
+
+// In-memory array to store all candidate analyses for the Recruiter Dashboard
+export const allAnalyses = [];
+let latestAnalysis = null;
+let latestJob = null;
 
 const safeMatchLevel = (semanticSimilarity) => {
   if (semanticSimilarity >= 0.75) return 'High';

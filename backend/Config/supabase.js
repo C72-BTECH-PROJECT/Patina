@@ -20,6 +20,25 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
   );
 }
 
+// Startup guard: prove which role the configured key actually carries. An
+// anon/other key here silently breaks privileged writes (e.g. Storage uploads
+// fail with "new row violates row-level security policy") while public reads
+// keep working, which makes the bug very hard to trace from symptoms alone.
+const keyRoleClaim = (() => {
+  try {
+    const payloadPart = supabaseServiceRoleKey.split('.')[1];
+    const payload = JSON.parse(
+      Buffer.from(payloadPart.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+    );
+    return payload.role || 'unknown';
+  } catch {
+    return 'not-a-jwt';
+  }
+})();
+console.log(
+  `[supabase] url=${supabaseUrl} key-role=${keyRoleClaim} key=...${supabaseServiceRoleKey.slice(-6)}`
+);
+
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
