@@ -79,12 +79,9 @@ async def parse_resume(
                 "education": entities["education"],
                 "projects": entities["projects"]
             },
-            "semantic_analysis": {
-                "similarity_score": embedding_result["similarity_score"],
-                "focused_score": embedding_result["focused_score"],
-                "full_text_score": embedding_result["full_text_score"],
-                "match_level": embedding_result["match_level"]
-            }
+            # Keep the established fields and expose the score components so
+            # consumers can explain why a candidate did or did not match.
+            "semantic_analysis": embedding_result
         }
 
     finally:
