@@ -13,12 +13,8 @@ function RecruiterLayout() {
   ];
 
   const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/', { replace: true });
-    } catch (error) {
-      alert(error.message || 'Could not sign out.');
-    }
+    await logout();
+    navigate('/', { replace: true });
   };
 
   return (

@@ -88,22 +88,19 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
-    const response = await withCredentialsFetch(`${API_BASE_URL}/api/auth/logout`, {
-      method: "POST",
-    });
+    try {
+      const response = await withCredentialsFetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+      });
 
-    if (!response.ok) {
-      let message = "Logout failed";
-      try {
-        const data = await response.json();
-        message = data.message || message;
-      } catch {
-        // Response had no JSON body — keep the default message.
+      if (!response.ok) {
+        console.warn('Logout endpoint returned non-OK status');
       }
-      throw new Error(message);
+    } catch (error) {
+      console.warn('Logout request failed:', error);
+    } finally {
+      setUser(null);
     }
-
-    setUser(null);
   }, []);
 
   const authFetch = useCallback(withCredentialsFetch, []);
