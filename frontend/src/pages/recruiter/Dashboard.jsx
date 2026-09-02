@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp, Users, Briefcase, CheckCircle, Clock, AlertTriangle, ChevronRight, Star, Filter, Download, Plus, Eye, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
+import Spinner from '../../components/Spinner';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -217,6 +218,15 @@ function RecruiterDashboard() {
   const topCandidates = [...applications].sort((a, b) => b.credibilityScore - a.credibilityScore);
   const shortlistedCount = applications.filter(a => a.status === 'shortlisted').length;
   const pendingCount = applications.filter(a => a.status === 'applied').length;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Spinner size="lg" />
+        <p className="text-body-sm text-muted-foreground">Loading dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

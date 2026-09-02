@@ -71,52 +71,61 @@ const CredibilityDemo = () => {
           strokeWidth="8"
         />
         {/* Progress Circle */}
-        <motion.circle
-          cx="130"
-          cy="130"
-          r="120"
-          fill="none"
-          stroke="hsl(var(--primary))"
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset }}
-          transition={{ duration: 1.5, delay: 0.5, ease: 'easeOut' }}
-        />
+        {score > 0 && (
+          <motion.circle
+            cx="130"
+            cy="130"
+            r="120"
+            fill="none"
+            stroke="hsl(var(--primary))"
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            initial={{ strokeDashoffset: circumference }}
+            animate={{ strokeDashoffset }}
+            transition={{ duration: 1.5, delay: 0.5, ease: 'easeOut' }}
+          />
+        )}
       </svg>
 
       {/* Center Content */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span
-          className="text-6xl font-bold text-foreground"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-        >
-          {score}
-        </motion.span>
-        <span className="text-xs text-muted-foreground mt-1 uppercase tracking-widest">Credibility Score</span>
-        <div className="flex gap-2 mt-3">
-          {['Python', 'React', 'Node'].map((skill, i) => (
+        {score === 0 ? (
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin text-foreground" />
+            <span className="text-xs text-muted-foreground uppercase tracking-widest">Calculating score...</span>
+          </div>
+        ) : (
+          <>
             <motion.span
-              key={skill}
-              className="px-2.5 py-1 text-xs rounded-full bg-muted text-muted-foreground"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1 + i * 0.1 }}
+              className="text-6xl font-bold text-foreground"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
             >
-              {skill}
+              {score}
             </motion.span>
-          ))}
-        </div>
-        <motion.div
-          className="mt-3 px-3 py-1 rounded-full bg-success/10 text-success text-xs font-medium"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 1.3 }}
-        >
+            <span className="text-xs text-muted-foreground mt-1 uppercase tracking-widest">Credibility Score</span>
+            <div className="flex gap-2 mt-3">
+              {['Python', 'React', 'Node'].map((skill, i) => (
+                <motion.span
+                  key={skill}
+                  className="px-2.5 py-1 text-xs rounded-full bg-muted text-muted-foreground"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 + i * 0.1 }}
+                >
+                  {skill}
+                </motion.span>
+              ))}
+            </div>
+            <motion.div
+              className="mt-3 px-3 py-1 rounded-full bg-success/10 text-success text-xs font-medium"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.9 }}
+            >
           ✓ Verified
         </motion.div>
       </div>
