@@ -10,6 +10,13 @@ from app.ner import SKILL_ALIASES, extract_skills
 # local API while still providing useful sentence-level similarity.
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
+# How the two signals combine into the parsing sub-score. These are emitted with
+# every response as `component_weights` so the explainability layer can state
+# what each component contributed instead of hard-coding the same numbers again
+# on the Node side.
+SKILL_COVERAGE_WEIGHT = 0.60
+SEMANTIC_SCORE_WEIGHT = 0.40
+
 
 def get_embedding(text: str) -> list:
     embedding = model.encode(text, normalize_embeddings=True)
@@ -112,9 +119,18 @@ def analyse(
 
     # Named skills are the most checkable requirements in a technical JD.
     # For a JD without recognised skills, semantic context is the only signal.
-    final_score = semantic_score
     if skill_coverage is not None:
-        final_score = (0.60 * skill_coverage) + (0.40 * semantic_score)
+        component_weights = {
+            "skill_coverage": SKILL_COVERAGE_WEIGHT,
+            "semantic_score": SEMANTIC_SCORE_WEIGHT,
+        }
+        final_score = (
+            (SKILL_COVERAGE_WEIGHT * skill_coverage)
+            + (SEMANTIC_SCORE_WEIGHT * semantic_score)
+        )
+    else:
+        component_weights = {"skill_coverage": 0.0, "semantic_score": 1.0}
+        final_score = semantic_score
     final_score = round(min(1.0, max(0.0, final_score)), 4)
 
     match_level = _match_level(final_score, skill_coverage, semantic_score)
@@ -138,6 +154,7 @@ def analyse(
         # Explainable fields for the UI, debugging, and future scoring logic.
         "semantic_score": semantic_score,
         "skill_coverage": skill_coverage,
+        "component_weights": component_weights,
         "resume_skills": resume_skills,
         "jd_skills": jd_skills,
         "matched_skills": matched_skills,

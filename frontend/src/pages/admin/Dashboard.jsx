@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { BriefcaseBusiness, ShieldCheck, ShieldOff, Users, UserRoundCheck, Zap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 const cards = [
   ['candidates', 'Candidates', Users, 'text-foreground'],
   ['recruiters', 'Recruiters', UserRoundCheck, 'text-foreground'],

@@ -5,100 +5,32 @@ import FormData from 'form-data';
 import fetch from 'node-fetch';
 
 import supabase from '../Config/supabase.js';
+import { buildScoreRecord, SUBSCORE_KEYS } from '../Services/explainability.js';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
 const NLP_PARSE_URL = process.env.NLP_PARSE_URL || 'http://localhost:8000/parse';
 const PARSER_VERSION = 'nlp-engine@1.0.0';
 
-const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));
-
-const safeMatchLevel = (semanticSimilarity) => {
-  if (semanticSimilarity >= 0.75) return 'High';
-  if (semanticSimilarity >= 0.45) return 'Medium';
-  return 'Low';
-};
-
-// Build the persisted score record from an NLP parse result.
-//
-// The GitHub Evidence and Assessment Results engines do not exist yet, so their
-// weights are held at 0 and their sub-scores recorded as null. The parsing
-// sub-score and the weighting scheme are stored explicitly, so once those
-// modules land the composite can be recomputed and the score re-explained from
-// what is on disk (CHECKLIST 4.4 / 4.7 / 4.11).
-const buildScoreRecord = (nlpJson) => {
-  const sa = nlpJson?.semantic_analysis || {};
-  const similarity = clamp01(sa.similarity_score ?? 0);
-  const matchLevel = sa.match_level ?? safeMatchLevel(similarity);
-
-  const parsingSubscore = {
-    value: Math.round(similarity * 10000) / 100, // 0-100
-    weight: 1.0,
-    components: {
-      similarity_score: similarity,
-      semantic_score: sa.semantic_score ?? null,
-      skill_coverage: sa.skill_coverage ?? null,
-      matched_skills: Array.isArray(sa.matched_skills) ? sa.matched_skills : [],
-      missing_skills: Array.isArray(sa.missing_skills) ? sa.missing_skills : [],
-      match_level: matchLevel,
-      match_reason: sa.match_reason ?? null,
-    },
-  };
-
-  const weights = {
-    parsing_semantic_alignment: 1.0,
-    github_evidence: 0,
-    assessment_results: 0,
-  };
-
-  const subscores = {
-    parsing_semantic_alignment: parsingSubscore,
-    github_evidence: null,
-    assessment_results: null,
-  };
-
-  const composite = Math.round(parsingSubscore.value * 100) / 100;
-
-  const explanation = {
-    summary:
-      parsingSubscore.components.match_reason ||
-      `Credibility is currently based only on résumé/JD semantic alignment (${parsingSubscore.value}/100).`,
-    factors: [
-      {
-        factor: 'Parsing Semantic Alignment',
-        direction: 'primary',
-        weight: 1.0,
-        contribution: parsingSubscore.value,
-        evidence: {
-          matched_skills: parsingSubscore.components.matched_skills,
-          missing_skills: parsingSubscore.components.missing_skills,
-          skill_coverage: parsingSubscore.components.skill_coverage,
-        },
-      },
-    ],
-    unavailable_evidence: ['github_evidence', 'assessment_results'],
-  };
-
-  return {
-    composite,
-    subscores,
-    weights,
-    explanation,
-    evidence_limited: true,
-    match_level: matchLevel,
-    similarity,
-  };
-};
-
 // Shape a persisted score (+ its resume, job and candidate profile) into the
 // object the recruiter dashboard and candidate view consume.
+//
+// Top-level keys are camelCase. `subScores` and `explanation` are handed over
+// exactly as they were persisted (snake_case inside) — the dashboard renders
+// the stored audit record rather than a re-derived copy of it, which is what
+// makes the drill-down auditable (CHECKLIST 4.11 / 5.8). The per-source
+// `*Score` fields are the stable interface for the candidate-facing result
+// tiles: null means "that engine produced no evidence", never zero.
 const serializeCandidate = ({ score, resume, job, profile }) => {
   const contact = resume?.contact || {};
   const skills = Array.isArray(resume?.skills) ? resume.skills : [];
   const profileName = profile
     ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
     : '';
-  const components = score?.subscores?.parsing_semantic_alignment?.components || {};
+  const subScores = score?.subscores || {};
+  const explanation = score?.explanation || null;
+  const subScoreValue = (key) =>
+    subScores[key]?.available ? Number(subScores[key].value) : null;
 
   return {
     id: score.id,
@@ -115,17 +47,28 @@ const serializeCandidate = ({ score, resume, job, profile }) => {
       linkedin: contact.linkedin || '',
     },
     extractedSkills: skills,
+    experience: Array.isArray(resume?.experience) ? resume.experience : [],
+    education: Array.isArray(resume?.education) ? resume.education : [],
     projects: Array.isArray(resume?.projects) ? resume.projects : [],
-    verifiedSkills: skills.map((name) => ({ name, verified: false, level: 'Unverified' })),
     credibilityScore: Number(score.composite_score),
-    matchPercentage: Number(score.composite_score),
-    subScores: score.subscores,
+    matchLevel: subScores[SUBSCORE_KEYS.PARSING]?.components?.match_level ?? null,
+
+    // Explainability payload (FR-13, GF-5).
+    subScores,
     weights: score.weights,
-    explanation: score.explanation,
+    explanation,
     evidenceLimited: score.evidence_limited,
-    semantic_similarity: components.similarity_score ?? null,
-    match_level: components.match_level ?? null,
-    raw_text_preview: resume?.raw_text_preview ?? null,
+    skillEvidence: explanation?.skill_evidence ?? [],
+    flags: explanation?.flags ?? [],
+    flagsAvailable: explanation?.flags_available ?? false,
+    flagsUnavailableReason: explanation?.flags_unavailable_reason ?? null,
+
+    // Per-source values, null while that source has no evidence.
+    nlpScore: subScoreValue(SUBSCORE_KEYS.PARSING),
+    githubScore: subScoreValue(SUBSCORE_KEYS.GITHUB),
+    assessmentScore: subScoreValue(SUBSCORE_KEYS.ASSESSMENT),
+
+    resumeFileName: resume?.file_name ?? null,
     appliedAt: score.created_at,
   };
 };
