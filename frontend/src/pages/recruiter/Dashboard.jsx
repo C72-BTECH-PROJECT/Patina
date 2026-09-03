@@ -54,13 +54,13 @@ const StatCard = ({ icon: Icon, label, value, trend, color, delay }) => (
   </motion.div>
 );
 
-const CandidateCard = ({ candidate, rank }) => {
+const CandidateCard = ({ candidate, rank, onShortlist }) => {
   const scoreColor = candidate.credibilityScore >= 80 ? 'text-success' :
                      candidate.credibilityScore >= 60 ? 'text-warning' : 'text-destructive';
 
   return (
     <motion.div
-      className="card p-5 relative group cursor-pointer"
+      className="card p-5 relative group"
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       whileHover={{ scale: 1.01, x: 2 }}
@@ -75,7 +75,7 @@ const CandidateCard = ({ candidate, rank }) => {
 
         <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
           <span className="font-bold text-foreground">
-            {candidate.candidateInfo?.name?.split(' ').map(n => n[0]).join('') || 'UN'}
+            {(candidate.candidateInfo?.name || 'UN').split(' ').map(n => n[0]).join('')}
           </span>
         </div>
 
@@ -84,8 +84,13 @@ const CandidateCard = ({ candidate, rank }) => {
             {candidate.candidateInfo?.name || 'Unknown'}
           </div>
           <div className="text-sm text-muted-foreground truncate">
-            {candidate.candidateInfo?.location || 'Location unknown'}
+            {candidate.candidateInfo?.email || candidate.candidateInfo?.location || 'No contact info'}
           </div>
+          {candidate.jobTitle && (
+            <div className="text-xs text-muted-foreground truncate mt-1">
+              Job: {candidate.jobTitle}
+            </div>
+          )}
         </div>
 
         <div className="text-right">
@@ -94,28 +99,34 @@ const CandidateCard = ({ candidate, rank }) => {
           </div>
           <div className="text-xs text-muted-foreground">Score</div>
         </div>
-
-        <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
       </div>
 
-      <div className="flex gap-2 mt-3 flex-wrap">
-        {candidate.skills?.slice(0, 3).map((skill, i) => (
-          <span
-            key={i}
-            className={`px-2 py-0.5 rounded-full text-xs ${
-              skill.verified
-                ? 'bg-success/10 text-success'
-                : 'bg-warning/10 text-warning'
-            }`}
-          >
-            {skill.name}
-          </span>
-        ))}
-        {candidate.skills?.length > 3 && (
-          <span className="px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">
-            +{candidate.skills.length - 3}
-          </span>
-        )}
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+        <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+          candidate.status === 'shortlisted' ? 'bg-success/10 text-success' :
+          candidate.status === 'rejected' ? 'bg-destructive/10 text-destructive' :
+          'bg-warning/10 text-warning'
+        }`}>
+          {candidate.status}
+        </span>
+        <div className="flex gap-2">
+          {candidate.status !== 'shortlisted' && onShortlist && (
+            <button
+              onClick={() => onShortlist('shortlisted')}
+              className="px-3 py-1.5 rounded-md bg-success text-success-foreground text-xs font-medium hover:bg-success/90 transition-colors"
+            >
+              Shortlist
+            </button>
+          )}
+          {candidate.status === 'shortlisted' && onShortlist && (
+            <button
+              onClick={() => onShortlist('rejected')}
+              className="px-3 py-1.5 rounded-md bg-destructive text-destructive-foreground text-xs font-medium hover:bg-destructive/90 transition-colors"
+            >
+              Reject
+            </button>
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -185,41 +196,128 @@ function RecruiterDashboard() {
   const [applications, setApplications] = React.useState([]);
   const [jobs, setJobs] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
-  const { authFetch } = useAuth();
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [filterStatus, setFilterStatus] = React.useState('all');
+  const [toast, setToast] = React.useState(null);
+  const { authFetch, user } = useAuth();
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const loadDashboard = async () => {
+    try {
+      const [candidatesResponse, jobsResponse, applicationsResponse] = await Promise.all([
+        authFetch(`${API_BASE_URL}/api/recruiter/applicants`),
+        authFetch(`${API_BASE_URL}/api/jobs/mine`),
+        authFetch(`${API_BASE_URL}/api/jobs/applications`),
+      ]);
+
+      const candidatesData = candidatesResponse.ok ? await candidatesResponse.json() : [];
+      const jobData = jobsResponse.ok ? await jobsResponse.json() : [];
+      const applicationsData = applicationsResponse.ok ? await applicationsResponse.json() : [];
+
+      const mappedCandidates = candidatesData.map(c => ({
+        _id: c.id || Math.random().toString(),
+        candidateId: c.candidateId,
+        candidateInfo: c.candidateInfo || {},
+        credibilityScore: Number(c.credibilityScore || 0),
+        skills: c.skills || [],
+        status: c.status || 'applied',
+        email: c.candidateInfo?.email || '',
+        phone: '',
+        github: '',
+        linkedin: '',
+        resume: '',
+        appliedAt: c.appliedAt,
+        applicationId: c.applicationId || null,
+        jobTitle: c.jobTitle || '',
+        jobId: c.jobId || null,
+      }));
+
+      setApplications(mappedCandidates);
+      setJobs(jobData);
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   React.useEffect(() => {
-    const loadDashboard = async () => {
-      try {
-        const [candidateResponse, jobsResponse] = await Promise.all([
-          authFetch(`${API_BASE_URL}/api/candidates`),
-          authFetch(`${API_BASE_URL}/api/jobs/mine`),
-        ]);
-        const data = candidateResponse.ok ? await candidateResponse.json() : [];
-        const jobData = jobsResponse.ok ? await jobsResponse.json() : [];
-        const mappedData = data.map(c => ({
-          _id: c.id || Math.random().toString(),
-          candidateInfo: c.candidate,
-          credibilityScore: c.credibilityScore || 0,
-          skills: c.verifiedSkills || [],
-          status: 'applied'
-        }));
-        setApplications(mappedData);
-        setJobs(jobData);
-      } catch (err) {
-        console.error('Failed to fetch candidates:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadDashboard();
+    const interval = setInterval(loadDashboard, 30000);
+    return () => clearInterval(interval);
   }, [authFetch]);
 
-  const topCandidates = [...applications].sort((a, b) => b.credibilityScore - a.credibilityScore);
+  const handleShortlist = async (applicationId, newStatus) => {
+    if (!applicationId) {
+      showToast('Missing application ID — cannot update status', 'error');
+      return;
+    }
+
+    try {
+      showToast('Updating...');
+      const response = await authFetch(`${API_BASE_URL}/api/jobs/applications/shortlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationId, status: newStatus }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        showToast(data.message || 'Failed to update status', 'error');
+        return;
+      }
+
+      setApplications(prev =>
+        prev.map(app =>
+          app.applicationId === applicationId ? { ...app, status: newStatus } : app
+        )
+      );
+      showToast(`Candidate ${newStatus === 'shortlisted' ? 'shortlisted' : 'updated'} successfully`);
+    } catch (err) {
+      showToast('Failed to update status', 'error');
+    }
+  };
+
+  const filteredCandidates = React.useMemo(() => {
+    let filtered = [...applications];
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(c =>
+        c.candidateInfo?.name?.toLowerCase().includes(query) ||
+        c.candidateInfo?.email?.toLowerCase().includes(query) ||
+        c.skills?.some(s => s.name.toLowerCase().includes(query))
+      );
+    }
+
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(c => c.status === filterStatus);
+    }
+
+    return filtered.sort((a, b) => b.credibilityScore - a.credibilityScore);
+  }, [applications, searchQuery, filterStatus]);
+
   const shortlistedCount = applications.filter(a => a.status === 'shortlisted').length;
   const pendingCount = applications.filter(a => a.status === 'applied').length;
 
   return (
     <div className="space-y-8">
+      {toast && (
+        <motion.div
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg ${
+            toast.type === 'error' ? 'bg-destructive text-destructive-foreground' : 'bg-success text-success-foreground'
+          }`}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+        >
+          {toast.message}
+        </motion.div>
+      )}
       <motion.div
         className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
         initial={{ opacity: 0, y: 20 }}
@@ -353,34 +451,46 @@ function RecruiterDashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
         >
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
             <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
               <Eye className="w-5 h-5" />
-              Top Candidates
+              Candidates
             </h3>
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" />
-              <select className="bg-background border border-input rounded-md px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <input
+                type="text"
+                placeholder="Search candidates..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-background border border-input rounded-md px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring w-full sm:w-56"
+              />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="bg-background border border-input rounded-md px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
                 <option value="all">All</option>
-                <option value="high">High Score</option>
+                <option value="applied">Pending</option>
                 <option value="shortlisted">Shortlisted</option>
+                <option value="rejected">Rejected</option>
               </select>
             </div>
           </div>
 
           <div className="space-y-3">
-            {topCandidates.slice(0, 5).map((candidate, index) => (
-              <CandidateCard key={candidate._id} candidate={candidate} rank={index + 1} />
-            ))}
+            {filteredCandidates.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No candidates match your search.</p>
+            ) : (
+              filteredCandidates.map((candidate, index) => (
+                <CandidateCard
+                  key={candidate._id}
+                  candidate={candidate}
+                  rank={index + 1}
+                  onShortlist={(newStatus) => candidate.applicationId && handleShortlist(candidate.applicationId, newStatus)}
+                />
+              ))
+            )}
           </div>
-
-          <Link
-            to="/recruiter/jobs"
-            className="mt-4 flex items-center justify-center gap-2 text-sm text-foreground hover:text-foreground/80 transition-colors"
-          >
-            View all candidates
-            <ChevronRight className="w-4 h-4" />
-          </Link>
         </motion.div>
 
         <motion.div
@@ -417,36 +527,6 @@ function RecruiterDashboard() {
           </Link>
         </motion.div>
       </div>
-
-      <motion.div
-        className="card p-6 relative"
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.9 }}
-      >
-        <div className="flex items-center gap-3 mb-4">
-          <AlertTriangle className="w-5 h-5 text-warning" />
-          <h3 className="text-lg font-bold text-foreground">Attention Required</h3>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl bg-muted border border-border">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-4 h-4 text-warning" />
-              <span className="font-medium text-warning">3 Pending Reviews</span>
-            </div>
-            <p className="text-sm text-muted-foreground">Candidates waiting for your review since last week</p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-destructive/5 border border-border">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-destructive" />
-              <span className="font-medium text-destructive">2 Flagged Applications</span>
-            </div>
-            <p className="text-sm text-muted-foreground">Potential inconsistencies detected in skill claims</p>
-          </div>
-        </div>
-      </motion.div>
     </div>
   );
 }

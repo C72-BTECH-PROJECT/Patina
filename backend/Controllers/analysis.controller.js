@@ -1,7 +1,6 @@
 import multer from 'multer';
 import FormData from 'form-data';
 import fetch from 'node-fetch';
-import path from 'path';
 
 import supabase from '../Config/supabase.js';
 
@@ -135,16 +134,6 @@ export const analyzeResume = [upload.single('resume'), async (req, res) => {
     // Persist the resume to Supabase Storage (upload-once, reuse for every job).
     await saveResumeToStorage(req.session.userId, req.file);
 
-    const { data: job, error: jobError } = await supabase
-      .from('jobs')
-      .select('id, title, description, experience_level, location')
-      .eq('id', String(jobId))
-      .eq('status', 'published')
-      .maybeSingle();
-    if (jobError || !job) {
-      return res.status(404).json({ message: 'Job not found' });
-    }
-
     latestJob = job;
 
     // FastAPI expects: resume (UploadFile) + jd (Form)
@@ -248,7 +237,185 @@ export const getCandidateAnalysis = (req, res) => {
   });
 };
 
-export const getAllCandidates = (req, res) => {
-  return res.json(allAnalyses);
+export const getAllApplicants = async (req, res) => {
+  try {
+    const recruiterId = req.session.userId;
+    console.log('[DEBUG] getAllApplicants recruiterId=', recruiterId);
+
+    const { data: jobRows, error: jobsError } = await supabase
+      .from('jobs')
+      .select('id, title, location')
+      .eq('recruiter_id', recruiterId);
+    console.log('[DEBUG] jobs found=', jobRows?.length, 'jobsError=', jobsError?.message);
+    if (jobsError) {
+      return res.status(500).json({ message: 'Failed to load jobs', error: jobsError.message });
+    }
+    if (!jobRows?.length) {
+      return res.json([]);
+    }
+
+    const { data: applicationRows, error: applicationsError } = await supabase
+      .from('applications')
+      .select('id, candidate_id, job_id, status, submitted_at')
+      .in('job_id', jobRows.map((j) => j.id))
+      .order('submitted_at', { ascending: false });
+    console.log('[DEBUG] applications found=', applicationRows?.length, 'applicationsError=', applicationsError?.message);
+
+    if (applicationsError) {
+      return res.status(500).json({ message: 'Failed to load applications', error: applicationsError.message });
+    }
+
+    const jobsById = new Map(jobRows.map((j) => [j.id, j]));
+
+    const enriched = await Promise.all((applicationRows || []).map(async (app) => {
+      let profile = null;
+      let authUser = null;
+
+      try {
+        const profileResult = await supabase
+          .from('profiles')
+          .select('first_name, last_name, email')
+          .eq('id', app.candidate_id)
+          .maybeSingle();
+        profile = profileResult.data;
+      } catch (e) {
+        profile = null;
+      }
+
+      if (!profile) {
+        try {
+          const authResult = await supabase.auth.admin.getUserById(app.candidate_id);
+          authUser = authResult.data?.user;
+        } catch (e) {
+          authUser = null;
+        }
+      }
+
+      const meta = authUser?.user_metadata || authUser?.raw_user_meta_data || {};
+      const firstName = profile?.first_name || meta.first_name || '';
+      const lastName = profile?.last_name || meta.last_name || '';
+      const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'Candidate';
+      const email = profile?.email || authUser?.email || meta.email || '';
+      const location = jobsById.get(app.job_id)?.location || '—';
+
+      const { data: scoreRow } = await supabase
+        .from('scores')
+        .select('composite_score')
+        .eq('candidate_id', app.candidate_id)
+        .eq('job_id', app.job_id)
+        .maybeSingle();
+
+      return {
+        id: app.id,
+        candidateId: app.candidate_id,
+        jobId: app.job_id,
+        jobTitle: jobsById.get(app.job_id)?.title || 'Unknown Job',
+        candidateInfo: {
+          name: fullName,
+          email,
+          location,
+        },
+        credibilityScore: Number(scoreRow?.composite_score ?? 0),
+        skills: [],
+        status: app.status,
+        applicationId: app.id,
+        appliedAt: app.submitted_at,
+      };
+    }));
+
+    return res.json(enriched);
+  } catch (err) {
+    console.error('[DEBUG] getAllApplicants failed:', err);
+    return res.status(500).json({ message: 'Failed to load applicants', error: String(err?.message || err) });
+  }
+};
+
+export const getAllCandidates = async (req, res) => {
+  try {
+    const recruiterId = req.session.userId;
+
+    const { data: jobRows, error: jobsError } = await supabase
+      .from('jobs')
+      .select('id, title, location')
+      .eq('recruiter_id', recruiterId);
+    if (jobsError) {
+      return res.status(500).json({ message: 'Failed to load jobs', error: jobsError.message });
+    }
+    if (!jobRows?.length) {
+      return res.json([]);
+    }
+
+    const { data: applicationRows, error: applicationsError } = await supabase
+      .from('applications')
+      .select('id, candidate_id, job_id, status, submitted_at')
+      .in('job_id', jobRows.map((j) => j.id))
+      .order('submitted_at', { ascending: false });
+    if (applicationsError) {
+      return res.status(500).json({ message: 'Failed to load applications', error: applicationsError.message });
+    }
+
+    const jobsById = new Map(jobRows.map((j) => [j.id, j]));
+
+    const enriched = await Promise.all((applicationRows || []).map(async (app) => {
+      let profile = null;
+      let authUser = null;
+
+      try {
+        const profileResult = await supabase
+          .from('profiles')
+          .select('first_name, last_name, email')
+          .eq('id', app.candidate_id)
+          .maybeSingle();
+        profile = profileResult.data;
+      } catch (e) {
+        profile = null;
+      }
+
+      if (!profile) {
+        try {
+          const authResult = await supabase.auth.admin.getUserById(app.candidate_id);
+          authUser = authResult.data?.user;
+        } catch (e) {
+          authUser = null;
+        }
+      }
+
+      const meta = authUser?.user_metadata || authUser?.raw_user_meta_data || {};
+      const firstName = profile?.first_name || meta.first_name || '';
+      const lastName = profile?.last_name || meta.last_name || '';
+      const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'Candidate';
+      const email = profile?.email || authUser?.email || meta.email || '';
+      const location = jobsById.get(app.job_id)?.location || '—';
+
+      const { data: scoreRow } = await supabase
+        .from('scores')
+        .select('composite_score')
+        .eq('candidate_id', app.candidate_id)
+        .eq('job_id', app.job_id)
+        .maybeSingle();
+
+      return {
+        id: app.id,
+        candidateId: app.candidate_id,
+        jobId: app.job_id,
+        jobTitle: jobsById.get(app.job_id)?.title || 'Unknown Job',
+        candidateInfo: {
+          name: fullName,
+          email,
+          location,
+        },
+        credibilityScore: Number(scoreRow?.composite_score ?? 0),
+        skills: [],
+        status: app.status,
+        applicationId: app.id,
+        appliedAt: app.submitted_at,
+      };
+    }));
+
+    return res.json(enriched);
+  } catch (err) {
+    console.error('[DEBUG] getAllCandidates failed:', err);
+    return res.status(500).json({ message: 'Failed to load candidates', error: String(err?.message || err) });
+  }
 };
 

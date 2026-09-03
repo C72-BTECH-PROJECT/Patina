@@ -16,6 +16,7 @@ import CandidateDashboard from './pages/candidate/Dashboard';
 import CandidateLayout from './components/layouts/CandidateLayout';
 import CandidateProfile from './pages/candidate/CandidateProfile';
 import CandidateJobs from './pages/candidate/CandidateJobs';
+import CandidateNotifications from './pages/candidate/Notifications';
 import CandidateJobDetail from './pages/candidate/JobDetail';
 
 // recruiter flow
@@ -56,6 +57,7 @@ function App() {
               <Route path="jobs" element={<CandidateJobs />} />
               <Route path="jobs/:id" element={<CandidateJobDetail />} />
               <Route path="profile" element={<CandidateProfile />} />
+              <Route path="notifications" element={<CandidateNotifications />} />
             </Route>
 
             {/* 🧑‍💼 RECRUITER FLOW (WITH LAYOUT) */}

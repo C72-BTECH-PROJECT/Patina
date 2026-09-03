@@ -6,6 +6,7 @@ import jobsRoutes from './Routes/jobs.routes.js';
 import analysisRoutes from './Routes/analysis.routes.js';
 import parseRoutes from './Routes/parse.routes.js';
 import adminRoutes from './Routes/admin.routes.js';
+import notificationRoutes from './Routes/notification.routes.js';
 
 import session from 'express-session';
 
@@ -51,6 +52,7 @@ app.use('/api', analysisRoutes);
 // parseRoutes defines POST / (mounted at /api/parse)
 app.use('/api/parse', parseRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

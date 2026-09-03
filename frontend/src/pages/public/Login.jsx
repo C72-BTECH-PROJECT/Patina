@@ -28,9 +28,11 @@ const AnimatedInput = ({ icon: Icon, label, type = 'text', value, onChange, plac
           onChange={onChange}
           placeholder={placeholder}
           autoComplete={type === 'password' ? 'current-password' : type === 'email' ? 'email' : 'off'}
-          className="w-full px-5 py-4 pl-12 bg-background border border-input rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-all"
+          className={`w-full bg-background border border-input rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-all ${isPassword ? 'px-5 py-4' : 'px-5 py-4 pl-12'}`}
         />
-        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+        {!isPassword && (
+          <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+        )}
 
         {isPassword && (
           <button
