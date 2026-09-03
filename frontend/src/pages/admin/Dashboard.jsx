@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { BriefcaseBusiness, ShieldCheck, ShieldOff, Users, UserRoundCheck, Zap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 const cards = [
   ['candidates', 'Candidates', Users, 'text-foreground'],
   ['recruiters', 'Recruiters', UserRoundCheck, 'text-foreground'],
@@ -26,6 +26,7 @@ function AdminDashboard() {
     if (!loading && user?.role !== 'ADMIN') navigate('/login', { replace: true });
   }, [loading, navigate, user]);
 
+  // Fetch overview once — no dependency on `tab` so switching tabs never triggers a re-fetch.
   useEffect(() => {
     if (user?.role !== 'ADMIN') return;
     const load = async () => {
@@ -34,20 +35,25 @@ function AdminDashboard() {
         const response = await authFetch(`${API_BASE_URL}/api/admin/overview`, { cache: 'no-store' });
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'Could not load dashboard.');
-        const candidateAccounts = data.users?.candidates || [];
-        const recruiterAccounts = data.users?.recruiters || [];
         setOverview(data);
-        setAccounts(tab === 'recruiter' ? recruiterAccounts : candidateAccounts);
         setSyncInfo({
           source: data.source || 'unknown server',
           project: data.project || 'unknown project',
           generatedAt: data.generatedAt || null,
-          recruitersReceived: recruiterAccounts.length,
+          recruitersReceived: (data.users?.recruiters || []).length,
         });
       } catch (error) { setNotice(error.message); } finally { setBusy(false); }
     };
     load();
-  }, [authFetch, tab, user]);
+  }, [authFetch, user]);
+
+  // Derive the visible account list from cached overview whenever tab or overview changes.
+  useEffect(() => {
+    if (!overview) return;
+    const candidateAccounts = overview.users?.candidates || [];
+    const recruiterAccounts = overview.users?.recruiters || [];
+    setAccounts(tab === 'recruiter' ? recruiterAccounts : candidateAccounts);
+  }, [tab, overview]);
 
   const selectTab = (role) => { setNotice(''); setTab(role); };
   const updateAccess = async (account) => {

@@ -105,7 +105,6 @@ const SkillsSelector = ({ selectedSkills, onToggle }) => {
 
 function Upload() {
   const [file, setFile] = useState(null);
-  const [jd, setJd] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [jobId, setJobId] = useState('');
@@ -173,24 +172,20 @@ function Upload() {
         return;
       }
       if (!file) {
-        setError('Upload a PDF resume first.');
-        return;
-      }
-      if (!jd.trim()) {
-        setError('Please add a job description to continue');
+        setError('Upload a PDF or DOCX resume first.');
         return;
       }
 
       setIsLoading(true);
       setError('');
 
-      navigate('/candidate/processing', { state: { file, jobId, jd } });
+      navigate('/candidate/processing', { state: { file, jobId } });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const isReady = file && jd.trim();
+  const isReady = Boolean(file && jobId);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -233,7 +228,7 @@ function Upload() {
             Upload Your <span className="text-foreground">Resume</span>
           </h1>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Upload your resume and paste a job description to start the AI-powered skill verification process
+            Select the role you're applying for and upload your resume to start the AI-powered skill verification process
           </p>
         </motion.div>
 
@@ -246,7 +241,7 @@ function Upload() {
           <div className="mb-8">
             <label className="block text-sm font-medium text-foreground mb-3 flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
-              Select Position
+              Select Job
             </label>
 
             {loadingJobs ? (
@@ -340,24 +335,6 @@ function Upload() {
             </DropZone>
           </div>
 
-          <div className="mb-8">
-            <label className="block text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              Job Description <span className="text-destructive">*</span>
-            </label>
-            <div className="relative">
-              <textarea
-                className="flex w-full h-44 rounded-md border border-input bg-background px-3 py-2 text-body-sm text-foreground placeholder:text-muted-foreground resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder="Paste the job description here... e.g. We are looking for a Python developer with experience in React, MongoDB and REST APIs..."
-                value={jd}
-                onChange={(e) => setJd(e.target.value)}
-              />
-              <div className="absolute bottom-3 right-3 text-xs text-muted-foreground">
-                {jd.length} characters
-              </div>
-            </div>
-          </div>
-
           <AnimatePresence>
             {error && (
               <motion.div
@@ -402,13 +379,13 @@ function Upload() {
             </span>
           </motion.button>
 
-          {!jd.trim() && file && (
+          {!jobId && !loadingJobs && !jobsError && (
             <motion.p
               className="text-sm text-warning mt-3 text-center"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              Please add a job description to continue
+              Select a job position to continue
             </motion.p>
           )}
         </motion.div>
