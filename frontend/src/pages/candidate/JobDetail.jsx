@@ -18,8 +18,6 @@ function CandidateJobDetail() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'Could not load this job.');
         setJob(data);
-        // If the candidate already applied, reflect it immediately on load.
-        if (data.applied) setApplied(true);
       } catch (loadError) {
         setError(loadError.message || 'Could not load this job.');
       } finally {
@@ -240,7 +238,7 @@ function CandidateJobDetail() {
                 disabled={applying || applied || (resumeCheckDone && hasResume === false)}
                 className={`inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-all ${
                   applied
-                    ? 'cursor-not-allowed border border-border bg-muted text-muted-foreground'
+                    ? 'cursor-default border border-success/30 bg-success/10 text-success'
                     : 'cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90'
                 } disabled:cursor-not-allowed disabled:opacity-60`}
               >

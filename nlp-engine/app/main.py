@@ -1,6 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-import json
 import shutil
 import os
 import uuid
@@ -34,26 +33,10 @@ def health_check():
         "version": "1.0.0"
     }
 
-def _parse_skill_list(raw: str) -> list:
-    """Defensively decode a JSON array of skill strings from a form field."""
-    try:
-        value = json.loads(raw or "[]")
-    except (ValueError, TypeError):
-        return []
-    if not isinstance(value, list):
-        return []
-    return [str(item) for item in value if str(item).strip()]
-
-
 @app.post("/parse")
 async def parse_resume(
     resume: UploadFile = File(...),
-    jd: str = Form(...),
-    # The stored job's structured skill lists. When present they are the
-    # authoritative job-skill source; `jd` (the markdown description) is then
-    # only used as text for semantic similarity.
-    required_skills: str = Form("[]"),
-    preferred_skills: str = Form("[]"),
+    jd: str = Form(...)
 ):
     file_ext = os.path.splitext(resume.filename)[1]
     unique_filename = f"{uuid.uuid4()}{file_ext}"
@@ -71,9 +54,7 @@ async def parse_resume(
             resume_text=raw_text,
             jd_text=jd,
             skills=entities["skills"],
-            noun_chunks=preprocessed["noun_chunks"],
-            jd_required_skills=_parse_skill_list(required_skills),
-            jd_preferred_skills=_parse_skill_list(preferred_skills),
+            noun_chunks=preprocessed["noun_chunks"]
         )
 
         return {

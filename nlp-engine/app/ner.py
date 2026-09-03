@@ -50,7 +50,7 @@ SKILL_KEYWORDS = [
     # concepts
     "system design", "data structures", "algorithms", "oop",
     "design patterns", "solid principles", "clean code",
-    "exponentjs",
+    "typescript", "exponentjs",
 ]
 
 # Store one canonical value for variants that appear frequently in resumes and
@@ -82,74 +82,6 @@ GENERIC_SKILL_PATTERNS = {
     "oop": r"\b(?:oop|object[ -]oriented programming)\b",
 }
 
-# --- Skill normalisation --------------------------------------------------------
-# One canonical spelling per skill, applied to BOTH the résumé side and the job
-# side before they are intersected. Without this, "Node.js" vs "nodejs",
-# "REST APIs" vs "rest" vs "api", or a skill listed twice all read as distinct
-# and inflate the missing-skills list.
-
-# alias / variant -> canonical, built from SKILL_ALIASES plus the canonical keys.
-_ALIAS_TO_CANONICAL = {}
-for _canon, _variants in SKILL_ALIASES.items():
-    _ALIAS_TO_CANONICAL[_canon.lower()] = _canon
-    for _v in _variants:
-        _ALIAS_TO_CANONICAL[_v.lower()] = _canon
-
-# Variants the alias map does not cover. The GENERIC_SKILL_PATTERNS keys ("rest",
-# "api") and their spelled-out forms all collapse to a single "rest api" token.
-_EXTRA_NORMALISATION = {
-    "rest": "rest api",
-    "restful": "rest api",
-    "rest api": "rest api",
-    "rest apis": "rest api",
-    "restful api": "rest api",
-    "restful apis": "rest api",
-    "api": "rest api",
-    "apis": "rest api",
-    "api development": "rest api",
-    "ci": "ci/cd",
-    "cd": "ci/cd",
-    "ci cd": "ci/cd",
-    "ci/cd": "ci/cd",
-    "cicd": "ci/cd",
-    "node": "nodejs",
-    "node js": "nodejs",
-    "postgres": "postgresql",
-    "postgre": "postgresql",
-    "k8s": "kubernetes",
-    "js": "javascript",
-    "ts": "typescript",
-    "golang": "golang",
-    "go lang": "golang",
-}
-
-
-def normalize_skill(raw) -> str | None:
-    """Return one canonical token for a skill string, or None if it is empty."""
-    if raw is None:
-        return None
-    s = " ".join(str(raw).split()).strip().lower()
-    s = s.strip(" \t.,:;/|()[]-")
-    if not s:
-        return None
-    if s in _EXTRA_NORMALISATION:
-        return _EXTRA_NORMALISATION[s]
-    if s in _ALIAS_TO_CANONICAL:
-        return _ALIAS_TO_CANONICAL[s]
-    return s
-
-
-def normalize_skills(values) -> list:
-    """Normalise an iterable of skill strings, preserving order, dropping dups."""
-    out = []
-    seen = set()
-    for value in values or []:
-        canonical = normalize_skill(value)
-        if canonical and canonical not in seen:
-            seen.add(canonical)
-            out.append(canonical)
-    return out
-
 
 def extract_skills(text: str) -> list:
     """Return ordered, canonical skills found in text."""
@@ -173,349 +105,35 @@ def extract_skills(text: str) -> list:
         ):
             found_skills.append(skill)
 
-    # Defensive: the catalog has historically carried duplicate entries.
-    return list(dict.fromkeys(found_skills))
+    return found_skills
 
 
-# --- Résumé section model -----------------------------------------------------
-# Experience, education and projects are extracted from their own section only.
-# The previous approach dumped every spaCy ORG/DATE entity in the whole document
-# into "experience" (so a phone number tagged DATE and acronyms like SVG/SSL
-# tagged ORG became fake job history), promoted employment bullet points to
-# project titles, and pulled certification lines into education. Scoping each to
-# a detected heading fixes all three; a section that is genuinely absent yields
-# an empty list, which is the honest result.
+def is_plausible_organisation(value: str) -> bool:
+    """Reject resume headings, skills and qualifications mislabeled as ORG."""
+    normalized = " ".join(value.split()).strip()
+    lowered = normalized.lower()
+    non_organisation_terms = {
+        *SKILL_KEYWORDS,
+        *SKILL_ALIASES.keys(),
+        "phone", "email", "linkedin", "github", "concepts", "skills",
+        "technical skills", "cloud & devops", "computer engineering",
+        "bachelor of technology", "b.tech", "master of technology", "m.tech",
+        "college name", "university name", "education", "experience",
+        "projects", "certifications", "maven concepts", "mern", "mern stack",
+        "crud", "ec2", "vpc", "ecr", "eks", "ci",
+    }
 
-_CANONICAL_SECTIONS = {
-    "experience": [
-        "experience", "work experience", "professional experience",
-        "employment", "employment history", "work history", "career history",
-        "professional background", "relevant experience", "internship",
-        "internships", "internship experience",
-    ],
-    "education": [
-        "education", "academic background", "academic qualifications",
-        "academic details", "educational qualifications", "qualifications",
-        "education and training",
-    ],
-    "projects": [
-        "projects", "personal projects", "academic projects", "key projects",
-        "selected projects", "notable projects", "project work", "project experience",
-    ],
-    "skills": [
-        "skills", "technical skills", "core skills", "core competencies",
-        "technologies", "technical proficiencies", "tech stack", "skill set",
-    ],
-    "certifications": [
-        "certifications", "certification", "certificates", "licenses",
-        "licenses and certifications", "courses", "certifications and courses",
-        "training", "professional development", "achievements and certifications",
-    ],
-    "summary": [
-        "summary", "professional summary", "career summary", "objective",
-        "career objective", "profile", "about", "about me",
-    ],
-    "achievements": [
-        "achievements", "accomplishments", "awards", "honors", "honours",
-        "awards and honors", "extracurricular", "activities",
-    ],
-}
-
-_HEADING_LOOKUP = {
-    phrase: canonical
-    for canonical, phrases in _CANONICAL_SECTIONS.items()
-    for phrase in phrases
-}
-
-_BULLET_RE = re.compile(r"^\s*(?:[-*•‣▪●◦⁃∙·–—o]\s+|\d+[.)]\s+)")
-
-_ACTION_VERBS = {
-    "engineered", "trained", "deployed", "built", "developed", "implemented",
-    "designed", "created", "architected", "optimized", "optimised", "integrated",
-    "migrated", "automated", "analyzed", "analysed", "researched", "improved",
-    "reduced", "increased", "spearheaded", "collaborated", "utilized", "utilised",
-    "leveraged", "programmed", "configured", "maintained", "refactored", "tested",
-    "wrote", "added", "led", "managed", "delivered", "launched", "achieved",
-    "coordinated", "mentored", "supported", "handled", "performed", "conducted",
-    "assisted", "contributed", "enhanced", "streamlined",
-}
-
-_ARTICLES = {"a", "an", "the"}
-
-_MONTH = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"
-_DATE_TOKEN = rf"(?:{_MONTH}\s*)?(?:19|20)\d{{2}}"
-_DATE_RANGE_RE = re.compile(
-    rf"({_DATE_TOKEN}|{_MONTH})\s*(?:-|–|—|to|through)\s*"
-    rf"({_DATE_TOKEN}|present|current|now|ongoing|{_MONTH})",
-    re.I,
-)
-_SINGLE_YEAR_RE = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
-
-_STRONG_EDUCATION_RE = re.compile(
-    r"\b(university|college|institute of technology|polytechnic|bachelor|master|"
-    r"ph\.?d|b\.?tech|m\.?tech|b\.?e\b|m\.?e\b|b\.?sc|m\.?sc|bca|mca|b\.?a\b|m\.?a\b|"
-    r"hsc|ssc|higher secondary|secondary school|diploma|degree|gpa|cgpa|"
-    r"school of engineering)\b",
-    re.I,
-)
-
-
-def _is_heading_line(line: str):
-    """Return the canonical section a line names, or None if it is not a heading."""
-    stripped = line.strip()
-    if not stripped or len(stripped) > 48:
-        return None
-    key = re.sub(r"[^a-z& ]", "", stripped.lower()).replace("&", " and ").strip()
-    key = " ".join(key.split())
-    if not key:
-        return None
-    if key in _HEADING_LOOKUP:
-        return _HEADING_LOOKUP[key]
-    # "Work Experience:" / "EDUCATION —" style lines with trailing noise.
-    first_three = " ".join(key.split()[:3])
-    if first_three in _HEADING_LOOKUP and len(key.split()) <= 4:
-        return _HEADING_LOOKUP[first_three]
-    return None
-
-
-def split_sections(text: str) -> dict:
-    """Group résumé lines under the heading they fall beneath.
-
-    Returns a dict of canonical-section-name -> list[str]. Lines above the first
-    recognised heading land under "header". Unrecognised headings start an
-    "other" bucket. Heading lines themselves are not included in any bucket.
-    """
-    sections = {"header": []}
-    current = "header"
-    for raw_line in text.split("\n"):
-        line = raw_line.rstrip()
-        if not line.strip():
-            continue
-        heading = _is_heading_line(line)
-        if heading is not None:
-            current = heading
-            sections.setdefault(current, [])
-            continue
-        # An all-caps short line that is not a known heading still ends the
-        # current section (it is some other section we do not model). Require
-        # letters only — "GPA 8.9/10" is an education line, not a heading.
-        if (
-            len(line.split()) <= 4
-            and re.fullmatch(r"[A-Z][A-Z &/'-]*[A-Z]", line.strip())
-            and not _BULLET_RE.match(line)
-            and current != "header"
-        ):
-            current = "other"
-            sections.setdefault(current, [])
-            continue
-        sections.setdefault(current, []).append(line.strip())
-    return sections
-
-
-def _is_bullet(line: str) -> bool:
-    return bool(_BULLET_RE.match(line))
-
-
-def _strip_bullet(line: str) -> str:
-    return _BULLET_RE.sub("", line).strip()
-
-
-def _first_word(line: str) -> str:
-    words = re.sub(r"[^a-zA-Z ]", " ", line).split()
-    return words[0].lower() if words else ""
-
-
-def _extract_date_span(line: str):
-    match = _DATE_RANGE_RE.search(line)
-    if match:
-        return " – ".join(part.strip() for part in match.groups())
-    years = _SINGLE_YEAR_RE.findall(line)
-    if years:
-        return years[0] if len(years) == 1 else f"{years[0]} – {years[-1]}"
-    return None
-
-
-_COMPANY_SUFFIX_RE = re.compile(
-    r"\b(inc|inc\.|llc|ltd|ltd\.|corp|corp\.|co\.|gmbh|plc|pvt|"
-    r"technologies|technology|labs|solutions|systems|software|consulting|"
-    r"services|group|studios|studio|media|networks|university|college|institute)\b",
-    re.I,
-)
-
-
-def _split_role_and_org(header: str):
-    """Split a job header line into (role, organisation).
-
-    Résumé styles vary ("Role, Company" and "Company — Role" both occur), so
-    order is decided by which part looks like an organisation — a company suffix
-    or a spaCy ORG entity — rather than by position.
-    """
-    parts = [
-        p.strip(" \t,|–—-·")
-        for p in re.split(r"\s{2,}|\s[|–—-]\s|,\s|\sat\s|\s@\s", header, maxsplit=1)
-        if p.strip(" \t,|–—-·")
-    ]
-    if len(parts) != 2:
-        return header.strip(" \t,|–—-·") or header, None
-
-    ent_orgs = {e.text.strip().lower() for e in nlp(header).ents if e.label_ == "ORG"}
-
-    def _org_score(part):
-        score = 0
-        if _COMPANY_SUFFIX_RE.search(part):
-            score += 2
-        if part.lower() in ent_orgs or any(o in part.lower() for o in ent_orgs):
-            score += 1
-        return score
-
-    a, b = parts
-    if _org_score(b) >= _org_score(a):
-        return a, b
-    return b, a
-
-
-def _extract_experience(sections: dict) -> list:
-    """Section-scoped work history. Empty list when there is no experience section."""
-    lines = sections.get("experience")
-    if not lines:
-        return []
-
-    entries = []
-    for line in lines:
-        if _is_bullet(line):
-            if entries:
-                entries[-1]["highlights"].append(_strip_bullet(line))
-            continue
-
-        date_span = _extract_date_span(line)
-        header = line
-        if date_span:
-            header = _DATE_RANGE_RE.sub("", header)
-            header = _SINGLE_YEAR_RE.sub("", header)
-        header = header.strip(" \t|,-–—•:").strip()
-
-        has_org = any(e.label_ == "ORG" for e in nlp(line).ents)
-        headingish = len(line.split()) <= 12 and _first_word(line) not in _ACTION_VERBS
-
-        if date_span or has_org or headingish:
-            role, organisation = _split_role_and_org(header)
-            entries.append({
-                "title": role or organisation or "Role",
-                "organisation": organisation,
-                "dates": date_span,
-                "highlights": [],
-            })
-        elif entries:
-            entries[-1]["highlights"].append(line.strip())
-
-    return entries
-
-
-def _extract_education(sections: dict, full_text: str) -> list:
-    """Education lines, scoped to the education section when one exists.
-
-    With a real education section, a bare year or a short non-bullet line counts.
-    Without one, fall back to a whole-document scan but require a strong
-    degree/institution keyword — a lone year elsewhere in the résumé (a phone
-    number, a project date) is not education.
-    """
-    section_lines = sections.get("education")
-    scoped = bool(section_lines)
-    candidates = section_lines if scoped else [
-        ln.strip() for ln in full_text.split("\n") if len(ln.strip()) > 5
-    ]
-
-    education = []
-    for line in candidates:
-        clean = _strip_bullet(line) if _is_bullet(line) else line.strip()
-        if len(clean) < 5 or clean in education:
-            continue
-        if _STRONG_EDUCATION_RE.search(clean):
-            education.append(clean)
-        elif scoped and not _is_bullet(line) and len(clean.split()) <= 14:
-            # Inside a real education section: keep entry lines (institution
-            # names, "2019 – 2023") even without a keyword; drop stray bullets.
-            education.append(clean)
-    return education
-
-
-def _looks_like_project_title(line: str) -> bool:
-    stripped = line.strip()
-    if not stripped or _is_bullet(line) or stripped.endswith("."):
+    # Multi-line entities commonly span neighbouring resume headings/bullets,
+    # rather than being a company name.
+    if "\n" in value or lowered in non_organisation_terms:
         return False
-    first = _first_word(stripped)
-    if first in _ACTION_VERBS or first in _ARTICLES:
+    if any(term in lowered for term in ("data structures", "algorithms", "database design", "system design")):
         return False
-    # "Title | React, Node"  /  "Title — stack"  /  "Title: description".
-    # A plain hyphen is deliberately excluded — it collides with date ranges
-    # ("Project Lead, Initech 2019 - 2021" is a job header, not a project).
-    if _extract_date_span(stripped):
+    if lowered in {alias for aliases in SKILL_ALIASES.values() for alias in aliases}:
         return False
-    if re.match(r"^[A-Za-z0-9][^|]{1,70}\s[|–—:]\s*\S", stripped):
-        return True
-    return False
-
-
-def _extract_projects(sections: dict, full_text: str) -> list:
-    """Projects, scoped to the projects section.
-
-    A line becomes a title only if it matches a title pattern, or is a short
-    heading-like line immediately followed by a bullet. Employment-style bullet
-    points and sentences starting with an action verb attach to the current
-    project's description instead of becoming their own project.
-    """
-    section_lines = sections.get("projects")
-    if section_lines:
-        lines = section_lines
-        scoped = True
-    else:
-        lines = [ln.strip() for ln in full_text.split("\n") if len(ln.strip()) > 5]
-        scoped = False
-
-    projects = []
-
-    def _add_desc(text_line):
-        if projects and text_line:
-            projects[-1]["description"].append(text_line)
-
-    for idx, line in enumerate(lines):
-        if _is_bullet(line):
-            _add_desc(_strip_bullet(line))
-            continue
-        if _first_word(line) in _ACTION_VERBS:
-            _add_desc(line.strip())
-            continue
-
-        next_is_bullet = idx + 1 < len(lines) and _is_bullet(lines[idx + 1])
-        heading_like = (
-            len(line.split()) <= 8
-            and not line.strip().endswith(".")
-            and _first_word(line) not in _ACTION_VERBS
-            and _first_word(line) not in _ARTICLES
-        )
-
-        if scoped:
-            is_title = _looks_like_project_title(line) or (heading_like and next_is_bullet)
-        else:
-            # No projects section: only a clear "Name | Tech" style line that
-            # also names a project counts. The heading-then-bullet path is too
-            # loose to use against the whole document (it catches job headers).
-            is_title = _looks_like_project_title(line) and bool(
-                re.search(r"\bproject\b", line.lower())
-            )
-
-        if is_title:
-            title = re.sub(r"^[\W_]+", "", line).strip().rstrip(":").strip()
-            if title and not any(p["title"].lower() == title.lower() for p in projects):
-                projects.append({"title": title, "description": []})
-        elif projects:
-            _add_desc(line.strip())
-
-    return [
-        {"title": p["title"], "description": " · ".join(p["description"]).strip(" ·")}
-        for p in projects
-    ]
-
+    if lowered in extract_skills(normalized):
+        return False
+    return len(normalized) >= 2
 
 def extract_entities(text: str) -> dict:
     doc = nlp(text)
@@ -533,11 +151,92 @@ def extract_entities(text: str) -> dict:
     # ── 1. SKILLS — word boundary matching ──────────────
     found_skills = extract_skills(text)
 
-    # ── 2-4. SECTION-SCOPED ENTITIES ─────────────────────
-    sections = split_sections(text)
-    experience = _extract_experience(sections)
-    education = _extract_education(sections, text)
-    projects = _extract_projects(sections, text)
+    # ── 2. EXPERIENCE ────────────────────────────────────
+    experience = []
+    seen_organisations = set()
+    for ent in doc.ents:
+        if ent.label_ == "ORG":
+            value = ent.text.strip()
+            key = " ".join(value.lower().split())
+            if is_plausible_organisation(value) and key not in seen_organisations:
+                experience.append({
+                    "type": "organisation",
+                    "value": value
+                })
+                seen_organisations.add(key)
+        elif ent.label_ == "DATE":
+            experience.append({
+                "type": "date",
+                "value": ent.text.strip()
+            })
+
+    # Split text line by line to prevent massive blocks caused by missing punctuation in resumes
+    lines = [line.strip() for line in text.split('\n') if len(line.strip()) > 5]
+
+    # ── 3. EDUCATION ─────────────────────────────────────
+    education_keywords = [
+        "university", "college", "bachelor", "master", "phd",
+        "degree", "diploma", "school", "b.tech", "m.tech",
+        "b.e", "m.e", "bsc", "msc", "hsc", "ssc",
+        "engineering", "computer science", "information technology"
+    ]
+    education = []
+    for line in lines:
+        line_lower = line.lower()
+        for keyword in education_keywords:
+            if keyword in line_lower:
+                if line not in education:
+                    education.append(line)
+                break
+
+    # ── 4. PROJECTS ──────────────────────────────────────
+    projects = []
+    in_projects_section = False
+    
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        line_lower = line.lower()
+        # Action verbs alone are not project evidence: employment bullets also
+        # contain "developed" and "implemented".  Require a Projects heading
+        # or an explicit project reference instead.
+        looks_like_heading = len(line.split()) <= 5 and (
+            line.isupper() or line.endswith(":")
+        )
+        if looks_like_heading:
+            in_projects_section = "project" in line_lower
+            i += 1
+            continue
+
+        is_project = in_projects_section or bool(
+            re.search(r'\b(?:project|capstone|personal project)\b', line_lower)
+        )
+        
+        if is_project:
+            # Clean bullet points from title
+            title = re.sub(r'^[\W_]+', '', line).strip()
+            
+            # Grab next few lines for description
+            description_lines = []
+            j = i + 1
+            while j < len(lines) and j < i + 4:
+                desc_line = lines[j]
+                # Break if next line looks like a new section heading
+                if len(desc_line.split()) < 3 and (desc_line.isupper() or desc_line.endswith(":")):
+                    break
+                clean_desc = re.sub(r'^[\W_]+', '', desc_line).strip()
+                if clean_desc:
+                    description_lines.append(clean_desc)
+                j += 1
+                
+            # Avoid adding exact duplicate titles
+            if not any(p['title'] == title for p in projects):
+                projects.append({
+                    "title": title,
+                    "description": " ".join(description_lines)
+                })
+            i = j - 1 # skip lines added to description
+        i += 1
 
     # ── 5. REGEX EXTRACTIONS (Email, Phone, Links) ───────
     email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
@@ -594,9 +293,7 @@ if __name__ == "__main__":
 
     print("\n──── EXPERIENCE ────")
     for item in result["experience"]:
-        print(f"  {item['title']} @ {item['organisation']} ({item['dates']})")
-        for highlight in item["highlights"]:
-            print(f"    - {highlight}")
+        print(f"  {item['type']}: {item['value']}")
 
     print("\n──── EDUCATION ────")
     for edu in result["education"]:
