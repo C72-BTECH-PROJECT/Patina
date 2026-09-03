@@ -4,10 +4,16 @@ import cors from 'cors';
 import authRoutes from './Routes/auth.routes.js';
 import jobsRoutes from './Routes/jobs.routes.js';
 import analysisRoutes from './Routes/analysis.routes.js';
-import parseRoutes from './Routes/parse.routes.js';
 import adminRoutes from './Routes/admin.routes.js';
 
 import session from 'express-session';
+
+if (!process.env.SESSION_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET environment variable must be set in production.');
+  }
+  console.warn('[WARNING] SESSION_SECRET is not set. Using an insecure default — set SESSION_SECRET in backend/.env before deploying.');
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -46,10 +52,9 @@ app.use('/api/jobs', jobsRoutes);
 // analysisRoutes defines:
 // POST /analyze
 // GET  /candidate-analysis
+// GET  /candidates
 app.use('/api', analysisRoutes);
 
-// parseRoutes defines POST / (mounted at /api/parse)
-app.use('/api/parse', parseRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (_req, res) => {
@@ -69,7 +74,7 @@ const server = app.listen(PORT);
 server.once('listening', () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(
-    `API endpoints:\n- GET  /api/jobs\n- POST /api/jobs\n- POST /api/analyze\n- GET  /api/candidate-analysis\n- POST /api/parse`
+    `API endpoints:\n- GET  /api/jobs\n- POST /api/jobs\n- POST /api/analyze\n- GET  /api/candidate-analysis\n- GET  /api/candidates`
   );
 });
 

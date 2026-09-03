@@ -1,308 +1,326 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Briefcase, MapPin, Filter, Users, ChevronRight, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { jobs, applications, candidates } from '../../data/recruiter/mockData';
+import { AlertTriangle, ChevronRight, Filter, MapPin, Users } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import Badge from '../../components/Badge';
+import EmptyState from '../../components/EmptyState';
+import Spinner from '../../components/Spinner';
 import CandidateModal from '../../components/recruiter/CandidateModal';
 
-// Glow Orb Component
-const GlowOrb = ({ className }) => (
-  <div className={`absolute w-96 h-96 rounded-full filter blur-3xl opacity-10 ${className}`}>
-    <div className={`w-full h-full rounded-full bg-gradient-to-br from-accent-purple/40 to-accent-cyan/30 animate-glow-pulse`} />
-  </div>
-);
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
-// Tab Button Component
-const TabButton = ({ label, active, onClick, count }) => (
-  <motion.button
-    onClick={onClick}
-    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-      active
-        ? 'bg-gradient-to-r from-accent-purple to-accent-cyan text-white'
-        : 'bg-white/5 text-white/50 hover:bg-white/10'
-    }`}
-    whileHover={{ scale: 1.05 }}
-    whileTap={{ scale: 0.95 }}
-  >
-    {label} {count !== undefined && <span className="ml-1 opacity-60">({count})</span>}
-  </motion.button>
-);
+const scoreTone = (score) =>
+  score >= 80 ? 'success' : score >= 60 ? 'warning' : 'destructive';
 
-// Score Range Slider Component
-const ScoreSlider = ({ value, onChange }) => (
-  <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-    <div className="flex items-center justify-between mb-2">
-      <label className="text-sm font-medium text-white/70 flex items-center gap-2">
-        <Filter className="w-4 h-4 text-accent-purple" />
-        Minimum Score: <span className="text-accent-purple font-bold">{value}+</span>
-      </label>
-    </div>
-    <input
-      type="range"
-      min="0"
-      max="100"
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="w-full h-2 rounded-full appearance-none cursor-pointer bg-white/10 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-r [&::-webkit-slider-thumb]:from-accent-purple [&::-webkit-slider-thumb]:to-accent-cyan"
-    />
-  </div>
-);
-
-// Candidate Row Component
-const CandidateRow = ({ app, candidate, onClick, index }) => {
-  const scoreColor =
-    app.credibilityScore >= 80 ? 'accent-emerald' :
-    app.credibilityScore >= 60 ? 'accent-amber' : 'accent-rose';
-
-  const statusIcon = {
-    shortlisted: <CheckCircle className="w-4 h-4 text-accent-emerald" />,
-    rejected: <XCircle className="w-4 h-4 text-accent-rose" />,
-    applied: <Clock className="w-4 h-4 text-accent-amber" />,
-  };
-
-  const statusColor = {
-    shortlisted: 'bg-accent-emerald/20 border-accent-emerald/30 text-accent-emerald',
-    rejected: 'bg-accent-rose/20 border-accent-rose/30 text-accent-rose',
-    applied: 'bg-accent-amber/20 border-accent-amber/30 text-accent-amber',
-  };
-
-  return (
-    <motion.div
-      className="glass-card p-5 relative group cursor-pointer"
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05 }}
-      whileHover={{ scale: 1.01, x: 4 }}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {/* Avatar */}
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-purple/30 to-accent-cyan/30 flex items-center justify-center font-bold text-white">
-            {candidate?.name?.charAt(0) || '?'}
-          </div>
-
-          {/* Info */}
-          <div>
-            <h3 className="font-bold text-white mb-1">{candidate?.name || 'Unknown'}</h3>
-            <div className="flex items-center gap-3 text-sm">
-              <span className={`font-bold text-${scoreColor}`}>
-                Score: {app.credibilityScore}
-              </span>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border flex items-center gap-1 ${statusColor[app.status]}`}>
-                {statusIcon[app.status]}
-                {app.status}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* View Button */}
-        <motion.button
-          onClick={onClick}
-          className="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-medium hover:bg-accent-purple/20 hover:border-accent-purple/30 transition-all"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          View Profile
-        </motion.button>
-      </div>
-    </motion.div>
-  );
+const TONE_TEXT_CLASS = {
+  success: 'text-success',
+  warning: 'text-warning',
+  destructive: 'text-destructive',
 };
 
-// Main JobDetails Component
+const countByStatus = (analysis, status) =>
+  (analysis.skillEvidence || []).filter((row) => row.status === status).length;
+
+function CandidateRow({ analysis, onOpen, index }) {
+  const tone = scoreTone(analysis.credibilityScore);
+  const matched = countByStatus(analysis, 'matched');
+  const missing = countByStatus(analysis, 'missing');
+
+  return (
+    <motion.button
+      type="button"
+      onClick={onOpen}
+      className="card p-5 w-full text-left group"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.04, 0.3) }}
+    >
+      <div className="flex items-center gap-4">
+        <div className="w-11 h-11 rounded-lg bg-muted flex items-center justify-center font-semibold text-foreground flex-shrink-0">
+          {analysis.candidate?.name?.charAt(0) || '?'}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-foreground truncate">{analysis.candidate?.name}</div>
+          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+            {analysis.matchLevel && <Badge variant={tone}>{analysis.matchLevel}</Badge>}
+            <span className="text-caption text-muted-foreground">
+              {matched} of {matched + missing} required skills evidenced
+            </span>
+            {analysis.evidenceLimited && <Badge variant="warning">Evidence-limited</Badge>}
+          </div>
+        </div>
+
+        <div className="text-right flex-shrink-0">
+          <div className={`text-h3 font-extrabold tabular-nums ${TONE_TEXT_CLASS[tone]}`}>
+            {analysis.credibilityScore}
+          </div>
+          <div className="text-caption text-muted-foreground">Score</div>
+        </div>
+
+        <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+      </div>
+    </motion.button>
+  );
+}
+
 function JobDetails() {
   const { id } = useParams();
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
-  const [filterScore, setFilterScore] = useState(0);
-  const [activeTab, setActiveTab] = useState('all');
+  const { authFetch } = useAuth();
 
-  const job = jobs.find((j) => j._id === id);
-  const apps = applications.filter((a) => a.job === id);
+  const [job, setJob] = useState(null);
+  const [analyses, setAnalyses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selected, setSelected] = useState(null);
 
-  if (!job) {
+  const [minScore, setMinScore] = useState(0);
+  const [skillFilter, setSkillFilter] = useState('all');
+  const [evidenceFilter, setEvidenceFilter] = useState('all');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [jobsResponse, candidatesResponse] = await Promise.all([
+        authFetch(`${API_BASE_URL}/api/jobs/mine`),
+        authFetch(`${API_BASE_URL}/api/candidates`),
+      ]);
+      if (!jobsResponse.ok || !candidatesResponse.ok) {
+        throw new Error('Could not load this job.');
+      }
+      const jobs = await jobsResponse.json();
+      const candidates = await candidatesResponse.json();
+
+      setJob(jobs.find((j) => String(j.id) === String(id)) || null);
+      // `/api/candidates` is already scoped to this recruiter's jobs and ranked
+      // by composite score; narrow it to this job.
+      setAnalyses(candidates.filter((c) => String(c.jobId) === String(id)));
+    } catch (err) {
+      setError(err.message || 'Could not load this job.');
+    } finally {
+      setLoading(false);
+    }
+  }, [authFetch, id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const filtered = useMemo(
+    () =>
+      analyses.filter((analysis) => {
+        if (analysis.credibilityScore < minScore) return false;
+        if (evidenceFilter === 'limited' && !analysis.evidenceLimited) return false;
+        if (evidenceFilter === 'complete' && analysis.evidenceLimited) return false;
+        if (skillFilter !== 'all') {
+          const hasSkill = (analysis.skillEvidence || []).some(
+            (row) => row.name === skillFilter && row.status === 'matched'
+          );
+          if (!hasSkill) return false;
+        }
+        return true;
+      }),
+    [analyses, minScore, skillFilter, evidenceFilter]
+  );
+
+  // Skills to filter by come from what the pipeline actually recognised in
+  // these résumés, not from a static list.
+  const filterableSkills = useMemo(() => {
+    const names = new Set();
+    for (const analysis of analyses) {
+      for (const row of analysis.skillEvidence || []) {
+        if (row.required_by_job) names.add(row.name);
+      }
+    }
+    return [...names].sort();
+  }, [analyses]);
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="glass-card p-12 text-center">
-          <h2 className="text-2xl font-bold text-white mb-4">Job Not Found</h2>
-          <Link to="/recruiter/jobs" className="text-accent-purple hover:text-accent-cyan">
-            ← Back to Jobs
-          </Link>
-        </div>
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Spinner />
+        <p className="text-body-sm text-muted-foreground">Loading candidates…</p>
       </div>
     );
   }
 
-  // Filter + Sort Logic
-  const filteredApps = apps
-    .filter((app) => {
-      if (filterScore > 0 && app.credibilityScore < filterScore) return false;
-      if (activeTab !== 'all' && app.status !== activeTab) return false;
-      return true;
-    })
-    .sort((a, b) => b.credibilityScore - a.credibilityScore);
-
-  const statusCounts = {
-    all: apps.length,
-    applied: apps.filter((a) => a.status === 'applied').length,
-    shortlisted: apps.filter((a) => a.status === 'shortlisted').length,
-    rejected: apps.filter((a) => a.status === 'rejected').length,
-  };
+  if (error || !job) {
+    return (
+      <div className="card">
+        <EmptyState
+          icon={AlertTriangle}
+          title={error ? 'Something went wrong' : 'Job not found'}
+          description={
+            error || 'This job does not exist, or it belongs to a different recruiter account.'
+          }
+          action={
+            <Link to="/recruiter/jobs" className="btn btn-primary no-underline">
+              Back to jobs
+            </Link>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="relative">
-      {/* Background Effects */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-10 pointer-events-none" />
-      <GlowOrb className="top-[-10%] left-[-10%]" />
+    <div className="space-y-6">
+      <Link
+        to="/recruiter/jobs"
+        className="inline-flex items-center gap-2 text-body-sm text-muted-foreground hover:text-foreground transition-colors no-underline"
+      >
+        ← Back to jobs
+      </Link>
 
-      <div className="relative z-10">
-        {/* Back Button */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <Link
-            to="/recruiter/jobs"
-            className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors no-underline group"
-          >
-            <motion.span
-              animate={{ x: [0, -5, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            >
-              ←
-            </motion.span>
-            <span>Back to Jobs</span>
-          </Link>
-        </motion.div>
+      {/* Job header */}
+      <motion.div
+        className="card p-6"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+          <div className="min-w-0">
+            <h1 className="text-h1 font-heading font-semibold text-foreground mb-2">{job.title}</h1>
+            <p className="text-body-sm text-muted-foreground max-w-2xl mb-4 line-clamp-3">
+              {job.description}
+            </p>
 
-        {/* Job Info Card */}
-        <motion.div
-          className="glass-card p-8 mt-6 relative overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <div className="corner-decoration top-left" />
-          <div className="corner-decoration bottom-right" />
-
-          <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-            <div>
-              <h1 className="text-3xl font-extrabold text-white mb-3">{job.title}</h1>
-              <p className="text-white/50 mb-4 max-w-2xl">{job.description}</p>
-
-              <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/70 text-sm font-medium flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  {job.experienceLevel}
-                </span>
-
-                {job.requiredSkills.map((skill, i) => (
-                  <span
-                    key={i}
-                    className="px-3 py-1 rounded-lg bg-accent-purple/20 border border-accent-purple/30 text-accent-purple text-sm font-medium"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="text-3xl font-extrabold text-accent-purple">{apps.length}</div>
-                <div className="text-sm text-white/40">Total Candidates</div>
-              </div>
+            <div className="flex flex-wrap gap-2">
+              {job.location && (
+                <Badge variant="outline">
+                  <MapPin className="w-3 h-3 mr-1" aria-hidden="true" />
+                  {job.location}
+                </Badge>
+              )}
+              {job.experienceLevel && <Badge variant="outline">{job.experienceLevel}</Badge>}
+              {(job.requiredSkills || []).map((skill) => (
+                <Badge key={skill} variant="primary">
+                  {skill}
+                </Badge>
+              ))}
             </div>
           </div>
-        </motion.div>
 
-        {/* Filters & Tabs */}
-        <motion.div
-          className="glass-card p-6 mt-6 relative"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <div className="corner-decoration top-left" />
-          <div className="corner-decoration bottom-right" />
+          <div className="text-right flex-shrink-0">
+            <div className="text-h1 font-extrabold text-foreground tabular-nums">
+              {analyses.length}
+            </div>
+            <div className="text-caption text-muted-foreground">
+              {analyses.length === 1 ? 'Candidate' : 'Candidates'}
+            </div>
+          </div>
+        </div>
+      </motion.div>
 
-          {/* Tabs */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {['all', 'applied', 'shortlisted', 'rejected'].map((tab) => (
-              <TabButton
-                key={tab}
-                label={tab.charAt(0).toUpperCase() + tab.slice(1)}
-                active={activeTab === tab}
-                onClick={() => setActiveTab(tab)}
-                count={statusCounts[tab]}
+      {/* Filters (CHECKLIST 5.6 — skill, score band, evidence availability) */}
+      <motion.div
+        className="card p-6"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Filter className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+          <h2 className="text-body font-medium text-foreground">Filter candidates</h2>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4">
+          <div>
+            <label htmlFor="min-score" className="block text-caption text-muted-foreground mb-2">
+              Minimum credibility score:{' '}
+              <span className="text-foreground font-medium tabular-nums">{minScore}</span>
+            </label>
+            <input
+              id="min-score"
+              type="range"
+              min="0"
+              max="100"
+              value={minScore}
+              onChange={(e) => setMinScore(Number(e.target.value))}
+              className="w-full accent-primary cursor-pointer"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="skill-filter" className="block text-caption text-muted-foreground mb-2">
+              Evidenced skill
+            </label>
+            <select
+              id="skill-filter"
+              value={skillFilter}
+              onChange={(e) => setSkillFilter(e.target.value)}
+              className="w-full bg-background border border-input rounded-md px-3 py-2 text-body-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="all">Any skill</option>
+              {filterableSkills.map((skill) => (
+                <option key={skill} value={skill}>
+                  {skill}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="evidence-filter"
+              className="block text-caption text-muted-foreground mb-2"
+            >
+              Evidence availability
+            </label>
+            <select
+              id="evidence-filter"
+              value={evidenceFilter}
+              onChange={(e) => setEvidenceFilter(e.target.value)}
+              className="w-full bg-background border border-input rounded-md px-3 py-2 text-body-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="all">All candidates</option>
+              <option value="complete">Scored on all evidence sources</option>
+              <option value="limited">Evidence-limited</option>
+            </select>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Ranked candidates */}
+      <div>
+        <h2 className="text-body font-medium text-foreground mb-3 flex items-center gap-2">
+          <Users className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+          {filtered.length} of {analyses.length} candidates, ranked by credibility score
+        </h2>
+
+        <div className="grid gap-3">
+          <AnimatePresence initial={false}>
+            {filtered.map((analysis, index) => (
+              <CandidateRow
+                key={analysis.id}
+                analysis={analysis}
+                index={index}
+                onOpen={() => setSelected(analysis)}
               />
             ))}
+          </AnimatePresence>
+        </div>
+
+        {filtered.length === 0 && (
+          <div className="card">
+            <EmptyState
+              icon={Users}
+              title={analyses.length ? 'No candidates match these filters' : 'No applications yet'}
+              description={
+                analyses.length
+                  ? 'Widen the score range or clear the skill and evidence filters.'
+                  : 'Candidates who upload a résumé against this job will be ranked here once the pipeline has scored them.'
+              }
+            />
           </div>
-
-          {/* Score Filter */}
-          <ScoreSlider value={filterScore} onChange={setFilterScore} />
-        </motion.div>
-
-        {/* Results */}
-        <motion.div
-          className="mt-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-accent-cyan" />
-            Showing {filteredApps.length} Candidates
-          </h2>
-
-          <div className="grid gap-4">
-            <AnimatePresence>
-              {filteredApps.map((app, index) => {
-                const candidate = candidates.find((c) => c._id === app.candidate);
-                return (
-                  <CandidateRow
-                    key={app._id}
-                    app={app}
-                    candidate={candidate}
-                    index={index}
-                    onClick={() =>
-                      setSelectedCandidate({
-                        ...app,
-                        ...candidate,
-                      })
-                    }
-                  />
-                );
-              })}
-            </AnimatePresence>
-
-            {/* Empty State */}
-            {filteredApps.length === 0 && (
-              <motion.div
-                className="glass-card p-12 text-center"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-              >
-                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-white/30" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">No Candidates Found</h3>
-                <p className="text-white/50">
-                  Try adjusting your filters or check back later.
-                </p>
-              </motion.div>
-            )}
-          </div>
-        </motion.div>
+        )}
       </div>
 
-      {/* Modal */}
       <AnimatePresence>
-        {selectedCandidate && (
-          <CandidateModal
-            candidate={selectedCandidate}
-            onClose={() => setSelectedCandidate(null)}
-          />
+        {selected && (
+          <CandidateModal analysis={selected} onClose={() => setSelected(null)} />
         )}
       </AnimatePresence>
     </div>
