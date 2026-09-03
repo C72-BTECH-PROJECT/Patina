@@ -83,7 +83,20 @@ export const getJobById = async (req, res) => {
     return res.status(404).json({ message: 'Job not found.' });
   }
 
-  return res.json(formatJob(job));
+  // Candidates also learn whether they already applied, so the UI can render
+  // the job as applied instead of leaving the Apply button clickable.
+  let applied = false;
+  if (req.session?.role === 'CANDIDATE') {
+    const { data: existing } = await supabase
+      .from('applications')
+      .select('id, status, submitted_at')
+      .eq('candidate_id', req.session.userId)
+      .eq('job_id', job.id)
+      .maybeSingle();
+    applied = Boolean(existing);
+  }
+
+  return res.json({ ...formatJob(job), applied });
 };
 export const applyToJob = async (req, res) => {
   const jobId = req.params.id;
