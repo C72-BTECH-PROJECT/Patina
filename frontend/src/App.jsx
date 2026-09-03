@@ -12,11 +12,11 @@ import AdminDashboard from './pages/admin/Dashboard';
 // candidate flow
 import Upload from './pages/candidate/Upload';
 import Processing from './pages/candidate/Processing';
-import Results from './pages/candidate/Results';
 import CandidateDashboard from './pages/candidate/Dashboard';
 import CandidateLayout from './components/layouts/CandidateLayout';
 import CandidateProfile from './pages/candidate/CandidateProfile';
 import CandidateJobs from './pages/candidate/CandidateJobs';
+import CandidateJobDetail from './pages/candidate/JobDetail';
 
 // recruiter flow
 import RecruiterLayout from './components/layouts/RecruiterLayout';
@@ -53,8 +53,8 @@ function App() {
             <Route path="/candidate/processing" element={<RequireRole role="CANDIDATE"><Processing /></RequireRole>} />
             <Route path="/candidate" element={<RequireRole role="CANDIDATE"><CandidateLayout /></RequireRole>}>
               <Route path="dashboard" element={<CandidateDashboard />} />
-              <Route path="results" element={<Results />} />
               <Route path="jobs" element={<CandidateJobs />} />
+              <Route path="jobs/:id" element={<CandidateJobDetail />} />
               <Route path="profile" element={<CandidateProfile />} />
             </Route>
 

@@ -4,16 +4,10 @@ import cors from 'cors';
 import authRoutes from './Routes/auth.routes.js';
 import jobsRoutes from './Routes/jobs.routes.js';
 import analysisRoutes from './Routes/analysis.routes.js';
+import parseRoutes from './Routes/parse.routes.js';
 import adminRoutes from './Routes/admin.routes.js';
 
 import session from 'express-session';
-
-if (!process.env.SESSION_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('SESSION_SECRET environment variable must be set in production.');
-  }
-  console.warn('[WARNING] SESSION_SECRET is not set. Using an insecure default — set SESSION_SECRET in backend/.env before deploying.');
-}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -52,9 +46,10 @@ app.use('/api/jobs', jobsRoutes);
 // analysisRoutes defines:
 // POST /analyze
 // GET  /candidate-analysis
-// GET  /candidates
 app.use('/api', analysisRoutes);
 
+// parseRoutes defines POST / (mounted at /api/parse)
+app.use('/api/parse', parseRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (_req, res) => {
@@ -66,9 +61,75 @@ app.use((req, res) => {
   res.status(404).json({ message: `Cannot GET ${req.url}` });
 });
 
-app.listen(PORT, () => {
+// Keep a module-level reference and register success/error separately. Passing
+// the callback directly to Express can invoke it for a listen error as well,
+// which previously printed a false "Server running" message on EADDRINUSE.
+const server = app.listen(PORT);
+
+server.once('listening', () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(
-    `API endpoints:\n- GET  /api/jobs\n- POST /api/jobs\n- POST /api/analyze\n- GET  /api/candidate-analysis\n- GET  /api/candidates`
+    `API endpoints:\n- GET  /api/jobs\n- POST /api/jobs\n- POST /api/analyze\n- GET  /api/candidate-analysis\n- POST /api/parse`
   );
 });
+
+server.once('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`Could not start: port ${PORT} is already in use. Stop the existing backend process and try again.`);
+  } else {
+    console.error('HTTP server failed:', error);
+  }
+  process.exitCode = 1;
+});
+// ---------------------------------------------------------------------------
+// Crash guards: log unhandled rejections and uncaught exceptions so the
+// process never shuts down silently and the log always explains what happened.
+// ---------------------------------------------------------------------------
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[uncaughtException]', error);
+  console.error(error?.stack || '');
+});
+
+// ---------------------------------------------------------------------------
+// Watchdog: if the listener ever stops, log it and rebind automatically so the
+// backend heals without a manual restart. Also keeps the event loop alive,
+// which a running HTTP server needs anyway.
+// ---------------------------------------------------------------------------
+let rebindAttempts = 0;
+
+setInterval(() => {
+  if (server.listening) {
+    rebindAttempts = 0;
+    process.exitCode = 0;
+    return;
+  }
+
+  rebindAttempts += 1;
+  console.error(`[watchdog] Server not listening - rebinding on port ${PORT} (attempt ${rebindAttempts})...`);
+
+  try {
+    server.listen(PORT);
+  } catch (error) {
+    console.error('[watchdog] Rebinding failed:', error.message);
+  }
+}, 15000);
+
+// ---------------------------------------------------------------------------
+// Graceful shutdown: release the port immediately on Ctrl+C / SIGTERM so the
+// next start never sees a stale socket. Open connections get up to 10 seconds
+// to drain before we force-exit.
+// ---------------------------------------------------------------------------
+const shutdown = (signal) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  server.close(() => {
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10000).unref();
+};
+
+process.on('SIGINT', () => shutdown('Ctrl+C (SIGINT)'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

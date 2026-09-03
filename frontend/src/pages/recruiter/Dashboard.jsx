@@ -1,194 +1,191 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  TrendingUp, Users, Briefcase, Clock, ShieldAlert, ChevronRight, Star, Plus, Eye, Calendar, Gauge,
-} from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { motion } from 'framer-motion';
+import { TrendingUp, Users, Briefcase, CheckCircle, Clock, AlertTriangle, ChevronRight, Star, Filter, Download, Plus, Eye, Calendar } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
-import Badge from '../../components/Badge';
-import EmptyState from '../../components/EmptyState';
-import Spinner from '../../components/Spinner';
-import CandidateModal from '../../components/recruiter/CandidateModal';
-import { EvidenceUnavailable } from '../../components/recruiter/ScoreBreakdown';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-const scoreTone = (score) =>
-  score >= 80 ? 'success' : score >= 60 ? 'warning' : 'destructive';
+const AnimatedCounter = ({ end, suffix = '', duration = 1.5 }) => {
+  const [count, setCount] = React.useState(0);
 
-const TONE_TEXT_CLASS = {
-  success: 'text-success',
-  warning: 'text-warning',
-  destructive: 'text-destructive',
+  React.useEffect(() => {
+    let startTime;
+    const animate = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / (duration * 1000), 1);
+      setCount(Math.floor(progress * end));
+      if (progress < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }, [end, duration]);
+
+  return <span>{count}{suffix}</span>;
 };
 
-const StatCard = ({ icon: Icon, label, value, hint, delay }) => (
+const StatCard = ({ icon: Icon, label, value, trend, color, delay }) => (
   <motion.div
-    className="card p-6"
-    initial={{ opacity: 0, y: 20 }}
+    className="card p-6 relative overflow-hidden group"
+    initial={{ opacity: 0, y: 30 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay }}
+    whileHover={{ y: -4 }}
   >
-    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mb-4">
-      <Icon className="w-5 h-5 text-foreground" aria-hidden="true" />
+    <div className="relative z-10">
+      <div className="flex items-center justify-between mb-4">
+        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+          <Icon className="w-6 h-6 text-foreground" />
+        </div>
+        {trend && (
+          <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+            trend > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+          }`}>
+            {trend > 0 ? '+' : ''}{trend}%
+          </span>
+        )}
+      </div>
+
+      <div className="text-3xl font-extrabold text-foreground mb-1">
+        <AnimatedCounter end={value} />
+      </div>
+      <div className="text-sm text-muted-foreground">{label}</div>
     </div>
-    <div className="text-h2 font-extrabold text-foreground tabular-nums mb-1">{value}</div>
-    <div className="text-body-sm text-muted-foreground">{label}</div>
-    {hint && <div className="text-caption text-muted-foreground mt-1">{hint}</div>}
   </motion.div>
 );
 
-const CandidateCard = ({ analysis, rank, onOpen }) => {
-  const tone = scoreTone(analysis.credibilityScore);
-  const evidenced = (analysis.skillEvidence || []).filter((r) => r.status === 'matched');
+const CandidateCard = ({ candidate, rank }) => {
+  const scoreColor = candidate.credibilityScore >= 80 ? 'text-success' :
+                     candidate.credibilityScore >= 60 ? 'text-warning' : 'text-destructive';
 
   return (
-    <motion.button
-      type="button"
-      onClick={onOpen}
-      className="card p-4 w-full text-left group"
-      initial={{ opacity: 0, x: -12 }}
+    <motion.div
+      className="card p-5 relative group cursor-pointer"
+      initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
+      whileHover={{ scale: 1.01, x: 2 }}
       transition={{ type: 'spring', stiffness: 300 }}
     >
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center font-semibold text-body-sm text-foreground flex-shrink-0">
+      <div className="flex items-center gap-4">
+        <div className={`w-10 h-10 rounded-lg ${
+          rank === 1 ? 'bg-warning/10' : rank === 2 ? 'bg-muted' : rank === 3 ? 'bg-warning/5' : 'bg-muted'
+        } flex items-center justify-center font-bold text-foreground`}>
           #{rank}
         </div>
 
+        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+          <span className="font-bold text-foreground">
+            {candidate.candidateInfo?.name?.split(' ').map(n => n[0]).join('') || 'UN'}
+          </span>
+        </div>
+
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-foreground truncate">{analysis.candidate?.name}</div>
-          <div className="text-caption text-muted-foreground truncate">
-            {analysis.jobTitle || 'Unassigned role'}
+          <div className="font-semibold text-foreground truncate">
+            {candidate.candidateInfo?.name || 'Unknown'}
+          </div>
+          <div className="text-sm text-muted-foreground truncate">
+            {candidate.candidateInfo?.location || 'Location unknown'}
           </div>
         </div>
 
-        <div className="text-right flex-shrink-0">
-          <div className={`text-h3 font-extrabold tabular-nums ${TONE_TEXT_CLASS[tone]}`}>
-            {analysis.credibilityScore}
+        <div className="text-right">
+          <div className={`text-2xl font-extrabold ${scoreColor}`}>
+            {candidate.credibilityScore}
           </div>
-          <div className="text-caption text-muted-foreground">Score</div>
+          <div className="text-xs text-muted-foreground">Score</div>
         </div>
 
-        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+        <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
       </div>
 
-      <div className="flex gap-1.5 mt-3 flex-wrap">
-        {evidenced.slice(0, 3).map((row) => (
-          <Badge key={row.name} variant="success">
-            {row.name}
-          </Badge>
+      <div className="flex gap-2 mt-3 flex-wrap">
+        {candidate.skills?.slice(0, 3).map((skill, i) => (
+          <span
+            key={i}
+            className={`px-2 py-0.5 rounded-full text-xs ${
+              skill.verified
+                ? 'bg-success/10 text-success'
+                : 'bg-warning/10 text-warning'
+            }`}
+          >
+            {skill.name}
+          </span>
         ))}
-        {evidenced.length > 3 && <Badge>+{evidenced.length - 3}</Badge>}
-        {evidenced.length === 0 && (
-          <span className="text-caption text-muted-foreground">
-            No required skill evidenced in the résumé
+        {candidate.skills?.length > 3 && (
+          <span className="px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">
+            +{candidate.skills.length - 3}
           </span>
         )}
-        {analysis.evidenceLimited && <Badge variant="warning">Evidence-limited</Badge>}
       </div>
-    </motion.button>
+    </motion.div>
   );
 };
 
 const JobCard = ({ job, index }) => (
   <motion.div
-    className="card p-4"
-    initial={{ opacity: 0, y: 12 }}
+    className="card p-5 relative group cursor-pointer"
+    initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: index * 0.05 }}
+    transition={{ delay: index * 0.1 }}
+    whileHover={{ scale: 1.01 }}
   >
-    <div className="flex items-center justify-between mb-2 gap-3">
-      <h3 className="font-medium text-foreground truncate">{job.title}</h3>
+    <div className="flex items-center justify-between mb-3">
+      <h3 className="font-bold text-foreground">{job.title}</h3>
       <Link
-        to={`/recruiter/jobs/${job.id}`}
-        className="px-3 py-1.5 rounded-md bg-muted border border-border text-foreground text-caption font-medium hover:bg-muted/80 transition-all no-underline flex-shrink-0"
+        to={`/recruiter/jobs/${job._id}`}
+        className="px-3 py-1.5 rounded-md bg-muted border border-border text-foreground text-xs font-medium hover:bg-muted/80 transition-all no-underline"
       >
         View →
       </Link>
     </div>
 
-    <p className="text-body-sm text-muted-foreground line-clamp-1 mb-3">{job.description}</p>
+    <p className="text-sm text-muted-foreground line-clamp-1 mb-3">{job.description}</p>
 
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {(job.requiredSkills || []).map((skill) => (
-        <Badge key={skill}>{skill}</Badge>
+    <div className="flex items-center gap-2 flex-wrap">
+      {job.requiredSkills?.map((skill, i) => (
+        <span key={i} className="px-2 py-0.5 rounded-full bg-muted text-foreground text-xs">
+          {skill}
+        </span>
       ))}
     </div>
 
-    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border text-caption text-muted-foreground">
+    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
       <span className="flex items-center gap-1">
-        <Clock className="w-3 h-3" aria-hidden="true" />
+        <Clock className="w-3 h-3" />
         {job.experienceLevel || 'Any'}
       </span>
-      {job.createdAt && (
-        <span className="flex items-center gap-1">
-          <Calendar className="w-3 h-3" aria-hidden="true" />
-          {new Date(job.createdAt).toLocaleDateString()}
-        </span>
-      )}
+      <span className="flex items-center gap-1">
+        <Calendar className="w-3 h-3" />
+        Posted recently
+      </span>
     </div>
   </motion.div>
 );
 
-/** Applications per day for the last 7 days, from each score's created_at. */
-const buildDailyApplications = (analyses) => {
-  const days = [];
-  const index = new Map();
-  for (let i = 6; i >= 0; i -= 1) {
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
-    date.setDate(date.getDate() - i);
-    const bucket = {
-      key: date.toDateString(),
-      day: date.toLocaleDateString(undefined, { weekday: 'short' }),
-      applications: 0,
-    };
-    days.push(bucket);
-    index.set(bucket.key, bucket);
-  }
+const skillsDistribution = [
+  { name: 'React', value: 35, color: '#0a0a0a' },
+  { name: 'Node.js', value: 25, color: '#525252' },
+  { name: 'Python', value: 20, color: '#737373' },
+  { name: 'Other', value: 20, color: '#a3a3a3' },
+];
 
-  for (const analysis of analyses) {
-    if (!analysis.appliedAt) continue;
-    const day = new Date(analysis.appliedAt);
-    day.setHours(0, 0, 0, 0);
-    const bucket = index.get(day.toDateString());
-    if (bucket) bucket.applications += 1;
-  }
+const weeklyApplications = [
+  { day: 'Mon', applications: 12 },
+  { day: 'Tue', applications: 19 },
+  { day: 'Wed', applications: 15 },
+  { day: 'Thu', applications: 25 },
+  { day: 'Fri', applications: 22 },
+  { day: 'Sat', applications: 8 },
+  { day: 'Sun', applications: 5 },
+];
 
-  return days;
-};
-
-/**
- * Per-skill confidence across the pipeline (CHECKLIST 5.11): for every skill a
- * job asked for, how many of the candidates it was required of actually
- * evidenced it. Counted from stored skill evidence, not a fixed distribution.
- */
-const buildSkillEvidenceSummary = (analyses) => {
-  const totals = new Map();
-
-  for (const analysis of analyses) {
-    for (const row of analysis.skillEvidence || []) {
-      if (!row.required_by_job) continue;
-      const entry = totals.get(row.name) || { name: row.name, required: 0, evidenced: 0 };
-      entry.required += 1;
-      if (row.status === 'matched') entry.evidenced += 1;
-      totals.set(row.name, entry);
-    }
-  }
-
-  return [...totals.values()]
-    .sort((a, b) => b.required - a.required || b.evidenced - a.evidenced)
-    .slice(0, 6);
-};
+const COLORS = ['#0a0a0a', '#525252', '#737373', '#a3a3a3'];
 
 function RecruiterDashboard() {
-  const { authFetch, user } = useAuth();
-  const [analyses, setAnalyses] = React.useState([]);
+  const [applications, setApplications] = React.useState([]);
   const [jobs, setJobs] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
-  const [selected, setSelected] = React.useState(null);
+  const { authFetch } = useAuth();
 
   React.useEffect(() => {
     const loadDashboard = async () => {
@@ -197,10 +194,19 @@ function RecruiterDashboard() {
           authFetch(`${API_BASE_URL}/api/candidates`),
           authFetch(`${API_BASE_URL}/api/jobs/mine`),
         ]);
-        setAnalyses(candidateResponse.ok ? await candidateResponse.json() : []);
-        setJobs(jobsResponse.ok ? await jobsResponse.json() : []);
+        const data = candidateResponse.ok ? await candidateResponse.json() : [];
+        const jobData = jobsResponse.ok ? await jobsResponse.json() : [];
+        const mappedData = data.map(c => ({
+          _id: c.id || Math.random().toString(),
+          candidateInfo: c.candidate,
+          credibilityScore: c.credibilityScore || 0,
+          skills: c.verifiedSkills || [],
+          status: 'applied'
+        }));
+        setApplications(mappedData);
+        setJobs(jobData);
       } catch (err) {
-        console.error('Failed to load the recruiter dashboard:', err);
+        console.error('Failed to fetch candidates:', err);
       } finally {
         setLoading(false);
       }
@@ -208,29 +214,9 @@ function RecruiterDashboard() {
     loadDashboard();
   }, [authFetch]);
 
-  const ranked = React.useMemo(
-    () => [...analyses].sort((a, b) => b.credibilityScore - a.credibilityScore),
-    [analyses]
-  );
-  const dailyApplications = React.useMemo(() => buildDailyApplications(analyses), [analyses]);
-  const skillSummary = React.useMemo(() => buildSkillEvidenceSummary(analyses), [analyses]);
-  const evidenceLimitedCount = analyses.filter((a) => a.evidenceLimited).length;
-  const averageScore = analyses.length
-    ? Math.round(analyses.reduce((sum, a) => sum + a.credibilityScore, 0) / analyses.length)
-    : 0;
-  // Flag detection needs a corroborating evidence source; the backend says so
-  // per candidate, and every candidate currently reports the same reason.
-  const flagsUnavailableReason = analyses.find((a) => !a.flagsAvailable)?.flagsUnavailableReason;
-  const flaggedCount = analyses.filter((a) => a.flagsAvailable && a.flags.length > 0).length;
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Spinner />
-        <p className="text-body-sm text-muted-foreground">Loading your hiring overview…</p>
-      </div>
-    );
-  }
+  const topCandidates = [...applications].sort((a, b) => b.credibilityScore - a.credibilityScore);
+  const shortlistedCount = applications.filter(a => a.status === 'shortlisted').length;
+  const pendingCount = applications.filter(a => a.status === 'applied').length;
 
   return (
     <div className="space-y-8">
@@ -240,72 +226,65 @@ function RecruiterDashboard() {
         animate={{ opacity: 1, y: 0 }}
       >
         <div>
-          <h1 className="text-h1 font-heading font-semibold text-foreground mb-2">
+          <h1 className="text-3xl font-extrabold text-foreground mb-2">
             Recruiter Dashboard
           </h1>
-          <p className="text-body-sm text-muted-foreground">
-            {user?.firstName ? (
-              <>
-                Welcome back,{' '}
-                <span className="text-foreground font-medium">{user.firstName}</span>.{' '}
-              </>
-            ) : null}
-            Candidates are ranked by a credibility score you can audit factor by factor.
+          <p className="text-muted-foreground">
+            Welcome back, <span className="text-foreground font-medium">Amit</span>. Here's your hiring overview.
           </p>
         </div>
 
-        <Link
-          to="/recruiter/create-job"
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-body-sm font-medium hover:bg-primary/90 transition-colors no-underline"
-        >
-          <Plus className="w-4 h-4" aria-hidden="true" />
-          Create new job
-        </Link>
+        <div className="flex items-center gap-3">
+          <motion.button
+            className="px-4 py-2 rounded-md border border-input bg-background text-foreground text-sm font-medium flex items-center gap-2 hover:bg-accent transition-all"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Download className="w-4 h-4" />
+            Export Report
+          </motion.button>
+
+          <Link
+            to="/recruiter/create-job"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors no-underline"
+          >
+            <Plus className="w-4 h-4" />
+            Create New Job
+          </Link>
+        </div>
       </motion.div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={Briefcase} label="Active jobs" value={jobs.length} delay={0.05} />
-        <StatCard
-          icon={Users}
-          label="Candidates scored"
-          value={analyses.length}
-          delay={0.1}
-        />
-        <StatCard
-          icon={Gauge}
-          label="Average credibility"
-          value={analyses.length ? `${averageScore}` : '—'}
-          hint={analyses.length ? 'Across all scored candidates' : 'No scores yet'}
-          delay={0.15}
-        />
-        <StatCard
-          icon={ShieldAlert}
-          label="Evidence-limited"
-          value={evidenceLimitedCount}
-          hint="Scored without GitHub or assessment evidence"
-          delay={0.2}
-        />
+        <StatCard icon={Briefcase} label="Active Jobs" value={jobs.length} color="accent-purple" delay={0.1} />
+        <StatCard icon={Users} label="Total Candidates" value={applications.length} trend={12} color="accent-cyan" delay={0.2} />
+        <StatCard icon={CheckCircle} label="Shortlisted" value={shortlistedCount} color="accent-emerald" delay={0.3} />
+        <StatCard icon={Clock} label="Pending Review" value={pendingCount} color="accent-amber" delay={0.4} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         <motion.div
-          className="card p-6 lg:col-span-2"
-          initial={{ opacity: 0, y: 20 }}
+          className="card p-6 lg:col-span-2 relative"
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
+          transition={{ delay: 0.5 }}
         >
-          <h3 className="text-body font-medium text-foreground mb-6 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4" aria-hidden="true" />
-            Applications scored, last 7 days
-          </h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Weekly Applications
+            </h3>
+            <div className="flex gap-2">
+              <button className="px-3 py-1.5 rounded-md bg-muted text-foreground text-xs font-medium">Week</button>
+              <button className="px-3 py-1.5 rounded-md bg-background text-muted-foreground text-xs font-medium hover:bg-accent">Month</button>
+            </div>
+          </div>
 
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={dailyApplications}>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={weeklyApplications}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <Tooltip
-                cursor={{ fill: 'hsl(var(--muted))' }}
                 contentStyle={{
                   backgroundColor: 'hsl(var(--background))',
                   border: '1px solid hsl(var(--border))',
@@ -313,184 +292,161 @@ function RecruiterDashboard() {
                 }}
                 itemStyle={{ color: 'hsl(var(--foreground))' }}
               />
-              <Bar dataKey="applications" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="applications" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
 
         <motion.div
-          className="card p-6"
-          initial={{ opacity: 0, y: 20 }}
+          className="card p-6 relative"
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.6 }}
         >
-          <h3 className="text-body font-medium text-foreground mb-1 flex items-center gap-2">
-            <Star className="w-4 h-4" aria-hidden="true" />
-            Skill evidence
+          <h3 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
+            <Star className="w-5 h-5" />
+            Top Skills
           </h3>
-          <p className="text-caption text-muted-foreground mb-5">
-            How often a skill your jobs require is actually evidenced in the résumés you received.
-          </p>
 
-          {skillSummary.length ? (
-            <div className="space-y-4">
-              {skillSummary.map((skill) => {
-                const pct = Math.round((skill.evidenced / skill.required) * 100);
-                return (
-                  <div key={skill.name}>
-                    <div className="flex items-baseline justify-between gap-2 mb-1.5">
-                      <span className="text-body-sm text-foreground truncate">{skill.name}</span>
-                      <span className="text-caption text-muted-foreground tabular-nums flex-shrink-0">
-                        {skill.evidenced}/{skill.required}
-                      </span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-border overflow-hidden">
-                      <motion.div
-                        className="h-full rounded-full bg-primary"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${pct}%` }}
-                        transition={{ duration: 0.6, ease: 'easeOut' }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+          <div className="flex flex-col items-center">
+            <ResponsiveContainer width="100%" height={150}>
+              <PieChart>
+                <Pie
+                  data={skillsDistribution}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={60}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {skillsDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+
+            <div className="flex flex-wrap justify-center gap-3 mt-4">
+              {skillsDistribution.map((skill, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: skill.color }} />
+                  <span className="text-xs text-muted-foreground">{skill.name}</span>
+                </div>
+              ))}
             </div>
-          ) : (
-            <p className="text-body-sm text-muted-foreground">
-              No scored candidates yet, so there is no skill evidence to summarise.
-            </p>
-          )}
+          </div>
         </motion.div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <motion.div
-          className="card p-6"
-          initial={{ opacity: 0, y: 20 }}
+          className="card p-6 relative"
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
+          transition={{ delay: 0.7 }}
         >
-          <h3 className="text-body font-medium text-foreground mb-1 flex items-center gap-2">
-            <Eye className="w-4 h-4" aria-hidden="true" />
-            Top candidates
-          </h3>
-          <p className="text-caption text-muted-foreground mb-4">
-            Select a candidate to audit how their score was produced.
-          </p>
-
-          {ranked.length ? (
-            <div className="space-y-3">
-              {ranked.slice(0, 5).map((analysis, index) => (
-                <CandidateCard
-                  key={analysis.id}
-                  analysis={analysis}
-                  rank={index + 1}
-                  onOpen={() => setSelected(analysis)}
-                />
-              ))}
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              Top Candidates
+            </h3>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <select className="bg-background border border-input rounded-md px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                <option value="all">All</option>
+                <option value="high">High Score</option>
+                <option value="shortlisted">Shortlisted</option>
+              </select>
             </div>
-          ) : (
-            <EmptyState
-              icon={Users}
-              title="No candidates scored yet"
-              description="Once a candidate uploads a résumé against one of your jobs, their credibility score and its breakdown appear here."
-            />
-          )}
+          </div>
+
+          <div className="space-y-3">
+            {topCandidates.slice(0, 5).map((candidate, index) => (
+              <CandidateCard key={candidate._id} candidate={candidate} rank={index + 1} />
+            ))}
+          </div>
+
+          <Link
+            to="/recruiter/jobs"
+            className="mt-4 flex items-center justify-center gap-2 text-sm text-foreground hover:text-foreground/80 transition-colors"
+          >
+            View all candidates
+            <ChevronRight className="w-4 h-4" />
+          </Link>
         </motion.div>
 
         <motion.div
-          className="card p-6"
-          initial={{ opacity: 0, y: 20 }}
+          className="card p-6 relative"
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.8 }}
         >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-body font-medium text-foreground flex items-center gap-2">
-              <Briefcase className="w-4 h-4" aria-hidden="true" />
-              Your jobs
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Briefcase className="w-5 h-5" />
+              Recent Jobs
             </h3>
             <Link
-              to="/recruiter/jobs"
-              className="text-caption text-muted-foreground hover:text-foreground transition-colors no-underline"
+              to="/recruiter/create-job"
+              className="px-3 py-1.5 rounded-md bg-muted border border-border text-foreground text-xs font-medium hover:bg-muted/80 transition-all no-underline"
             >
-              View all →
+              + Add New
             </Link>
           </div>
 
-          {jobs.length ? (
-            <div className="space-y-3">
-              {jobs.slice(0, 5).map((job, index) => (
-                <JobCard key={job.id} job={job} index={index} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={Briefcase}
-              title="No jobs posted"
-              description="Create a job to start receiving and scoring applications."
-              action={
-                <Link to="/recruiter/create-job" className="btn btn-primary no-underline">
-                  Create a job
-                </Link>
-              }
-            />
-          )}
+          <div className="space-y-3">
+            {jobs.slice(0, 5).map((job, index) => (
+              <JobCard key={job._id} job={job} index={index} />
+            ))}
+          </div>
+
+          <Link
+            to="/recruiter/jobs"
+            className="mt-4 flex items-center justify-center gap-2 text-sm text-foreground hover:text-foreground/80 transition-colors"
+          >
+            View all jobs
+            <ChevronRight className="w-4 h-4" />
+          </Link>
         </motion.div>
       </div>
 
-      {/* Attention required — real counts only, and an explicit unavailable
-          state for the checks that need evidence the pipeline cannot collect
-          yet (CHECKLIST 4.6 / 5.9 / 5.10). */}
       <motion.div
-        className="card p-6"
-        initial={{ opacity: 0, y: 20 }}
+        className="card p-6 relative"
+        initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.45 }}
+        transition={{ delay: 0.9 }}
       >
-        <h3 className="text-body font-medium text-foreground mb-4 flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 text-warning" aria-hidden="true" />
-          Attention required
-        </h3>
+        <div className="flex items-center gap-3 mb-4">
+          <AlertTriangle className="w-5 h-5 text-warning" />
+          <h3 className="text-lg font-bold text-foreground">Attention Required</h3>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-lg bg-muted border border-border">
-            <div className="text-h3 font-extrabold text-foreground tabular-nums mb-1">
-              {evidenceLimitedCount}
+          <div className="p-4 rounded-xl bg-muted border border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-warning" />
+              <span className="font-medium text-warning">3 Pending Reviews</span>
             </div>
-            <div className="text-body-sm font-medium text-foreground mb-1">
-              Evidence-limited candidates
-            </div>
-            <p className="text-caption text-muted-foreground leading-relaxed">
-              Scored on résumé evidence alone. Their missing sources had their weight
-              redistributed, so these scores are not directly comparable to fully evidenced ones.
-            </p>
+            <p className="text-sm text-muted-foreground">Candidates waiting for your review since last week</p>
           </div>
 
-          {flagsUnavailableReason ? (
-            <EvidenceUnavailable
-              title="Inconsistency detection not available"
-              reason={flagsUnavailableReason}
-            />
-          ) : (
-            <div className="p-4 rounded-lg bg-muted border border-border">
-              <div className="text-h3 font-extrabold text-foreground tabular-nums mb-1">
-                {flaggedCount}
-              </div>
-              <div className="text-body-sm font-medium text-foreground mb-1">
-                Flagged applications
-              </div>
-              <p className="text-caption text-muted-foreground leading-relaxed">
-                Candidates whose résumé claims are contradicted by their other evidence.
-              </p>
+          <div className="p-4 rounded-xl bg-destructive/5 border border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-destructive" />
+              <span className="font-medium text-destructive">2 Flagged Applications</span>
             </div>
-          )}
+            <p className="text-sm text-muted-foreground">Potential inconsistencies detected in skill claims</p>
+          </div>
         </div>
       </motion.div>
-
-      <AnimatePresence>
-        {selected && <CandidateModal analysis={selected} onClose={() => setSelected(null)} />}
-      </AnimatePresence>
     </div>
   );
 }

@@ -13,6 +13,9 @@ venv/
 backend/uploads/
 nlp-engine/uploads/
 
+# Backend runtime logs (created by background server)
+backend/server-*.log
+
 *.pdf
 *.docx
 

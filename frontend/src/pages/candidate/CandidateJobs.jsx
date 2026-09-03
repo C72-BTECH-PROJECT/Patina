@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Briefcase, MapPin } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Briefcase, MapPin, ArrowRight } from 'lucide-react';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 function CandidateJobs() {
   const [jobs, setJobs] = useState([]);
@@ -50,6 +51,15 @@ function CandidateJobs() {
               <span>{job.location}</span>
               <span>•</span>
               <span>{job.experienceLevel}</span>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Link
+                to={`/candidate/jobs/${job.id}`}
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground no-underline transition hover:bg-primary/90"
+              >
+                View Full Detail
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
           </div>
         ))}

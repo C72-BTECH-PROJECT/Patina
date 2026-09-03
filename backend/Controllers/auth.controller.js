@@ -1,32 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
-
 import supabase from '../Config/supabase.js';
+import supabaseAuth from '../Config/supabaseAuth.js';
 
 const ALLOWED_ROLES = new Set(['candidate', 'recruiter']);
 const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,30}$/;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const RESET_REDIRECT_URL = `${FRONTEND_URL}/reset-password`;
-const MIN_PASSWORD_LENGTH = 8;
-
-// A short-lived client carrying only the public anon key, for every GoTrue
-// operation that establishes or uses a user session (login, signup, password
-// recovery, resend-confirmation).
-//
-// These must NEVER run on the shared service-role client in Config/supabase.js:
-// supabase-js caches the returned session in memory, and from then on every
-// query on that singleton is sent with the user's JWT instead of the
-// service-role key — so all RLS-bypassing writes (resumes, scores, storage
-// uploads) start failing process-wide with "new row violates row-level
-// security policy" until the server restarts.
-const createUserScopedClient = () => {
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  if (!anonKey) {
-    throw new Error('SUPABASE_ANON_KEY is not configured — required for auth flows.');
-  }
-  return createClient(process.env.SUPABASE_URL, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-};
 
 const formatProfile = (profile, email) => ({
   id: profile.id,
@@ -78,15 +55,7 @@ export const resendConfirmation = async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ message: 'Email is required.' });
 
-  let authClient;
-  try {
-    authClient = createUserScopedClient();
-  } catch (err) {
-    console.error('resendConfirmation misconfigured:', err?.message || err);
-    return res.status(500).json({ message: 'Email confirmation is not available right now.' });
-  }
-
-  const { error } = await authClient.auth.resend({
+  const { error } = await supabaseAuth.auth.resend({
     type: 'signup',
     email: String(email).trim().toLowerCase(),
     options: { emailRedirectTo: `${FRONTEND_URL}/email-confirmed` },
@@ -96,111 +65,64 @@ export const resendConfirmation = async (req, res) => {
   return res.status(200).json({ message: 'Confirmation email sent. Check your inbox and spam folder.' });
 };
 
-// Step 1 of the password reset: email a recovery link.
-//
-// Always responds 200 with the same message regardless of whether the account
-// exists, so the endpoint can't be used to enumerate usernames or emails. The
-// request route is rate-limited in auth.routes.js.
-export const requestPasswordReset = async (req, res) => {
-  const { username, email } = req.body || {};
-  const identifier = String(username || email || '').trim();
-
-  const genericResponse = {
-    message:
-      'If an account matches that information, a password reset link has been sent to its email address.',
-  };
-
-  if (!identifier) {
-    return res.status(400).json({ message: 'Enter your username or email address.' });
+export const updatePassword = async (req, res) => {
+  const { username, newPassword } = req.body || {};
+  if (!username || !newPassword) {
+    return res.status(400).json({ message: 'Username and new password are required.' });
   }
+
+  const trimmedUsername = String(username).trim();
+
+  let profile = null;
+  let profileError = null;
 
   try {
-    let targetEmail = null;
+    const profileResult = await supabase
+      .from('profiles')
+      .select('id, email')
+      .ilike('username', trimmedUsername)
+      .maybeSingle();
+    profile = profileResult.data;
+    profileError = profileResult.error;
+  } catch (e) {
+    profileError = e;
+  }
 
-    if (identifier.includes('@')) {
-      targetEmail = identifier.toLowerCase();
-    } else {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .ilike('username', identifier)
-        .maybeSingle();
+  if (!profile && !profileError) {
+    const { data: authUsersList } = await supabase.auth.admin.listUsers();
+    const matchedAuthUser = (authUsersList?.users || []).find((u) => {
+      const metaUsername = u.user_metadata?.username || u.raw_user_meta_data?.username;
+      return String(metaUsername || '').toLowerCase() === trimmedUsername.toLowerCase();
+    });
 
-      if (profile?.id) {
-        const { data: authUser } = await supabase.auth.admin.getUserById(profile.id);
-        targetEmail = authUser?.user?.email || null;
-      }
+    if (matchedAuthUser) {
+      profile = {
+        id: matchedAuthUser.id,
+        email: matchedAuthUser.email,
+      };
     }
-
-    if (targetEmail) {
-      const userClient = createUserScopedClient();
-      const { error } = await userClient.auth.resetPasswordForEmail(targetEmail, {
-        redirectTo: RESET_REDIRECT_URL,
-      });
-      if (error) {
-        console.error('resetPasswordForEmail failed:', error.message);
-      }
-    }
-  } catch (err) {
-    // Swallow — the response must not reveal whether anything was found or sent.
-    console.error('Password reset request error:', err?.message || err);
   }
 
-  return res.status(200).json(genericResponse);
-};
-
-// Step 2 of the password reset: set the new password.
-//
-// Authorisation comes entirely from the recovery credentials in the emailed
-// link (either a `token_hash` for the OTP-style template, or the
-// access/refresh token pair from the redirect hash). A raw username is never
-// accepted here, and the service-role key is never used to change the password.
-export const resetPassword = async (req, res) => {
-  const { newPassword, tokenHash, accessToken, refreshToken } = req.body || {};
-
-  if (!newPassword || String(newPassword).length < MIN_PASSWORD_LENGTH) {
-    return res
-      .status(400)
-      .json({ message: `New password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
-  }
-  if (!tokenHash && !(accessToken && refreshToken)) {
-    return res
-      .status(400)
-      .json({ message: 'This reset link is invalid or has expired. Request a new one.' });
+  if (!profile) {
+    return res.status(404).json({ message: 'User not found.' });
   }
 
-  let userClient;
-  try {
-    userClient = createUserScopedClient();
-  } catch (err) {
-    console.error('Password reset misconfigured:', err?.message || err);
-    return res.status(500).json({ message: 'Password reset is not available right now.' });
+  const authEmail = profile.email;
+  if (!authEmail) {
+    return res.status(400).json({ message: 'Auth email not found for this user.' });
   }
 
-  // Turn the emailed recovery token into a session for that user.
-  const { error: sessionError } = tokenHash
-    ? await userClient.auth.verifyOtp({ type: 'recovery', token_hash: tokenHash })
-    : await userClient.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-
-  if (sessionError) {
-    return res
-      .status(400)
-      .json({ message: 'This reset link is invalid or has expired. Request a new one.' });
-  }
-
-  const { error: updateError } = await userClient.auth.updateUser({ password: newPassword });
-
-  // Never keep the recovery session alive past the password change.
-  await userClient.auth.signOut().catch(() => {});
+  const { error: updateError } = await supabase.auth.admin.updateUserById(profile.id, {
+    password: newPassword,
+    email_confirm: true,
+  });
 
   if (updateError) {
-    console.error('Password reset update failed:', updateError.message);
+    console.error('Password update failed:', updateError.message);
     return res.status(400).json({ message: updateError.message });
   }
 
-  return res
-    .status(200)
-    .json({ message: 'Password updated. You can now sign in with your new password.' });
+  return res.status(200).json({ message: 'Password updated successfully. You can now log in.' });
 };
 
 export const signup = async (req, res) => {
@@ -224,17 +146,7 @@ export const signup = async (req, res) => {
     return res.status(400).json({ message: 'Password must be at least 8 characters.' });
   }
 
-  let authClient;
-  try {
-    authClient = createUserScopedClient();
-  } catch (err) {
-    console.error('signup misconfigured:', err?.message || err);
-    return res.status(500).json({ message: 'Account creation is not available right now.' });
-  }
-
-  // Runs on the anon client, not the shared service-role singleton — signUp can
-  // return a session and would otherwise poison every later service-role query.
-  const { data, error } = await authClient.auth.signUp({
+  const { data, error } = await supabaseAuth.auth.signUp({
     email: String(email).trim().toLowerCase(),
     password,
     options: {
@@ -249,9 +161,6 @@ export const signup = async (req, res) => {
       },
     },
   });
-
-  // Drop any session signUp may have opened on the throwaway client.
-  await authClient.auth.signOut().catch(() => {});
 
   if (error) return res.status(400).json({ message: error.message });
   if (!data.user) return res.status(500).json({ message: 'Account creation did not return a user.' });
@@ -319,25 +228,14 @@ export const login = async (req, res) => {
     return res.status(401).json({ message: 'Invalid username or password.' });
   }
 
-  let authClient;
-  try {
-    authClient = createUserScopedClient();
-  } catch (err) {
-    console.error('Login misconfigured:', err?.message || err);
-    return res.status(500).json({
-      message: 'Authentication is not configured correctly. Set SUPABASE_ANON_KEY in backend/.env.',
-    });
-  }
-
-  // Verify the password on the anon client, never the shared service-role one
-  // (see createUserScopedClient). Discard the session immediately — the app's
-  // own Express session is the source of truth from here on.
-  const { data: signInData, error: signInError } = await authClient.auth.signInWithPassword({
+  // IMPORTANT: sign in on the anon auth client, never on the shared
+  // service-role client. A sign-in stores the user's JWT in that client's
+  // in-memory session, which would make every later request (Storage uploads,
+  // admin queries) run as the logged-in user and fail RLS.
+  const { data: signInData, error: signInError } = await supabaseAuth.auth.signInWithPassword({
     email: authUser.user.email,
     password,
   });
-  await authClient.auth.signOut().catch(() => {});
-
   if (signInError?.message?.toLowerCase().includes('email not confirmed')) {
     return res.status(403).json({ message: 'Please confirm your email before signing in.' });
   }

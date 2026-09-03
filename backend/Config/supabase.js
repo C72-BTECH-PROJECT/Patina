@@ -20,45 +20,27 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
   );
 }
 
-// The server relies on the service-role key to bypass RLS on every write
-// (resumes, scores, storage, profiles). If an anon key lands in this slot —
-// easy to do by copy/paste — reads still mostly work but every insert fails
-// with "new row violates row-level security policy".
-const decodeKeyRole = (jwt) => {
+// Startup guard: prove which role the configured key actually carries. An
+// anon/other key here silently breaks privileged writes (e.g. Storage uploads
+// fail with "new row violates row-level security policy") while public reads
+// keep working, which makes the bug very hard to trace from symptoms alone.
+const keyRoleClaim = (() => {
   try {
-    return JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString()).role || null;
+    const payloadPart = supabaseServiceRoleKey.split('.')[1];
+    const payload = JSON.parse(
+      Buffer.from(payloadPart.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+    );
+    return payload.role || 'unknown';
   } catch {
-    return null;
+    return 'not-a-jwt';
   }
-};
+})();
+console.log(
+  `[supabase] url=${supabaseUrl} key-role=${keyRoleClaim} key=...${supabaseServiceRoleKey.slice(-6)}`
+);
 
-const keyRole = decodeKeyRole(supabaseServiceRoleKey);
-
-// One unambiguous boot line: the role of the key this client is actually built
-// with. If this ever says anything but "service_role", RLS errors on insert are
-// explained.
-console.log(`[supabase] service client key role: ${keyRole ?? 'undecodable'} (project ${supabaseUrl})`);
-if (keyRole && keyRole !== 'service_role') {
-  console.warn(
-    `[WARNING] SUPABASE_SERVICE_ROLE_KEY is a "${keyRole}" key, not "service_role". ` +
-      'Database and storage writes will fail RLS.'
-  );
-}
-
-// Pin the service-role key as the Authorization header for every REST/storage
-// request. supabase-js otherwise swaps in an in-memory session token whenever
-// one exists on this client (e.g. after auth.signInWithPassword), silently
-// downgrading writes to the caller's RLS context. This client must never leave
-// service-role context, so the header is fixed here and auth flows use their
-// own short-lived clients instead (see auth.controller.js).
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
-  global: {
-    headers: {
-      Authorization: `Bearer ${supabaseServiceRoleKey}`,
-      apikey: supabaseServiceRoleKey,
-    },
-  },
 });
 
 export default supabase;
