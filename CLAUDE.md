@@ -54,3 +54,17 @@ Full spec: PROJECT_SOURCE_DOCS.md.
   Do not stage files. Write code only and leave the working tree dirty —
   the user handles all version control themselves. If you think a commit
   boundary makes sense, say so in your summary and stop.
+
+## Session protocol
+- **Start:** read CLAUDE.md, the last 5 entries in WORKLOG.md, and the
+  ISSUES.md entries for the module being touched. Never read the whole log.
+- **Before code:** write a task spec in `tasks/T-NNNN-<slug>.md` (see
+  `tasks/TEMPLATE.md`). Wait for the user's approval of the acceptance
+  criteria before implementing anything.
+- **During:** if you find a problem outside the current task's scope, add a
+  new ISSUES.md entry — do not fix it silently out of scope.
+- **End:** run the task's verification steps, fill in the task's "Result"
+  section with PASS/FAIL + evidence per criterion, then append one entry to
+  WORKLOG.md (format and length limit defined there).
+- Never commit, push, or open PRs (existing rule above — kept here as a
+  reminder since this section is read every session).

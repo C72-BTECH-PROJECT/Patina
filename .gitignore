@@ -24,3 +24,6 @@ Thumbs.db
 
 # OneDrive/Windows cloud placeholder created locally; not project content.
 Microsoft/
+
+# Raw prompt capture from the UserPromptSubmit hook (local session data).
+.claude/logs/
