@@ -28,6 +28,15 @@ diff you're already writing.
 | I-0006 | Upload.jsx: neither Choose-File nor drag-drop validates file type on selection, only at submit | `frontend/src/pages/candidate/Upload.jsx` | P2 | OPEN | 2026-10-12, L-0001 |
 | I-0007 | `scores` table referenced by backend code but not created in any migration | `supabase/migrations/`, `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-10-12, L-0001 |
 | I-0008 | `Docs/IMPLEMENTATION-TRACKER.md` Firestore/MongoDB sections are stale doc drift | `Docs/IMPLEMENTATION-TRACKER.md` | P2 | OPEN | 2026-10-12, L-0001 |
+| I-0009 | HEAD `POST /api/analyze` and `/api/resume/upload` always 500 (`path` not imported, `job` undefined) | `backend/Controllers/analysis.controller.js` | P0 | OPEN | 2026-10-12, T-0001 |
+| I-0010 | Supabase Preview check fails on `main`; fixing it naively turns on auto-apply of migrations to production — **decision needed** | `supabase/migrations/`, Supabase GitHub integration | P1 | OPEN | 2026-10-12, T-0001 |
+| I-0011 | Merge `314e494` reverted the 32905c1 NLP engine (HEAD runs the older parser) | `nlp-engine/app/{ner,embedder,main}.py` | P1 | OPEN | 2026-10-12, T-0001 |
+| I-0012 | HEAD frontend reads `import.meta.env.VITE_*` under CRA; 5 pages hardcode `localhost:5000` | `frontend/src/**` | P1 | OPEN | 2026-10-12, T-0001 |
+| I-0013 | `resumes` table referenced by backend but not in any migration | `supabase/migrations/`, `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
+| I-0014 | `PROJECT_SOURCE_DOCS.md` deleted from HEAD by `314e494`, still referenced | repo root | P2 | OPEN | 2026-10-12, T-0001 |
+| I-0015 | `ner.py` contact fields picked via `list(set(...))[0]` — nondeterministic across processes | `nlp-engine/app/ner.py` | P1 | OPEN | 2026-10-12, T-0001 |
+| I-0016 | Signup rejects one-word "Full Name" with a misleading "all fields required" message | `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
+| I-0017 | Signup's explicit `profiles` insert duplicates the `on_auth_user_created` trigger and logs a pkey error on every signup | `backend/Controllers/auth.controller.js` | P3 | OPEN | 2026-10-12, T-0001 |
 
 ---
 
@@ -191,6 +200,212 @@ naming that doesn't match the real `scores` table.
 task, not a tracker reconciliation). Leave the tracker as-is until a
 dedicated tracker-reconciliation task; this entry exists so the drift is
 visible before anyone cites that section as current.
+
+---
+
+### I-0009 — HEAD `POST /api/analyze` and `/api/resume/upload` always 500
+**Status:** OPEN
+**Severity:** P0 (blocks the core demo flow at HEAD)
+**Module:** `backend/Controllers/analysis.controller.js`
+**Spec ref:** FR-1 (PROJECT_SOURCE_DOCS.md @ 32905c1)
+**Evidence:**
+- Imports are only lines 1-5 (`multer`, `form-data`, `node-fetch`,
+  `supabase`); `path` is never imported, yet `saveResumeToStorage` calls
+  `path.extname(...)` at `:34`. Every valid request throws
+  `ReferenceError: path is not defined` before NLP is called.
+- `job` is referenced at `:137` (`latestJob = job;`) and `:144`
+  (`form.append('jd', job.description)`) but never defined in that scope.
+- NLP URL is hardcoded `http://localhost:8000/parse` at `:146` (the baseline
+  read `NLP_PARSE_URL`).
+- Not present at baseline 32905c1 — introduced by `71c632d` and carried into
+  HEAD through the merges.
+**Impact:** Candidate cannot analyse or upload a resume at HEAD.
+**Proposed fix:** Separate task; T-0001's backend live test will show this
+as the expected HEAD failure when run against current code.
+
+---
+
+### I-0010 — Supabase Preview check fails on `main`; auto-apply decision needed
+**Status:** OPEN — **decision needed from the project owner before any fix**
+**Severity:** P1 (not tech debt: see Impact)
+**Module:** `supabase/migrations/`, Supabase GitHub integration (project
+`zzgymrxrwuuffyrbhify`)
+**Spec ref:** n/a (infra)
+**Evidence:**
+- There is no `.github/workflows` directory at any commit
+  (`git log --all -- .github` empty; `gh run list` empty). The red check on
+  commits is the **Supabase Preview** check-run from the Supabase GitHub app.
+- `gh api repos/C72-BTECH-PROJECT/Patina/commits/<sha>/check-runs` for
+  `32905c1` and `cc0e637` (both on `main`): `Supabase Preview | supabase |
+  completed failure` with summary
+  `ERROR: type "patina_user_role" already exists (SQLSTATE 42710) At
+  statement: 0 -- Patina: Supabase Auth profile schema`. For `92db9f0`
+  (`Anthony_V2`): `completed skipped` — "This git branch is not associated
+  with any Supabase Branch".
+- Cause: `supabase/migrations/20260823_create_profiles.sql:6` is an
+  unguarded `create type public.patina_user_role ...`; the file header says
+  "Run once in the Supabase Dashboard SQL Editor", i.e. the schema was
+  applied by hand, so the integration replaying migrations collides.
+**Impact:** Today the integration fails at statement 0, so nothing is
+applied. Once the migrations succeed (e.g. someone makes them idempotent),
+**every merge to `main` will auto-apply schema changes to the shared
+production DB** that both teammates and the test harness use.
+**Decision options (not acted on):**
+- (a) Disable production auto-deploy of migrations in the Supabase GitHub
+  integration settings, and keep applying schema by hand / via CLI.
+- (b) First make every migration idempotent (`create ... if not exists`,
+  `do $$ begin ... exception when duplicate_object then null; end $$;` for
+  types/policies), accepting that merges to `main` then deploy schema
+  automatically.
+**Proposed fix:** Pending the owner's choice between (a) and (b).
+
+---
+
+### I-0011 — Merge `314e494` reverted the 32905c1 NLP engine
+**Status:** OPEN
+**Severity:** P1
+**Module:** `nlp-engine/app/ner.py`, `embedder.py`, `main.py`
+**Spec ref:** FR-2 / NFR-5 (PROJECT_SOURCE_DOCS.md @ 32905c1)
+**Evidence:** `git diff --stat 32905c1 HEAD -- nlp-engine` →
+`embedder.py | 72 +-----`, `main.py | 23 +-`, `ner.py | 529 ++++------`
+(126 insertions, 498 deletions); the only commit touching `nlp-engine/` in
+`32905c1..HEAD` is `314e494` (Aaron). HEAD lost: the
+`required_skills`/`preferred_skills` form fields on `/parse`,
+`component_weights` and `jd_source` in `semantic_analysis`, skill-name
+normalisation, and per-section structured `experience`
+(`{title, organisation, dates, highlights}` → back to
+`{type, value}` pairs). CODE_MAP.md / REVIEW_BRIEF.md at HEAD still describe
+the 32905c1 behaviour.
+**Impact:** Current parser output is older and less structured than what
+was already built; docs describe code that isn't there.
+**Proposed fix:** Separate task — decide whether to restore 32905c1's NLP
+files (and re-apply anything genuinely new from 314e494). T-0001 snapshots
+give the before/after comparison.
+
+---
+
+### I-0012 — HEAD frontend reads `import.meta.env` under CRA; hardcoded API URLs
+**Status:** OPEN
+**Severity:** P1
+**Module:** `frontend/src/**`
+**Spec ref:** n/a (config)
+**Evidence:** The frontend is Create React App (`react-scripts 5.0.1`,
+`frontend/package.json` scripts). At HEAD,
+`import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'` is used in
+`context/AuthContext.jsx:4`, `components/layouts/CandidateLayout.jsx:7`,
+`pages/public/Login.jsx:7`, `pages/candidate/{Upload.jsx:16,JobDetail.jsx:6,Notifications.jsx:6,CandidateJobs.jsx:5}`,
+`pages/recruiter/{Jobs.jsx:7,Dashboard.jsx:9}`, `pages/admin/Dashboard.jsx:6`.
+`frontend/.env` defines only `REACT_APP_API_BASE_URL`, which nothing at HEAD
+reads. Hardcoded `http://localhost:5000` also at
+`pages/public/ResetPassword.jsx:30`, `pages/candidate/Assessment.jsx:61,104`,
+`Results.jsx:68`, `Processing.jsx:185`, `pages/recruiter/CreateJob.jsx:211`.
+At 32905c1 all files used `process.env.REACT_APP_API_BASE_URL` (unified in
+`fdd22c3`); `314e494` reintroduced the Vite form.
+**Impact:** API base URL can't be configured at HEAD; the app only works
+against a backend on `localhost:5000`.
+**Proposed fix:** Separate task — standardise on
+`process.env.REACT_APP_API_BASE_URL` (one shared constant).
+
+---
+
+### I-0013 — `resumes` table referenced by backend but not in any migration
+**Status:** OPEN
+**Severity:** P1
+**Module:** `supabase/migrations/`, `backend/Controllers/analysis.controller.js`
+**Spec ref:** n/a (infra)
+**Evidence:** Baseline `analysis.controller.js:198` (`.from('resumes').insert(...)`)
+writes a `resumes` **table** (distinct from the `resumes` storage bucket in
+I-0001). The five files in `supabase/migrations/` create only `profiles`,
+`jobs`, `applications`, the admin role, suspension columns and
+`notifications`.
+**Impact:** Same as I-0007 — a fresh environment has no `resumes` table.
+**Proposed fix:** Fold into the I-0001/I-0007 migration work (not fixed in
+T-0001).
+
+---
+
+### I-0014 — `PROJECT_SOURCE_DOCS.md` deleted from HEAD, still referenced
+**Status:** OPEN
+**Severity:** P2
+**Module:** repo root
+**Spec ref:** n/a (docs)
+**Evidence:** `git log --all --diff-filter=A -- PROJECT_SOURCE_DOCS.md` →
+added in `fdd22c3` (anthonyjennis, 2026-09-03);
+`git log --all --diff-filter=D -- "*SOURCE*"` → deleted in `314e494`
+(aaronninan-2702, "feat: NLP engine updates + full resume parsing
+pipeline"). Not in the working tree, under `..`, or in `~/.claude`. It still
+exists unchanged at `32905c1` (266 lines; `git show 32905c1:PROJECT_SOURCE_DOCS.md`).
+Referenced by `CLAUDE.md`, `CODE_MAP.md`, `REVIEW_BRIEF.md`,
+`tasks/TEMPLATE.md` (which says it "does not exist ... yet" — inaccurate).
+**Impact:** Task specs can't cite FR/NFR ids from the working tree.
+**Proposed fix:** Restore from `32905c1` in a docs-only task (deliberately
+not done in T-0001).
+
+---
+
+### I-0015 — `ner.py` contact fields nondeterministic (`list(set(...))[0]`)
+**Status:** OPEN
+**Severity:** P1
+**Module:** `nlp-engine/app/ner.py`
+**Spec ref:** FR-2 (PROJECT_SOURCE_DOCS.md @ 32905c1)
+**Evidence:** `email`, `phone`, `github`, `linkedin` are each chosen as
+`list(set(matches))[0]` (HEAD `ner.py:247-261`, baseline `:548-562`). Python
+randomises string hashing per process, so when a resume contains two or more
+matches the chosen value can change between server restarts.
+**Impact:** Same resume can yield different contact details (and different
+GitHub handle for validation) on different runs. The T-0001 harness pins
+`PYTHONHASHSEED=0` on the test server so snapshots are stable — **that hides
+the bug in tests; production remains nondeterministic.**
+**Proposed fix:** Pick the first match in document order
+(`dict.fromkeys(matches)` / first `re` hit) instead of via a `set`.
+
+---
+
+### I-0016 — Signup rejects a one-word "Full Name" with a misleading message
+**Status:** OPEN
+**Severity:** P1 (blocks browser signup for anyone who types a single name)
+**Module:** `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js`
+**Spec ref:** NFR-8 area (authentication), PROJECT_SOURCE_DOCS.md @ 32905c1
+**Reported:** owner, 2026-10-12. Browser signup on the current frontend
+(:3000) alerts "First name, last name, username, email, and password are
+required" with every visible field filled.
+**Evidence (code comparison):**
+- **What the form sends**, the same at HEAD and 32905c1:
+  - HEAD `Login.jsx:103-111`, baseline `:101-109` build
+    `{ email, password, username, role, name }`, plus
+    `companyName`/`verificationInfo` for recruiters.
+  - The only name input is a single "Full Name" field (HEAD `Login.jsx:303-309`, placeholder "John Doe").
+  - The 400 message is shown through `alert(data.message)` at HEAD `:129`.
+- **What the controller requires**, the same logic at both revisions (HEAD `auth.controller.js:129-137`, baseline `:207-215`):
+  - It reads `name`, splits it with `.trim().split(/\s+/)`, takes the first token as `firstName`, and joins the rest into `lastName`.
+  - It then rejects the request if `!firstName || !lastName`, using the generic message above.
+- **Cause:** a one-word Full Name, e.g. "Anthony", gives `lastName === ''`, so the request returns 400 even though every visible field is filled. With username, email and password all non-empty, this is the only path to that message.
+  - The message names "First name, last name" fields that don't exist in the form.
+  - `Login.jsx` changed by only 8 lines between 32905c1 and HEAD (the env-var line, I-0012), so the defect is **not a regression**. It exists at 32905c1 too.
+- Observed workaround: a two-word name (the T-0001 test accounts used "T0001 Candidate" / "T0001 Recruiter" through the API).
+**Impact:** Mononymous users, or anyone typing only a first name, can't sign up, and the error doesn't tell them why.
+**Proposed fix:** Either accept a single-word name (empty `last_name`), or split
+the form into First/Last fields with a specific validation message. Not
+fixed in T-0001.
+
+---
+
+### I-0017 — Signup's explicit `profiles` insert duplicates the DB trigger
+**Status:** OPEN
+**Severity:** P3 (log noise; profile data correct)
+**Module:** `backend/Controllers/auth.controller.js`
+**Spec ref:** n/a
+**Evidence:** Creating `t0001_cand` / `t0001_recr` through the baseline API
+(2026-10-12) returned 201, and the backend logged
+`Signup profile insert failed: duplicate key value violates unique constraint "profiles_pkey"`
+twice (`tests/.out/signup-backend.err.log`). The trigger
+`on_auth_user_created` (`supabase/migrations/20260823_create_profiles.sql`,
+`after insert on auth.users` → `insert into public.profiles`) already creates
+the row from signup metadata. The controller then inserts the same `id` again
+(HEAD `auth.controller.js:168-180`, baseline `:255-268`), and that error is
+only logged. The resulting profiles had correct username, role and names.
+**Impact:** A misleading error on every signup. If the trigger and the insert ever diverge, the insert's values are silently dropped.
+**Proposed fix:** Remove the controller insert, or make it an `upsert` and handle the error.
 
 ---
 

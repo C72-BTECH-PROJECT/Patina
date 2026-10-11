@@ -27,3 +27,10 @@ Microsoft/
 
 # Raw prompt capture from the UserPromptSubmit hook (local session data).
 .claude/logs/
+
+# T-0001 test harness: real resumes + their snapshots stay local; run logs
+# are scratch. Synthetic fixtures are exempt from the *.pdf/*.docx rules.
+tests/private/
+tests/.out/
+!tests/fixtures/*.pdf
+!tests/fixtures/*.docx

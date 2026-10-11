@@ -1,0 +1,124 @@
+{
+  "entities": {
+    "candidate_name": "Rosa Delgado",
+    "education": [
+      "B.S. Computer Science",
+      "Example State University",
+      "2016 - 2020"
+    ],
+    "email": "rosa.delgado@example.com",
+    "experience": [],
+    "github": "github.com/example-rdelgado",
+    "linkedin": null,
+    "phone": "+15550109988",
+    "projects": [],
+    "skill_count": 10,
+    "skills": [
+      "python",
+      "fastapi",
+      "postgresql",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "github",
+      "terraform",
+      "sql"
+    ]
+  },
+  "filename": "f5_multicolumn.pdf",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "rosa delgado\ncontact experience",
+      "platform engineer\n+1",
+      "proseware cloud",
+      "feb 2022 - present",
+      "denver",
+      "co - ran",
+      "kubernetes services",
+      "aws eks",
+      "terraform",
+      "github.com/example-rdelgado - built fastapi internal tools"
+    ],
+    "sentence_count": 7,
+    "token_count": 58,
+    "tokens_preview": [
+      "rosa",
+      "delgado",
+      "contact",
+      "experience",
+      "platform",
+      "engineer",
+      "proseware",
+      "cloud",
+      "feb",
+      "present",
+      "denver",
+      "co",
+      "ran",
+      "kubernetes",
+      "service",
+      "aws",
+      "eks",
+      "terraform",
+      "build",
+      "fastapi"
+    ]
+  },
+  "raw_text_preview": "Rosa Delgado\nCONTACT EXPERIENCE\nrosa.delgado@example.com Platform Engineer\n+1 555 010 9988 Proseware Cloud (Feb 2022 - Present)\nDenver, CO - Ran 40 Kubernetes services on AWS EKS with Terraform.\ngithub.com/example-rdelgado - Built FastAPI internal tools for deploy approvals.\nBackend Developer\nSKILLS",
+  "semantic_analysis": {
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
+    "focused_score": 0.714,
+    "full_text_score": 0.607,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react",
+      "redis",
+      "aws",
+      "kubernetes"
+    ],
+    "jd_source": "structured_skills",
+    "match_level": "Moderate Match",
+    "match_reason": "Matched 7 of 10 job skills (from the role's listed required/preferred skills); missing: rest api, react, redis.",
+    "matched_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "aws",
+      "kubernetes"
+    ],
+    "missing_skills": [
+      "rest api",
+      "react",
+      "redis"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "python",
+      "fastapi",
+      "postgresql",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "github",
+      "terraform",
+      "sql"
+    ],
+    "semantic_score": 0.6765,
+    "similarity_score": 0.6906,
+    "skill_coverage": 0.7
+  },
+  "status": "success"
+}

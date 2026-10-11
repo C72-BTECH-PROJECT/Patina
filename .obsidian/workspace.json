@@ -4,21 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "878016a30df6777e",
+        "id": "ed4484f2a528dadd",
         "type": "tabs",
         "children": [
           {
-            "id": "7f45c1a60df297c0",
+            "id": "0a048147c7ee17b0",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Docs/Architecture.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "Architecture"
+              "title": "New tab"
             }
           }
         ]
@@ -185,8 +181,19 @@
       "bases:Create new base": false
     }
   },
-  "active": "7f45c1a60df297c0",
+  "active": "0a048147c7ee17b0",
   "lastOpenFiles": [
+    "Docs/Architecture.md",
+    "tests/private/Anthony_Jennis_Resume.pdf",
+    "tests/private/Actual Resume.docx",
+    "tests/private/6.jpg",
+    "tests/private/7.jpg",
+    "tests/private/Copy of Resume.pdf",
+    "tests/private/5.jpg",
+    "tests/private",
+    "tests/New folder",
+    "tests",
+    "New folder",
     "WORKLOG.md.tmp.22740.acd0f9140fb3",
     "WORKLOG.md",
     "REVIEW_BRIEF.md",

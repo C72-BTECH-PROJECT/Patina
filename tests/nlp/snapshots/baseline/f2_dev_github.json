@@ -1,0 +1,161 @@
+{
+  "entities": {
+    "candidate_name": "Arjun Mehta",
+    "education": [
+      "B.E. in Information Technology - Example University of Pune (2015 - 2019)"
+    ],
+    "email": "arjun.mehta@example.com",
+    "experience": [
+      {
+        "dates": "Aug 2021 – Present",
+        "highlights": [],
+        "organisation": "Contoso Retail Tech ()",
+        "title": "Senior Developer"
+      },
+      {
+        "dates": null,
+        "highlights": [],
+        "organisation": null,
+        "title": "Split a monolith into six Spring Boot microservices on Kubernetes."
+      },
+      {
+        "dates": null,
+        "highlights": [],
+        "organisation": null,
+        "title": "Owned the order service: 99.95% availability over 12 months."
+      },
+      {
+        "dates": "Jul 2019 – Jul 2021",
+        "highlights": [],
+        "organisation": "Fabrikam Software ()",
+        "title": "Developer"
+      },
+      {
+        "dates": null,
+        "highlights": [],
+        "organisation": null,
+        "title": "Built Express APIs backed by MongoDB for a logistics dashboard."
+      }
+    ],
+    "github": "github.com/example-arjunm",
+    "linkedin": null,
+    "phone": null,
+    "projects": [],
+    "skill_count": 14,
+    "skills": [
+      "java",
+      "javascript",
+      "nodejs",
+      "express",
+      "spring",
+      "mongodb",
+      "mysql",
+      "docker",
+      "kubernetes",
+      "jenkins",
+      "git",
+      "github",
+      "microservices",
+      "api"
+    ]
+  },
+  "filename": "f2_dev_github.docx",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "arjun mehta",
+      "github.com/example-arjunm\nsummary\njava",
+      "node.js developer",
+      "4 years",
+      "product companies",
+      "technical skills\njava",
+      "spring boot",
+      "node.js",
+      "express",
+      "mongodb"
+    ],
+    "sentence_count": 5,
+    "token_count": 67,
+    "tokens_preview": [
+      "arjun",
+      "mehta",
+      "pune",
+      "india",
+      "summary",
+      "java",
+      "developer",
+      "year",
+      "product",
+      "company",
+      "technical",
+      "skills",
+      "java",
+      "spring",
+      "boot",
+      "express",
+      "mongodb",
+      "mysql",
+      "kubernetes",
+      "docker"
+    ]
+  },
+  "raw_text_preview": "Arjun Mehta\narjun.mehta@example.com | +91 98765 01234 | Pune, India\ngithub.com/example-arjunm\nSummary\nJava and Node.js developer with 4 years in product companies.\nTechnical Skills\nJava, Spring Boot, Node.js, Express, MongoDB, MySQL, Kubernetes,\nDocker, Git, Jenkins, Microservices\nWork Experience\nSe",
+  "semantic_analysis": {
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
+    "focused_score": 0.6664,
+    "full_text_score": 0.4616,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react",
+      "redis",
+      "aws",
+      "kubernetes"
+    ],
+    "jd_source": "structured_skills",
+    "match_level": "Weak Match",
+    "match_reason": "Matched 4 of 10 job skills (from the role's listed required/preferred skills); missing: python, sql, postgresql, react, redis, aws.",
+    "matched_skills": [
+      "docker",
+      "git",
+      "rest api",
+      "kubernetes"
+    ],
+    "missing_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "react",
+      "redis",
+      "aws"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "java",
+      "javascript",
+      "nodejs",
+      "express",
+      "spring",
+      "mongodb",
+      "mysql",
+      "docker",
+      "kubernetes",
+      "jenkins",
+      "git",
+      "github",
+      "microservices",
+      "rest api"
+    ],
+    "semantic_score": 0.5947,
+    "similarity_score": 0.4779,
+    "skill_coverage": 0.4
+  },
+  "status": "success"
+}

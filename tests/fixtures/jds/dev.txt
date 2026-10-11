@@ -1,0 +1,18 @@
+Backend Software Engineer (Python)
+
+We are hiring a backend engineer to build and run the APIs behind our
+customer-facing web app. You will design REST APIs in Python (Django or
+FastAPI), model data in PostgreSQL, and ship services in Docker containers to
+AWS. You will work with a small team that also maintains a React front end.
+
+Requirements:
+- 2+ years building production web services in Python
+- Strong SQL and PostgreSQL schema design
+- Docker and Git in daily use
+- Experience designing and documenting REST APIs
+
+Nice to have:
+- React or another modern JavaScript framework
+- Redis or other caching layers
+- AWS (ECS, RDS, S3)
+- Kubernetes
