@@ -33,7 +33,6 @@ diff you're already writing.
 | I-0011 | Merge `314e494` reverted the 32905c1 NLP engine (HEAD runs the older parser) | `nlp-engine/app/{ner,embedder,main}.py` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0012 | HEAD frontend reads `import.meta.env.VITE_*` under CRA; 5 pages hardcode `localhost:5000` | `frontend/src/**` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0013 | `resumes` table referenced by backend but not in any migration | `supabase/migrations/`, `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
-| I-0014 | `PROJECT_SOURCE_DOCS.md` deleted from HEAD by `314e494`, still referenced | repo root | P2 | OPEN | 2026-10-12, T-0001 |
 | I-0015 | `ner.py` contact fields picked via `list(set(...))[0]` — nondeterministic across processes | `nlp-engine/app/ner.py` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0016 | Signup rejects one-word "Full Name" with a misleading "all fields required" message | `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0017 | Signup's explicit `profiles` insert duplicates the `on_auth_user_created` trigger and logs a pkey error on every signup | `backend/Controllers/auth.controller.js` | P3 | OPEN | 2026-10-12, T-0001 |
@@ -196,6 +195,13 @@ and every credibility-score read/write will fail silently or error.
 risks misleading anyone writing a task spec who cites this section as the
 current DB plan, and it's the apparent source of the `credibility_scores`
 naming that doesn't match the real `scores` table.
+**Note (2026-10-12, L-0005) — `PROJECT_SOURCE_DOCS.md` (restored verbatim from
+`32905c1`) also disagrees with the code, left unedited on purpose:** line 106
+says "Data (MongoDB, though implementation has moved to Supabase — ..." and
+the spec's database wording is MongoDB-based while the code uses Supabase
+(Firestore appears only in `Docs/IMPLEMENTATION-TRACKER.md`, not in the spec —
+grep of the spec finds no `firestore`/`firebase`). Any reconciliation of the
+spec's MongoDB references belongs in the same tracker-reconciliation task.
 **Proposed fix:** Out of scope for this session (documentation-only setup
 task, not a tracker reconciliation). Leave the tracker as-is until a
 dedicated tracker-reconciliation task; this entry exists so the drift is
@@ -226,7 +232,7 @@ as the expected HEAD failure when run against current code.
 ---
 
 ### I-0010 — Supabase Preview check fails on `main`; auto-apply decision needed
-**Status:** OPEN — **decision needed from the project owner before any fix**
+**Status:** OPEN — decision made (option a, 2026-10-12); stays OPEN until the migrations themselves are fixed
 **Severity:** P1 (not tech debt: see Impact)
 **Module:** `supabase/migrations/`, Supabase GitHub integration (project
 `zzgymrxrwuuffyrbhify`)
@@ -257,7 +263,17 @@ production DB** that both teammates and the test harness use.
   `do $$ begin ... exception when duplicate_object then null; end $$;` for
   types/policies), accepting that merges to `main` then deploy schema
   automatically.
-**Proposed fix:** Pending the owner's choice between (a) and (b).
+**Decision (2026-10-12, owner):** chose option (a) and **disabled production
+auto-deploy of migrations in the Supabase GitHub integration**. Recorded as
+reported by the owner; not independently verified from the repo (the setting
+lives in the Supabase dashboard). Consequence: schema stays applied by hand /
+CLI, merges to `main` no longer deploy schema.
+**Remaining work:** the migrations still collide on replay (e.g.
+`20260823_create_profiles.sql:6` unguarded `create type`), so the Preview
+check may still show red and any future replay (branching, fresh env) will
+fail. Making them idempotent is tracked with I-0001/I-0007/I-0013. Close this
+issue when that is done and the Preview check is verified.
+**Proposed fix:** Option (a) taken; fix the migrations (idempotent) to finish.
 
 ---
 
@@ -321,25 +337,6 @@ I-0001). The five files in `supabase/migrations/` create only `profiles`,
 **Impact:** Same as I-0007 — a fresh environment has no `resumes` table.
 **Proposed fix:** Fold into the I-0001/I-0007 migration work (not fixed in
 T-0001).
-
----
-
-### I-0014 — `PROJECT_SOURCE_DOCS.md` deleted from HEAD, still referenced
-**Status:** OPEN
-**Severity:** P2
-**Module:** repo root
-**Spec ref:** n/a (docs)
-**Evidence:** `git log --all --diff-filter=A -- PROJECT_SOURCE_DOCS.md` →
-added in `fdd22c3` (anthonyjennis, 2026-09-03);
-`git log --all --diff-filter=D -- "*SOURCE*"` → deleted in `314e494`
-(aaronninan-2702, "feat: NLP engine updates + full resume parsing
-pipeline"). Not in the working tree, under `..`, or in `~/.claude`. It still
-exists unchanged at `32905c1` (266 lines; `git show 32905c1:PROJECT_SOURCE_DOCS.md`).
-Referenced by `CLAUDE.md`, `CODE_MAP.md`, `REVIEW_BRIEF.md`,
-`tasks/TEMPLATE.md` (which says it "does not exist ... yet" — inaccurate).
-**Impact:** Task specs can't cite FR/NFR ids from the working tree.
-**Proposed fix:** Restore from `32905c1` in a docs-only task (deliberately
-not done in T-0001).
 
 ---
 
@@ -442,3 +439,26 @@ Choose-File didn't — no longer exists in the current code: both paths now
 behave identically (neither validates at selection, both validate only at
 submit via `isResumeFile`). See I-0006 for that current behavior, which is a
 different bug, not this one.
+
+### I-0014 — `PROJECT_SOURCE_DOCS.md` deleted from HEAD, still referenced (RESOLVED)
+**Status:** RESOLVED — ad-hoc docs task, 2026-10-12 (see WORKLOG L-0005)
+**Severity:** P2
+**Module:** repo root
+**Spec ref:** n/a (docs)
+**Original evidence:** added in `fdd22c3`, deleted in `314e494`; still present
+unchanged at `32905c1` (266 lines). Referenced by `CLAUDE.md`, `CODE_MAP.md`,
+`REVIEW_BRIEF.md`, `tasks/TEMPLATE.md`.
+**Evidence of resolution:**
+- `git restore --source=32905c1 -- PROJECT_SOURCE_DOCS.md` (no shell
+  redirection). Working-tree file is 266 lines.
+- `git hash-object PROJECT_SOURCE_DOCS.md` = `6ef3f4a570952273584ee1932d6cae4db0a7217a`
+  = `git rev-parse 32905c1:PROJECT_SOURCE_DOCS.md` → byte-identical blob.
+- Literal check `git diff 32905c1 -- PROJECT_SOURCE_DOCS.md` is NOT empty
+  right now: it prints `deleted file mode`, only because the restored file is
+  untracked (not in the index, and we don't stage per CLAUDE.md), so git
+  sees it as absent from the tree. Once the owner stages/commits it, that
+  command prints nothing. The blob-hash equality above is the real proof.
+- Content not edited. Its stale DB wording (line 106: "Data (MongoDB, though
+  implementation has moved to Supabase ...)") is recorded in I-0008, not
+  rewritten.
+**Follow-up for owner:** commit the restored file (untracked right now).

@@ -60,3 +60,16 @@ rollup per archived month at the top of this file.
 - Files changed: tasks/T-0001-baseline-harness.md, tests/BASELINE_RESULTS.md, WORKLOG.md (mod).
 - Issues logged: none (A2 behaviour is baseline-only; HEAD hardcodes already in I-0012).
 - Next: stop the baseline stack when done; T-0002 = run harness with -Target current and diff.
+
+## L-0005 · 2026-10-12 · Restore PROJECT_SOURCE_DOCS.md; I-0014 resolved; I-0010 decision
+- Prompt: restore PROJECT_SOURCE_DOCS.md from 32905c1 unedited, fix TEMPLATE.md, resolve I-0014, record I-0010 option (a).
+- Task: ad-hoc (docs-only)
+- Done: `git restore --source=32905c1 -- PROJECT_SOURCE_DOCS.md`; TEMPLATE.md spec-ref note fixed;
+  I-0014 moved to Resolved; I-0008 got a note on the spec's MongoDB wording (doc not edited);
+  I-0010 records owner's option (a) (auto-deploy disabled), stays OPEN.
+- Verification: blob hash of working file == `git rev-parse 32905c1:PROJECT_SOURCE_DOCS.md` (6ef3f4a). Literal
+  `git diff 32905c1 -- PROJECT_SOURCE_DOCS.md` prints a "deleted file" diff, not nothing: file is untracked
+  (we don't stage). Will print nothing once the owner stages it.
+- Files changed: ISSUES.md, tasks/TEMPLATE.md, WORKLOG.md (mod); PROJECT_SOURCE_DOCS.md (new, untracked).
+- Issues logged: I-0014 resolved; I-0008, I-0010 updated. I-0010 auto-deploy setting is owner-reported, not verified.
+- Next: owner commits PROJECT_SOURCE_DOCS.md + docs changes.

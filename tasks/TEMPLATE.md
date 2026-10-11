@@ -9,11 +9,11 @@
 
 ## Spec ref
 <FR-NN / NFR-NN / Feedback-N from PROJECT_SOURCE_DOCS.md.
-NOTE: PROJECT_SOURCE_DOCS.md does not exist in this repo yet (as of 2026-10-12).
-Until it's added, cite one of:
+PROJECT_SOURCE_DOCS.md is at the repo root (restored 2026-10-12 from 32905c1).
+Cite FR/NFR ids from it. Otherwise cite one of:
   - CLAUDE.md "Known guide feedback" item # (1-5), or
   - Docs/IMPLEMENTATION-TRACKER.md feature #/section name.
-If neither applies, say so explicitly — do not leave this blank.>
+If none applies, say so explicitly — do not leave this blank.>
 
 ## Scope
 **In:**
