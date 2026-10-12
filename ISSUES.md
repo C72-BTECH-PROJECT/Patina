@@ -32,7 +32,6 @@ diff you're already writing.
 | I-0015 | `ner.py` contact fields picked via `list(set(...))[0]` — nondeterministic across processes | `nlp-engine/app/ner.py` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0016 | Signup rejects one-word "Full Name" with a misleading "all fields required" message | `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0017 | Signup's explicit `profiles` insert duplicates the `on_auth_user_created` trigger and logs a pkey error on every signup | `backend/Controllers/auth.controller.js` | P3 | OPEN | 2026-10-12, T-0001 |
-| I-0020 | `POST /api/notifications/send` lets any logged-in user send any message to any user | `backend/Routes/notification.routes.js` | P0 | OPEN | 2026-10-12, T-0002 |
 | I-0021 | `requireAuth` fails open when the profile lookup errors or the profile is missing | `backend/Middlewares/auth.Middleware.js` | P0 | OPEN | 2026-10-12, T-0002 |
 | I-0025 | `multer.memoryStorage()` without `limits`: upload size is unbounded and buffered in memory | `backend/Controllers/analysis.controller.js` | P2 | OPEN | 2026-10-12, T-0002 |
 | I-0026 | Landing page's hardcoded demo score and "10000+ verified" stats read as real data | `frontend/src/pages/public/Landing.jsx` | P3 | OPEN | 2026-10-12, T-0002 |
@@ -363,20 +362,6 @@ only logged. The resulting profiles had correct username, role and names.
 
 ---
 
-### I-0020 — `POST /api/notifications/send` allows spoofed notifications
-**Status:** OPEN
-**Severity:** P0 (security)
-**Module:** `backend/Routes/notification.routes.js`
-**Spec ref:** n/a
-**Evidence:**
-- **Route:** `notification.routes.js:7-20` is guarded by `requireAuth` only. It inserts `{userId, type, message, data}` from the request body for any `userId`, through the service-role client.
-- **No caller:** nothing in the frontend calls it.
-- Introduced by `ad4f694`.
-**Impact:** Any logged-in user, a candidate included, can send arbitrary messages to any user's notification list. That is a phishing vector.
-**Proposed fix:** Delete the route. `shortlistCandidate` already sends notifications server-side (INTEGRATION_REVIEW.md R34).
-
----
-
 ### I-0021 — `requireAuth` fails open
 **Status:** OPEN
 **Severity:** P0 (security)
@@ -456,6 +441,19 @@ only logged. The resulting profiles had correct username, role and names.
 ---
 
 ## Resolved
+
+### I-0020 — `POST /api/notifications/send` allows spoofed notifications (RESOLVED)
+**Status:** RESOLVED T-0005: route deleted (R34).
+**Severity (at time of finding):** P0 (security)
+**Module:** `backend/Routes/notification.routes.js`
+**Spec ref:** n/a
+**Original entry:** `POST /send` was guarded by `requireAuth` only and inserted `{userId, type, message, data}` from the body for any user through the service-role client. Nothing in the frontend called it. Introduced by `ad4f694`.
+**Evidence of resolution** (working tree, 2026-10-12; not yet committed):
+- `notification.routes.js` now has only `GET /` and `POST /:id/read`; the `sendNotification` import is gone from the route file. `sendNotification` is still used server-side by `shortlistCandidate`.
+- **Red run** (`tests/.out/t0005-red.log`): candidate → recruiter `POST /send` gave `{"http":200,"inInbox":true,"inDb":true}`.
+- **Green run** (`tests/.out/t0005-green.log`): 404, not in inbox, not in DB; unauthenticated → not accepted; own list and mark-read still work. 4 of 4 here, 15 of 15 together with T-0004's file.
+- `grep -rn "notifications/send" frontend/src backend tests` finds only the test file.
+- Full harness: NLP 10/10, backend 23/23, frontend = the same 5 CreateJob/Jobs CI warnings; `sweep.mjs --check` exit 0.
 
 ### I-0019 — `shortlistCandidate` IDOR (RESOLVED)
 **Status:** RESOLVED T-0004: ownership check added (R32), status allow-list narrowed to `shortlisted`/`rejected`.

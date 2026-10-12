@@ -154,3 +154,13 @@ rollup per archived month at the top of this file.
 - Files changed: jobs.controller.js; tests/backend/{lib/testdb,lib/session,sweep,live-shortlist-authz}.mjs, run-suite.ps1, README, .env.example; tasks/T-0004..0007; ISSUES, WORKLOG.
 - Issues logged: I-0029 (malformed applicationId -> 500). I-0019 moved to Resolved.
 - Next: owner commits T-0004; then T-0005 (I-0020).
+
+## L-0013 · 2026-10-12 · T-0005 remove notifications/send (I-0020), test-first
+- Prompt: T-0004 committed; continue with T-0005.
+- Task: T-0005 (complete: all 5 criteria PASS).
+- Done: `live-notifications-authz.test.mjs` (4 tests); deleted `POST /api/notifications/send` and the unused import; file added to `-Live` in run-suite.ps1.
+- Verification: red 1/4 failed (candidate spoof → 200, delivered to the recruiter's inbox and DB) → green 4/4 (404, nothing delivered).
+  Full harness: NLP 10/10, backend 23/23, frontend = same 5 CreateJob/Jobs CI warnings; sweep --check 0; grep finds no other caller.
+- Files changed: backend/Routes/notification.routes.js; tests/backend/live-notifications-authz.test.mjs, tests/run-suite.ps1; tasks/T-0005; ISSUES, WORKLOG.
+- Issues logged: none new. I-0020 moved to Resolved.
+- Next: owner commits T-0005; then T-0006 (I-0021, fail-closed requireAuth).
