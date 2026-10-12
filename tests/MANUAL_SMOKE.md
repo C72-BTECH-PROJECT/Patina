@@ -105,7 +105,17 @@ a credibility score for `t0001_cand`. These are marked **(no score)**.
 | C13 | `/recruiter/jobs`, open "[T-0001 TEST] harness job" | The job lists and its details render (title, description, required skills). **(no score)**: "No applications yet" (same `/api/candidates` source). | expectation was correct |
 | C14 | Sign out. Open `/reset-password`, enter `t0001_nonexistent` (a username that does not exist), submit | The generic message: "If an account matches that information, a password reset link has been sent to its email address." (shown even though no account matches, and no email is sent). Do **not** use `t0001_cand`/`t0001_recr`: that sends a real reset email to their address. The request is rate-limited to 5 per 15 minutes. | expectation was correct |
 | C15 | Make sure you are signed out (header/menu shows Sign in; `/candidate/jobs` redirects to `/login`) | Logged out | expectation was correct |
-| C16 | Clean up: `node tests/backend/sweep.mjs` | `remaining:` with every count `0` (including `profile-missing:*`); exit code 0 | |
+| C16 | Clean up: `node tests/backend/sweep.mjs` | `remaining:` with every count `0` (including `profile-missing:*`); exit code 0 | Run by the assistant after the stack was stopped: removed applications 1, jobs 1, storage 1; `remaining:` all 0; exit 0 |
+
+**Run of 2026-10-12 (stack stopped, sweep run).** The owner recorded C1-C15 in
+the Observed column: every step matched its prediction. C16 (cleanup) was run by
+the assistant after the stack was stopped. What the sweep found is DB evidence of
+what the run left behind, and agrees with the owner's observations:
+
+- It removed `applications` 1, `jobs` 1 (the seeded job) and storage
+  `candidates/<C>/` 1, and found `scores` 0, `resumes` 0 and `notifications` 0:
+  a stored resume (C3) and an application (C7), but nothing scored.
+- `remaining:` all `0`, including `profile-missing:*`; exit code 0.
 
 ---
 

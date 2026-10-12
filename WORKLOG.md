@@ -187,3 +187,26 @@ rollup per archived month at the top of this file.
 - Files changed: tests/backend/live-analysis-isolation.test.mjs, tests/run-suite.ps1, tests/README.md; tasks/T-0007; ISSUES, WORKLOG.
 - Issues logged: none new.
 - Next: owner commits T-0007. Remaining from L-0011: tracker task (R40, AUDIT/CHECKLIST), score-on-apply + merged Dashboard (R9/R38, I-0028); I-0029 (bad UUID 500) is open.
+
+## L-0016 · 2026-10-12 · Manual smoke section C (integrated), stack run and closed
+- Prompt: add section C to MANUAL_SMOKE.md, seed the job, start the stack on 3000/5000/8000, leave it running; then "done".
+- Task: none (manual verification support; no code changed).
+- Done: section C (C1-C16, predictions only; A and B untouched). Seeded job bbd5d81f-fd02-4311-aa7d-ba238199c39e. Ports were free; started NLP/backend/frontend.
+  On "done": stopped all three process trees, ports free, ran sweep.mjs.
+- Verification: sweep removed applications 1, jobs 1, storage candidates/<C>/ 1 (scores/resumes/notifications 0); remaining all 0, exit 0.
+  Consistent with C3/C7 (resume stored, application created) and "no score yet".
+- Observations: the owner filled the Observed column (committed in af4fad4): C1-C15 all matched the predictions. C16 filled with the sweep result.
+- Files changed: tests/MANUAL_SMOKE.md (Observed note and C16), WORKLOG.md.
+- Issues logged: none.
+- Next: PR description for Anthony_V2 -> main.
+
+## L-0017 · 2026-10-12 · PR description for Anthony_V2 -> main
+- Prompt: smoke observations committed (all matched); write PR_DESCRIPTION.md, not committed.
+- Task: none (docs only).
+- Done: PR_DESCRIPTION.md (what happened, per person from §10, R6/R9/R38, T-0004..T-0007 red/green table, harness before/now, after-you-pull, open items).
+  Corrected my earlier "observations not provided" note in MANUAL_SMOKE.md and L-0016 now that the owner's observations are committed; C16 filled.
+- Verification: facts re-checked against the repo: main's code == 4ed559d's code (git diff empty); mongoose gone from package.json and no imports; SUPABASE_ANON_KEY read lazily in supabaseAuth.js;
+  figures copied from the T-0004..T-0007 Results.
+- Files changed: PR_DESCRIPTION.md (new, untracked by request), tests/MANUAL_SMOKE.md, WORKLOG.md.
+- Issues logged: none.
+- Next: owner opens the PR; then tracker task and score-on-apply.
