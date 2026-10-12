@@ -26,25 +26,19 @@ diff you're already writing.
 | I-0004 | AI-cruft / hallucinated entries in `SKILL_KEYWORDS` | `nlp-engine/app/ner.py` | P3 | OPEN | pre-WORKLOG (after an NLP fix, exact date not recorded) |
 | I-0005 | `Assessment.jsx` unrouted, no backend, silently serves mock data | `frontend/src/pages/candidate/Assessment.jsx` | P1 | OPEN | pre-WORKLOG (after an NLP fix, exact date not recorded) |
 | I-0006 | Upload.jsx: neither Choose-File nor drag-drop validates file type on selection, only at submit | `frontend/src/pages/candidate/Upload.jsx` | P2 | OPEN | 2026-10-12, L-0001 |
-| I-0007 | `scores` table referenced by backend code but not created in any migration | `supabase/migrations/`, `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-10-12, L-0001 |
 | I-0008 | `Docs/IMPLEMENTATION-TRACKER.md` Firestore/MongoDB sections are stale doc drift | `Docs/IMPLEMENTATION-TRACKER.md` | P2 | OPEN | 2026-10-12, L-0001 |
-| I-0009 | HEAD `POST /api/analyze` and `/api/resume/upload` always 500 (`path` not imported, `job` undefined) | `backend/Controllers/analysis.controller.js` | P0 | OPEN | 2026-10-12, T-0001 |
 | I-0010 | Supabase Preview check fails on `main`; fixing it naively turns on auto-apply of migrations to production — **decision needed** | `supabase/migrations/`, Supabase GitHub integration | P1 | OPEN | 2026-10-12, T-0001 |
-| I-0011 | Merge `314e494` reverted the 32905c1 NLP engine (HEAD runs the older parser) | `nlp-engine/app/{ner,embedder,main}.py` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0012 | HEAD frontend reads `import.meta.env.VITE_*` under CRA; 5 pages hardcode `localhost:5000` | `frontend/src/**` | P1 | OPEN | 2026-10-12, T-0001 |
-| I-0013 | `resumes` table referenced by backend but not in any migration | `supabase/migrations/`, `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0015 | `ner.py` contact fields picked via `list(set(...))[0]` — nondeterministic across processes | `nlp-engine/app/ner.py` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0016 | Signup rejects one-word "Full Name" with a misleading "all fields required" message | `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0017 | Signup's explicit `profiles` insert duplicates the `on_auth_user_created` trigger and logs a pkey error on every signup | `backend/Controllers/auth.controller.js` | P3 | OPEN | 2026-10-12, T-0001 |
-| I-0018 | Unauthenticated `POST /api/auth/update-password` resets any user's password from a username (account takeover) | `backend/Routes/auth.routes.js`, `backend/Controllers/auth.controller.js` | P0 | OPEN | 2026-10-12, T-0002 |
-| I-0019 | `shortlistCandidate` has no ownership check: any recruiter can change any application's status | `backend/Controllers/jobs.controller.js` | P0 | OPEN | 2026-10-12, T-0002 |
 | I-0020 | `POST /api/notifications/send` lets any logged-in user send any message to any user | `backend/Routes/notification.routes.js` | P0 | OPEN | 2026-10-12, T-0002 |
 | I-0021 | `requireAuth` fails open when the profile lookup errors or the profile is missing | `backend/Middlewares/auth.Middleware.js` | P0 | OPEN | 2026-10-12, T-0002 |
-| I-0022 | In-memory `latestAnalysis` / `allAnalyses` would serve one candidate's analysis to every user (masked by I-0009) | `backend/Controllers/analysis.controller.js` | P0 | OPEN | 2026-10-12, T-0002 |
-| I-0023 | Backend swallows `uncaughtException` and never exits on EADDRINUSE (15 s watchdog loop) | `backend/index.js` | P2 | OPEN | 2026-10-12, T-0002 |
-| I-0024 | Boot log prints the last 6 characters of the service-role key | `backend/Config/supabase.js` | P2 | OPEN | 2026-10-12, T-0002 |
 | I-0025 | `multer.memoryStorage()` without `limits`: upload size is unbounded and buffered in memory | `backend/Controllers/analysis.controller.js` | P2 | OPEN | 2026-10-12, T-0002 |
 | I-0026 | Landing page's hardcoded demo score and "10000+ verified" stats read as real data | `frontend/src/pages/public/Landing.jsx` | P3 | OPEN | 2026-10-12, T-0002 |
+| I-0027 | 404 handler always says "Cannot GET", whatever the method | `backend/index.js` | P3 | OPEN | 2026-10-12, T-0003 |
+| I-0028 | `/api/recruiter/applicants` returns an empty email for applicants who have a profile | `backend/Controllers/analysis.controller.js` | P3 | OPEN | 2026-10-12, T-0003 |
+| I-0029 | `shortlistCandidate` returns 500 (not 400/404) for a malformed, non-UUID `applicationId` | `backend/Controllers/jobs.controller.js` | P3 | OPEN | 2026-10-12, T-0004 |
 
 ---
 
@@ -75,6 +69,10 @@ management API in a migration script).
 - **Never in any migration:** the MIME allow-list and the 10 MB cap.
 - **Live check:** read-only bucket listing on 2026-10-12: `resumes` is private, `allowed_mime_types` = pdf + docx.
 - See INTEGRATION_REVIEW.md R19 and §7.
+**Note (2026-10-12, T-0003): still OPEN.**
+- **The bucket insert is back:** the restored `20260903_create_resumes_and_scores.sql:14` has `insert into storage.buckets (id, name, public)` (committed in `a7c74e4`, R19).
+- **Still in no migration:** the MIME allow-list (pdf/docx) and the 10 MB size cap. A fresh environment gets a bucket without them.
+- **The backend no longer depends on the allow-list for correctness:** `saveResumeToStorage` now sends the extension-derived content type, and `uploadResume` accepts only `.pdf`/`.docx` (R7, `e9e4592`).
 
 ---
 
@@ -154,31 +152,6 @@ new, related gap was found in its place.
 
 ---
 
-### I-0007 — `scores` table referenced by backend but not in any migration
-**Status:** OPEN
-**Severity:** P1
-**Module:** `supabase/migrations/`, `backend/Controllers/analysis.controller.js`
-**Spec ref:** Docs/IMPLEMENTATION-TRACKER.md's `credibility_scores`
-collection (see [I-0008](#i-0008--docsimplementation-trackermd-firestoremongodb-sections-are-stale-doc-drift))
-— this `scores` table appears to be the actual, undocumented
-implementation of that concept.
-**Evidence:** `analysis.controller.js:301-306,391` queries
-`supabase.from('scores').select('composite_score')...` keyed by
-`candidate_id`/`job_id`. No file under `supabase/migrations/` creates a
-`scores` table — same pattern as [I-0001](#i-0001--resumes-storage-bucket-not-in-any-migration).
-**Impact:** Same as I-0001: a fresh environment will not have this table,
-and every credibility-score read/write will fail silently or error.
-**Proposed fix:** Add a migration for `scores` (columns at minimum:
-`candidate_id`, `job_id`, `composite_score`, timestamps).
-**Note (2026-10-12, T-0002): root cause found.**
-- **The migration existed and was deleted.** `scores` was created at `32905c1` by `20260903_create_resumes_and_scores.sql:41-63` (with RLS at `:71-100`). `314e494` deleted that file.
-- **The table is live.** A read-only count shows 3 rows.
-- **Fix:** restore the migration instead of writing a new one (INTEGRATION_REVIEW.md R19).
-- **Line numbers above are now from `ad4f694`.** The `:301-306,391` reads are its `getAllApplicants`/`getAllCandidates`.
-- **The schema has no unique `(candidate_id, job_id)`.** So those `.maybeSingle()` reads break after a second analysis (R30).
-
----
-
 ### I-0008 — `Docs/IMPLEMENTATION-TRACKER.md` Firestore/MongoDB sections are stale doc drift
 **Status:** OPEN
 **Severity:** P2
@@ -237,35 +210,6 @@ visible before anyone cites that section as current.
 
 ---
 
-### I-0009 — HEAD `POST /api/analyze` and `/api/resume/upload` always 500
-**Status:** OPEN
-**Severity:** P0 (blocks the core demo flow at HEAD)
-**Module:** `backend/Controllers/analysis.controller.js`
-**Spec ref:** FR-1 (PROJECT_SOURCE_DOCS.md @ 32905c1)
-**Evidence:**
-- Imports are only lines 1-5 (`multer`, `form-data`, `node-fetch`,
-  `supabase`); `path` is never imported, yet `saveResumeToStorage` calls
-  `path.extname(...)` at `:34`. Every valid request throws
-  `ReferenceError: path is not defined` before NLP is called.
-- `job` is referenced at `:137` (`latestJob = job;`) and `:144`
-  (`form.append('jd', job.description)`) but never defined in that scope.
-- NLP URL is hardcoded `http://localhost:8000/parse` at `:146` (the baseline
-  read `NLP_PARSE_URL`).
-- Not present at baseline 32905c1. ~~introduced by `71c632d`~~: **corrected in
-  T-0002**, see the note below.
-**Impact:** Candidate cannot analyse or upload a resume at HEAD.
-**Proposed fix:** Separate task; T-0001's backend live test will show this
-as the expected HEAD failure when run against current code.
-**Note (2026-10-12, T-0002): attribution corrected, and confirmed by the harness.**
-- **Who introduced it:**
-  - `71c632d` imports `path` (`analysis.controller.js:4@71c632d`) and defines `job` (`:138-146@71c632d`). `72451d1` still has both.
-  - **`ad4f694` removed both.** At HEAD this leaves `path.extname` at `:34` and a dangling `job` at `:137`, `:144`, `:215`.
-  - The hardcoded NLP URL predates both commits (`f270666:49`).
-- **Harness:** the tier 2 run against current returned `HTTP 500: {"message":"Analyze failed","error":"path is not defined"}` (`tests/.out/current-backend-tests.log`).
-- **Fix order:** restoring only the import and the lookup would re-enable I-0022. See INTEGRATION_REVIEW.md R29/R14.
-
----
-
 ### I-0010 — Supabase Preview check fails on `main`; auto-apply decision needed
 **Status:** OPEN — decision made (option a, 2026-10-12); stays OPEN until the migrations themselves are fixed
 **Severity:** P1 (not tech debt: see Impact)
@@ -295,7 +239,7 @@ production DB** that both teammates and the test harness use.
 - (a) Disable production auto-deploy of migrations in the Supabase GitHub
   integration settings, and keep applying schema by hand / via CLI.
 - (b) First make every migration idempotent (`create ... if not exists`,
-  `do $$ begin ... exception when duplicate_object then null; end $$;` for
+  `do $ begin ... exception when duplicate_object then null; end $;` for
   types/policies), accepting that merges to `main` then deploy schema
   automatically.
 **Decision (2026-10-12, owner):** chose option (a) and **disabled production
@@ -309,34 +253,11 @@ check may still show red and any future replay (branching, fresh env) will
 fail. Making them idempotent is tracked with I-0001/I-0007/I-0013. Close this
 issue when that is done and the Preview check is verified.
 **Proposed fix:** Option (a) taken; fix the migrations (idempotent) to finish.
+**Note (2026-10-12, T-0003):** both 20260903 migrations are now in the repo, and both are still unguarded:
+- `create table public.resumes` / `public.scores` (`20260903_create_resumes_and_scores.sql:18,41`);
+- `create table public.notifications` (`20260903_create_notifications.sql:6`).
 
----
-
-### I-0011 — Merge `314e494` reverted the 32905c1 NLP engine
-**Status:** OPEN
-**Severity:** P1
-**Module:** `nlp-engine/app/ner.py`, `embedder.py`, `main.py`
-**Spec ref:** FR-2 / NFR-5 (PROJECT_SOURCE_DOCS.md @ 32905c1)
-**Evidence:** `git diff --stat 32905c1 HEAD -- nlp-engine` →
-`embedder.py | 72 +-----`, `main.py | 23 +-`, `ner.py | 529 ++++------`
-(126 insertions, 498 deletions); the only commit touching `nlp-engine/` in
-`32905c1..HEAD` is `314e494` (Aaron). HEAD lost: the
-`required_skills`/`preferred_skills` form fields on `/parse`,
-`component_weights` and `jd_source` in `semantic_analysis`, skill-name
-normalisation, and per-section structured `experience`
-(`{title, organisation, dates, highlights}` → back to
-`{type, value}` pairs). CODE_MAP.md / REVIEW_BRIEF.md at HEAD still describe
-the 32905c1 behaviour.
-**Impact:** Current parser output is older and less structured than what
-was already built; docs describe code that isn't there.
-**Proposed fix:** Separate task — decide whether to restore 32905c1's NLP
-files (and re-apply anything genuinely new from 314e494). T-0001 snapshots
-give the before/after comparison.
-**Note (2026-10-12, T-0002):**
-- **Wider than NLP:** `314e494` is a **whole-tree reset**. `314e494^{tree}` == `71c632d^{tree}` (`f09d034b…`), so it contains nothing new to re-apply.
-- **HEAD NLP is pre-baseline:** it is byte-identical to `365a09e`.
-- **Fixture evidence:** the fixture-by-fixture comparison is in INTEGRATION_REVIEW.md §3.3. All four 32905c1 parsing fixes are overwritten at HEAD.
-- **Open question:** does Aaron have unpushed NLP work? (Q1 in INTEGRATION_REVIEW.md).
+T-0003 kept them verbatim. R19 and R33 put their idempotency in this batch.
 
 ---
 
@@ -366,26 +287,13 @@ against a backend on `localhost:5000`.
 - **Effect:** the `|| 'http://localhost:5000'` fallback is always used.
 - **Bundle check:** the built bundle contains no `VITE_API_BASE_URL` string.
 - **Where the uses came from:** reintroduced by `314e494`; added by `71c632d` (`JobDetail.jsx`, `Upload.jsx`) and `ad4f694` (`CandidateLayout.jsx`, `Notifications.jsx`).
-
----
-
-### I-0013 — `resumes` table referenced by backend but not in any migration
-**Status:** OPEN
-**Severity:** P1
-**Module:** `supabase/migrations/`, `backend/Controllers/analysis.controller.js`
-**Spec ref:** n/a (infra)
-**Evidence:** Baseline `analysis.controller.js:198` (`.from('resumes').insert(...)`)
-writes a `resumes` **table** (distinct from the `resumes` storage bucket in
-I-0001). The five files in `supabase/migrations/` create only `profiles`,
-`jobs`, `applications`, the admin role, suspension columns and
-`notifications`.
-**Impact:** Same as I-0007 — a fresh environment has no `resumes` table.
-**Proposed fix:** Fold into the I-0001/I-0007 migration work (not fixed in
-T-0001).
-**Note (2026-10-12, T-0002): root cause.**
-- **The migration was deleted.** `public.resumes` was created by `20260903_create_resumes_and_scores.sql:18+@32905c1`, which `314e494` deleted.
-- **The table is live.** A read-only count shows 3 rows.
-- **Fix:** restore the file (INTEGRATION_REVIEW.md R19).
+**Note (2026-10-12, T-0003): partly addressed. Stays OPEN for the hardcoded URLs.**
+- **`import.meta.env`:** `git grep -n "import.meta.env" HEAD -- frontend/src` finds nothing.
+  - R23 (the revert) restored `process.env.REACT_APP_API_BASE_URL` in AuthContext, Login, CandidateJobs, recruiter Jobs/Dashboard and admin Dashboard.
+  - R10 switched JobDetail and Upload.
+  - R33 switched CandidateLayout and Notifications.
+- **Still hardcoded `http://localhost:5000`:** `ResetPassword.jsx:6` (as at `32905c1`), `Assessment.jsx:61,104` and `CreateJob.jsx:211`. No T-0003 row covered these.
+- **Not done:** the "one shared constant" from the proposed fix. Each file still declares its own `API_BASE_URL`.
 
 ---
 
@@ -455,37 +363,6 @@ only logged. The resulting profiles had correct username, role and names.
 
 ---
 
-### I-0018 — Unauthenticated password reset by username (account takeover)
-**Status:** OPEN
-**Severity:** P0 (security)
-**Module:** `backend/Routes/auth.routes.js`, `backend/Controllers/auth.controller.js`, `frontend/src/pages/public/ResetPassword.jsx`
-**Spec ref:** NFR-8 area (authentication), PROJECT_SOURCE_DOCS.md
-**Evidence:**
-- **The hole:**
-  - `auth.routes.js:12`: `router.post('/update-password', updatePassword)`, with no auth middleware.
-  - `auth.controller.js:68-124` looks the user up by `username` (profiles, falling back to `auth.admin.listUsers`).
-  - It then calls `supabase.auth.admin.updateUserById(id, { password: newPassword, email_confirm: true })` with the service-role client.
-  - `ResetPassword.jsx:30` calls it directly.
-- **History:** `git log -S"update-password" -- backend/Routes/auth.routes.js` → added `97b7461`, removed `fdd22c3` (baseline uses the token-gated `request-password-reset`/`reset-password`, `auth.routes.js:51-52@32905c1`), re-added `314e494`.
-**Impact:** Anyone who knows or guesses a username can set that account's password and log in as them, including recruiters and the admin.
-**Proposed fix:** Restore the baseline token-gated flow (INTEGRATION_REVIEW.md R13). Until then, don't expose this backend beyond localhost.
-
----
-
-### I-0019 — `shortlistCandidate` IDOR
-**Status:** OPEN
-**Severity:** P0 (security)
-**Module:** `backend/Controllers/jobs.controller.js`
-**Spec ref:** n/a (authorization)
-**Evidence:**
-- **Route:** `jobs.routes.js:19` requires only the RECRUITER role.
-- **Update:** `jobs.controller.js:229-234` runs `.update({ status }).eq('id', applicationId)` with the service-role client (RLS bypassed), with no check that the application's job belongs to `req.session.userId`.
-- Introduced by `ad4f694`.
-**Impact:** Any recruiter can shortlist or reject any candidate's application on another recruiter's job. A "shortlisted" notification is sent to the candidate.
-**Proposed fix:** Fetch the application with `job:jobs!inner(recruiter_id)` and require that it equals the session user. Return 404 on 0 rows (INTEGRATION_REVIEW.md R32).
-
----
-
 ### I-0020 — `POST /api/notifications/send` allows spoofed notifications
 **Status:** OPEN
 **Severity:** P0 (security)
@@ -511,49 +388,6 @@ only logged. The resulting profiles had correct username, role and names.
 - Changed by `ad4f694`.
 **Impact:** During a DB or network error, and for users whose profile row was deleted, the suspension check and the profile requirement are skipped.
 **Proposed fix:** Restore the fail-closed check (INTEGRATION_REVIEW.md R35).
-
----
-
-### I-0022 — In-memory analysis globals leak across users
-**Status:** OPEN (currently masked by I-0009)
-**Severity:** P0 (security, latent)
-**Module:** `backend/Controllers/analysis.controller.js`
-**Spec ref:** NFR (data privacy), CHECKLIST 0.2 @32905c1
-**Evidence:**
-- **The globals:** `analysis.controller.js:114-115` holds module-level `allAnalyses` and `latestAnalysis`, set at `:197-221`.
-- **The leak:** `getCandidateAnalysis` (`:229-236`) returns the global `latestAnalysis` to **any** candidate.
-- **Origin:** this is the pre-baseline in-memory design (`f270666`). The `e7bf01b` merge resolution brought it back; baseline `32905c1` had replaced it with Supabase queries scoped to the session user (`:258-336@32905c1`).
-- **Why it's masked:** analyze 500s at HEAD (I-0009), so the globals stay empty.
-**Impact:** As soon as I-0009 is fixed alone, the last uploaded candidate's parsed resume (contact details included) is served to whichever candidate opens their results.
-**Proposed fix:** Fix together with I-0009 by restoring the baseline scoped readers (INTEGRATION_REVIEW.md R14).
-
----
-
-### I-0023 — Backend never exits on EADDRINUSE; swallows `uncaughtException`
-**Status:** OPEN
-**Severity:** P2
-**Module:** `backend/index.js`
-**Spec ref:** n/a
-**Evidence:**
-- **Swallowed errors:** `index.js:94-95` logs `uncaughtException` and continues.
-- **The loop:** a `setInterval` watchdog (`:106-119`) re-calls `server.listen` every 15 s and resets `process.exitCode = 0` (`:109`). The one-shot `error` listener (`:79-84`) only handles the first EADDRINUSE.
-- Added by `71c632d`.
-**Impact:** A port clash leaves a zombie process logging retries forever, and real crashes don't restart the process.
-**Proposed fix:** `process.exit(1)` on EADDRINUSE and after logging `uncaughtException`. Drop the watchdog and keep the graceful shutdown (INTEGRATION_REVIEW.md R11).
-
----
-
-### I-0024 — Service-role key suffix written to logs
-**Status:** OPEN
-**Severity:** P2 (hygiene; not exploitable on its own)
-**Module:** `backend/Config/supabase.js`
-**Spec ref:** n/a
-**Evidence:**
-- **The log line:** `supabase.js:39` logs `key=...${supabaseServiceRoleKey.slice(-6)}` at boot.
-- **Where it ends up:** observed in `tests/.out/current-backend.out.log` (git-ignored). The suffix isn't repeated here.
-- Added by `71c632d`. Baseline logs only the role and project.
-**Impact:** Part of a secret ends up in log files and terminals.
-**Proposed fix:** Restore the baseline log line (INTEGRATION_REVIEW.md R5).
 
 ---
 
@@ -610,7 +444,31 @@ only logged. The resulting profiles had correct username, role and names.
 
 ---
 
+### I-0029 — `shortlistCandidate` 500s on a malformed `applicationId`
+**Status:** OPEN
+**Severity:** P3
+**Module:** `backend/Controllers/jobs.controller.js`
+**Spec ref:** n/a
+**Evidence:** found during T-0004. Probe as `t0001_recr`: `POST /api/jobs/applications/shortlist {"applicationId":"not-a-uuid","status":"shortlisted"}` → `500 {"message":"Could not update application status."}` (after the T-0004 fix, the ownership lookup hits Postgres `22P02 invalid input syntax for type uuid` and takes the 500 branch).
+**Impact:** A malformed id is a client error but is reported as a server error; no data is touched or leaked.
+**Proposed fix:** Validate `applicationId` as a UUID before the lookup and return 400. Left out of T-0004 on purpose (Scope: Out).
+
+---
+
 ## Resolved
+
+### I-0019 — `shortlistCandidate` IDOR (RESOLVED)
+**Status:** RESOLVED T-0004: ownership check added (R32), status allow-list narrowed to `shortlisted`/`rejected`.
+**Severity (at time of finding):** P0 (security)
+**Module:** `backend/Controllers/jobs.controller.js`
+**Spec ref:** n/a (authorization)
+**Original entry:** no ownership check on `shortlistCandidate`; any recruiter could change any application's status (and trigger a "shortlisted" notification to the candidate). Introduced by `ad4f694`.
+**Evidence of resolution** (working tree, 2026-10-12; not yet committed):
+- `jobs.controller.js:165` allow-list is `['shortlisted', 'rejected']`; `:172-184` looks the application up with `job:jobs!inner(recruiter_id)` and returns 404 unless `recruiter_id === req.session.userId`.
+- **Red run** (`tests/.out/t0004-red.log`, before the fix): recruiter B shortlisting A's application → `{"http":200,"row":"shortlisted","notifications":1}`; rejecting → `{"http":200,"row":"rejected"}`; unknown id → 500; status `"submitted"` → 200. 4 of 11 failed.
+- **Green run** (`tests/.out/t0004-green.log`, after): 11 of 11 pass (`tests/backend/live-shortlist-authz.test.mjs`).
+- Full harness `run-suite.ps1 -Target current -Live`: NLP 10/10, backend 19/19, frontend = the same 5 CreateJob/Jobs CI warnings; `sweep.mjs --check` exit 0.
+- **Follow-up:** malformed ids still 500 (I-0029).
 
 ### I-0002 — SkillsSelector hardcoded, never wired (RESOLVED)
 **Status:** RESOLVED — superseded by rewrite, no T- ref (code changed before
@@ -666,3 +524,182 @@ unchanged at `32905c1` (266 lines). Referenced by `CLAUDE.md`, `CODE_MAP.md`,
   implementation has moved to Supabase ...)") is recorded in I-0008, not
   rewritten.
 **Follow-up for owner:** commit the restored file (untracked right now).
+
+### I-0007 — `scores` table referenced by backend but not in any migration (RESOLVED)
+**Status:** RESOLVED T-0003: the deleted migration was restored (INTEGRATION_REVIEW.md R19).
+**Severity (at time of finding):** P1
+**Module:** `supabase/migrations/`, `backend/Controllers/analysis.controller.js`
+**Spec ref:** Docs/IMPLEMENTATION-TRACKER.md's `credibility_scores`
+collection (see [I-0008](#i-0008--docsimplementation-trackermd-firestoremongodb-sections-are-stale-doc-drift))
+— this `scores` table appears to be the actual, undocumented
+implementation of that concept.
+**Evidence:** `analysis.controller.js:301-306,391` queries
+`supabase.from('scores').select('composite_score')...` keyed by
+`candidate_id`/`job_id`. No file under `supabase/migrations/` creates a
+`scores` table — same pattern as [I-0001](#i-0001--resumes-storage-bucket-not-in-any-migration).
+**Impact:** Same as I-0001: a fresh environment will not have this table,
+and every credibility-score read/write will fail silently or error.
+**Proposed fix:** Add a migration for `scores` (columns at minimum:
+`candidate_id`, `job_id`, `composite_score`, timestamps).
+**Note (2026-10-12, T-0002): root cause found.**
+- **The migration existed and was deleted.** `scores` was created at `32905c1` by `20260903_create_resumes_and_scores.sql:41-63` (with RLS at `:71-100`). `314e494` deleted that file.
+- **The table is live.** A read-only count shows 3 rows.
+- **Fix:** restore the migration instead of writing a new one (INTEGRATION_REVIEW.md R19).
+- **Line numbers above are now from `ad4f694`.** The `:301-306,391` reads are its `getAllApplicants`/`getAllCandidates`.
+- **The schema has no unique `(candidate_id, job_id)`.** So those `.maybeSingle()` reads break after a second analysis (R30).
+**Evidence of resolution** (verified at HEAD `5446ebe`, 2026-10-12):
+- `supabase/migrations/20260903_create_resumes_and_scores.sql` is back. Its blob `8c9decd` equals `32905c1`'s, and it was committed in `a7c74e4`.
+- `:41` has `create table public.scores (` (with RLS further down).
+- **The `.maybeSingle()` problem (R30):** the `getAllApplicants` score read now uses `.order('created_at',{ascending:false}).limit(1)` (`5446ebe`). The baseline `getAllCandidates` takes the latest row per candidate in code.
+- **Still open:** the migration is not idempotent (unguarded `create table`). That is tracked in I-0010, as R19 decided.
+
+### I-0009 — HEAD `POST /api/analyze` and `/api/resume/upload` always 500 (RESOLVED)
+**Status:** RESOLVED T-0003: baseline `analyzeResume` restored (R14, superseding R29).
+**Severity (at time of finding):** P0 (blocks the core demo flow at HEAD)
+**Module:** `backend/Controllers/analysis.controller.js`
+**Spec ref:** FR-1 (PROJECT_SOURCE_DOCS.md @ 32905c1)
+**Evidence:**
+- Imports are only lines 1-5 (`multer`, `form-data`, `node-fetch`,
+  `supabase`); `path` is never imported, yet `saveResumeToStorage` calls
+  `path.extname(...)` at `:34`. Every valid request throws
+  `ReferenceError: path is not defined` before NLP is called.
+- `job` is referenced at `:137` (`latestJob = job;`) and `:144`
+  (`form.append('jd', job.description)`) but never defined in that scope.
+- NLP URL is hardcoded `http://localhost:8000/parse` at `:146` (the baseline
+  read `NLP_PARSE_URL`).
+- Not present at baseline 32905c1. ~~introduced by `71c632d`~~: **corrected in
+  T-0002**, see the note below.
+**Impact:** Candidate cannot analyse or upload a resume at HEAD.
+**Proposed fix:** Separate task; T-0001's backend live test will show this
+as the expected HEAD failure when run against current code.
+**Note (2026-10-12, T-0002): attribution corrected, and confirmed by the harness.**
+- **Who introduced it:**
+  - `71c632d` imports `path` (`analysis.controller.js:4@71c632d`) and defines `job` (`:138-146@71c632d`). `72451d1` still has both.
+  - **`ad4f694` removed both.** At HEAD this leaves `path.extname` at `:34` and a dangling `job` at `:137`, `:144`, `:215`.
+  - The hardcoded NLP URL predates both commits (`f270666:49`).
+- **Harness:** the tier 2 run against current returned `HTTP 500: {"message":"Analyze failed","error":"path is not defined"}` (`tests/.out/current-backend-tests.log`).
+- **Fix order:** restoring only the import and the lookup would re-enable I-0022. See INTEGRATION_REVIEW.md R29/R14.
+**Evidence of resolution** (verified at HEAD `5446ebe`, 2026-10-12):
+- `analysis.controller.js:2` has `import path from 'path'`.
+- In `analyzeResume`, the job lookup (`.from('jobs')` at `:243`) runs before the NLP call (`fetch(NLP_PARSE_URL…)` at `:262`) and before the storage upload.
+- **Harness tier 2** (`live-analyze.test.mjs`) passed in T-0003 Phases 1, 3 and 4: HTTP 200 with all keys, and teardown removed 1 score, 1 resume and 1 storage object. It returned 500 `path is not defined` at `4ed559d`.
+- **`POST /api/resume/upload`:** a live probe (T-0003 Phase 3) as `t0001_cand` got 200 for a DOCX, and the status endpoint then reported it.
+
+### I-0011 — Merge `314e494` reverted the 32905c1 NLP engine (RESOLVED)
+**Status:** RESOLVED T-0003: NLP restored to `32905c1` by `git revert --no-commit 314e494` (R17). Committed in `a7c74e4`.
+**Severity (at time of finding):** P1
+**Module:** `nlp-engine/app/ner.py`, `embedder.py`, `main.py`
+**Spec ref:** FR-2 / NFR-5 (PROJECT_SOURCE_DOCS.md @ 32905c1)
+**Evidence:** `git diff --stat 32905c1 HEAD -- nlp-engine` →
+`embedder.py | 72 +-----`, `main.py | 23 +-`, `ner.py | 529 ++++------`
+(126 insertions, 498 deletions); the only commit touching `nlp-engine/` in
+`32905c1..HEAD` is `314e494` (Aaron). HEAD lost: the
+`required_skills`/`preferred_skills` form fields on `/parse`,
+`component_weights` and `jd_source` in `semantic_analysis`, skill-name
+normalisation, and per-section structured `experience`
+(`{title, organisation, dates, highlights}` → back to
+`{type, value}` pairs). CODE_MAP.md / REVIEW_BRIEF.md at HEAD still describe
+the 32905c1 behaviour.
+**Impact:** Current parser output is older and less structured than what
+was already built; docs describe code that isn't there.
+**Proposed fix:** Separate task — decide whether to restore 32905c1's NLP
+files (and re-apply anything genuinely new from 314e494). T-0001 snapshots
+give the before/after comparison.
+**Note (2026-10-12, T-0002):**
+- **Wider than NLP:** `314e494` is a **whole-tree reset**. `314e494^{tree}` == `71c632d^{tree}` (`f09d034b…`), so it contains nothing new to re-apply.
+- **HEAD NLP is pre-baseline:** it is byte-identical to `365a09e`.
+- **Fixture evidence:** the fixture-by-fixture comparison is in INTEGRATION_REVIEW.md §3.3. All four 32905c1 parsing fixes are overwritten at HEAD.
+- **Open question:** does Aaron have unpushed NLP work? (Q1 in INTEGRATION_REVIEW.md).
+**Evidence of resolution** (verified at HEAD `5446ebe`, 2026-10-12):
+- `git diff 32905c1 HEAD -- nlp-engine` is empty.
+- Snapshots f1–f6 sha256-match `tests/nlp/snapshots/baseline/` (`4338e6ca…`, `11399a83…`, `81d92b5e…`, `047bd608…`, `72d51441…`, `c6276fb1…`). The 3 private snapshots also match. This was checked in T-0003 Phases 1, 3 and 4.
+- **Q1:** Aaron confirmed there is no unpushed NLP work (INTEGRATION_REVIEW.md §11).
+
+### I-0013 — `resumes` table referenced by backend but not in any migration (RESOLVED)
+**Status:** RESOLVED T-0003: the deleted migration was restored (INTEGRATION_REVIEW.md R19).
+**Severity (at time of finding):** P1
+**Module:** `supabase/migrations/`, `backend/Controllers/analysis.controller.js`
+**Spec ref:** n/a (infra)
+**Evidence:** Baseline `analysis.controller.js:198` (`.from('resumes').insert(...)`)
+writes a `resumes` **table** (distinct from the `resumes` storage bucket in
+I-0001). The five files in `supabase/migrations/` create only `profiles`,
+`jobs`, `applications`, the admin role, suspension columns and
+`notifications`.
+**Impact:** Same as I-0007 — a fresh environment has no `resumes` table.
+**Proposed fix:** Fold into the I-0001/I-0007 migration work (not fixed in
+T-0001).
+**Note (2026-10-12, T-0002): root cause.**
+- **The migration was deleted.** `public.resumes` was created by `20260903_create_resumes_and_scores.sql:18+@32905c1`, which `314e494` deleted.
+- **The table is live.** A read-only count shows 3 rows.
+- **Fix:** restore the file (INTEGRATION_REVIEW.md R19).
+**Evidence of resolution** (verified at HEAD `5446ebe`, 2026-10-12):
+- `supabase/migrations/20260903_create_resumes_and_scores.sql:18` has `create table public.resumes (`. The file is byte-identical to `32905c1` (blob `8c9decd`).
+- **Still open:** idempotency is tracked in I-0010.
+
+### I-0018 — Unauthenticated password reset by username (account takeover) (RESOLVED)
+**Status:** RESOLVED T-0003: baseline token-gated reset restored (R13).
+**Severity (at time of finding):** P0 (security)
+**Module:** `backend/Routes/auth.routes.js`, `backend/Controllers/auth.controller.js`, `frontend/src/pages/public/ResetPassword.jsx`
+**Spec ref:** NFR-8 area (authentication), PROJECT_SOURCE_DOCS.md
+**Evidence:**
+- **The hole:**
+  - `auth.routes.js:12`: `router.post('/update-password', updatePassword)`, with no auth middleware.
+  - `auth.controller.js:68-124` looks the user up by `username` (profiles, falling back to `auth.admin.listUsers`).
+  - It then calls `supabase.auth.admin.updateUserById(id, { password: newPassword, email_confirm: true })` with the service-role client.
+  - `ResetPassword.jsx:30` calls it directly.
+- **History:** `git log -S"update-password" -- backend/Routes/auth.routes.js` → added `97b7461`, removed `fdd22c3` (baseline uses the token-gated `request-password-reset`/`reset-password`, `auth.routes.js:51-52@32905c1`), re-added `314e494`.
+**Impact:** Anyone who knows or guesses a username can set that account's password and log in as them, including recruiters and the admin.
+**Proposed fix:** Restore the baseline token-gated flow (INTEGRATION_REVIEW.md R13). Until then, don't expose this backend beyond localhost.
+**Evidence of resolution** (verified at HEAD `5446ebe`, 2026-10-12):
+- `git grep -n "update-password\|updateUserById\|updatePassword" HEAD -- backend frontend/src` finds nothing.
+- `auth.routes.js:51-52` has only `request-password-reset` (rate-limited) and `reset-password`.
+- `auth.routes.js` and `ResetPassword.jsx` are byte-identical to `32905c1`.
+- **Live probe** (T-0003 Phase 1): `POST /api/auth/update-password` → **404**, and `POST /api/auth/reset-password {}` → **400** "New password must be at least 8 characters."
+
+### I-0022 — In-memory analysis globals leak across users (RESOLVED)
+**Status:** RESOLVED T-0003: the baseline scoped readers were restored (R14).
+**Severity (at time of finding):** P0 (security, latent)
+**Module:** `backend/Controllers/analysis.controller.js`
+**Spec ref:** NFR (data privacy), CHECKLIST 0.2 @32905c1
+**Evidence:**
+- **The globals:** `analysis.controller.js:114-115` holds module-level `allAnalyses` and `latestAnalysis`, set at `:197-221`.
+- **The leak:** `getCandidateAnalysis` (`:229-236`) returns the global `latestAnalysis` to **any** candidate.
+- **Origin:** this is the pre-baseline in-memory design (`f270666`). The `e7bf01b` merge resolution brought it back; baseline `32905c1` had replaced it with Supabase queries scoped to the session user (`:258-336@32905c1`).
+- **Why it's masked:** analyze 500s at HEAD (I-0009), so the globals stay empty.
+**Impact:** As soon as I-0009 is fixed alone, the last uploaded candidate's parsed resume (contact details included) is served to whichever candidate opens their results.
+**Proposed fix:** Fix together with I-0009 by restoring the baseline scoped readers (INTEGRATION_REVIEW.md R14).
+**Evidence of resolution** (verified at HEAD `5446ebe`, 2026-10-12):
+- `grep -n "allAnalyses\|latestAnalysis" backend/Controllers/analysis.controller.js` finds nothing.
+- `getCandidateAnalysis` reads `scores` filtered by `.eq('candidate_id', req.session.userId)`, which is the same as `32905c1`.
+
+### I-0023 — Backend never exits on EADDRINUSE; swallows `uncaughtException` (RESOLVED)
+**Status:** RESOLVED T-0003: R11 applied (committed in `e9e4592`).
+**Severity (at time of finding):** P2
+**Module:** `backend/index.js`
+**Spec ref:** n/a
+**Evidence:**
+- **Swallowed errors:** `index.js:94-95` logs `uncaughtException` and continues.
+- **The loop:** a `setInterval` watchdog (`:106-119`) re-calls `server.listen` every 15 s and resets `process.exitCode = 0` (`:109`). The one-shot `error` listener (`:79-84`) only handles the first EADDRINUSE.
+- Added by `71c632d`.
+**Impact:** A port clash leaves a zombie process logging retries forever, and real crashes don't restart the process.
+**Proposed fix:** `process.exit(1)` on EADDRINUSE and after logging `uncaughtException`. Drop the watchdog and keep the graceful shutdown (INTEGRATION_REVIEW.md R11).
+**Evidence of resolution** (verified at HEAD `5446ebe`, 2026-10-12):
+- `backend/index.js:91` calls `process.exit(1)` in the listen `error` handler.
+- `:105` calls `process.exit(1)` after logging `uncaughtException`.
+- There is no `setInterval` or watchdog. The graceful shutdown (`:116-118`) is kept.
+- **Live probe** (T-0003 Phase 3): a second backend started on a busy port exited within 20 s with **exit code 1**. In Phase 1 the same scenario left a zombie process.
+
+### I-0024 — Service-role key suffix written to logs (RESOLVED)
+**Status:** RESOLVED T-0003: baseline `supabase.js` restored (R5/R12, committed in `a7c74e4`).
+**Severity (at time of finding):** P2 (hygiene; not exploitable on its own)
+**Module:** `backend/Config/supabase.js`
+**Spec ref:** n/a
+**Evidence:**
+- **The log line:** `supabase.js:39` logs `key=...${supabaseServiceRoleKey.slice(-6)}` at boot.
+- **Where it ends up:** observed in `tests/.out/current-backend.out.log` (git-ignored). The suffix isn't repeated here.
+- Added by `71c632d`. Baseline logs only the role and project.
+**Impact:** Part of a secret ends up in log files and terminals.
+**Proposed fix:** Restore the baseline log line (INTEGRATION_REVIEW.md R5).
+**Evidence of resolution** (verified at HEAD `5446ebe`, 2026-10-12):
+- `backend/Config/supabase.js:40` logs only `service client key role: … (project …)`. There is no `slice(` in the file.
+- The file is byte-identical to `32905c1`. That also brings back the role warning and the Authorization/apikey pin.

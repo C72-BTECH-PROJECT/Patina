@@ -162,9 +162,25 @@ export const shortlistCandidate = async (req, res) => {
     return res.status(400).json({ message: 'applicationId and status are required.' });
   }
 
-  const allowed = ['shortlisted', 'rejected', 'submitted'];
+  const allowed = ['shortlisted', 'rejected'];
   if (!allowed.includes(status)) {
     return res.status(400).json({ message: 'Invalid status.' });
+  }
+
+  // The application must belong to a job this recruiter owns. A missing row and
+  // someone else's row look the same (404) so ids can't be probed.
+  const { data: owned, error: lookupError } = await supabase
+    .from('applications')
+    .select('id, job:jobs!inner(recruiter_id)')
+    .eq('id', applicationId)
+    .maybeSingle();
+
+  if (lookupError) {
+    console.error('Shortlist lookup failed:', lookupError.message);
+    return res.status(500).json({ message: 'Could not update application status.' });
+  }
+  if (!owned || owned.job?.recruiter_id !== req.session.userId) {
+    return res.status(404).json({ message: 'Application not found.' });
   }
 
   const { data, error } = await supabase

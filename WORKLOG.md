@@ -131,3 +131,26 @@ rollup per archived month at the top of this file.
 - Files changed: analysis.controller.js, jobs.controller.js, jobs.routes.js, CandidateLayout.jsx, Notifications.jsx, 3 deleted; ISSUES.md, task, WORKLOG.
 - Issues logged: I-0028 (applicants email now empty; no caller).
 - Next: owner commits Phase 4; then close-out (final Result, ISSUES statuses).
+
+## L-0011 · 2026-10-12 · T-0003 close-out
+- Prompt: continue (Phase 4 committed as 5446ebe).
+- Task: T-0003 (complete: all 11 criteria PASS).
+- Done: final per-criterion Result in the task file. ISSUES.md: I-0007/09/11/13/18/22/23/24 moved to Resolved with evidence re-checked
+  at 5446ebe; notes on I-0001 (MIME/size cap still in no migration), I-0010 (migrations unguarded), I-0012 (3 hardcoded URLs left);
+  I-0027/28 added to the Open table.
+- Verification: greps/blob hashes re-run at HEAD (nlp diff empty, migration blob 8c9decd = 32905c1, no update-password, exit(1) at index.js:91,105).
+- Files changed: ISSUES.md, tasks/T-0003-apply-integration.md, WORKLOG.md (docs only).
+- Issues logged: none new.
+- Next: owner runs tests/MANUAL_SMOKE.md on the restored UI; Prompt 4b (I-0019/20/21, test-first); tracker task (R40, AUDIT/CHECKLIST reconcile); score-on-apply + merged Dashboard (R9/R38, I-0028).
+
+## L-0012 · 2026-10-12 · T-0004 shortlist ownership (I-0019), test-first
+- Prompt: specs for I-0019/20/21/22 (T-0004..T-0007), then fix I-0019 test-first; owner added a status allow-list criterion.
+- Task: T-0004 (complete: all 8 criteria PASS). T-0005..T-0007 specs written, not started.
+- Done: created `t0001_recr2` (plus-alias email, admin-confirmed, password in tests/.env only). Test infra: sweep/guards for R2,
+  C2 and `notifications`; profile snapshot, `--restore-profiles`, `profile-missing:*` in `--check`; lib/session.mjs.
+  `live-shortlist-authz.test.mjs` (11 tests). Fix: ownership lookup via `jobs!inner(recruiter_id)` -> 404, allow-list is `shortlisted`/`rejected` only.
+- Verification: red 4/11 failed (200 + row changed + notification created; unknown id 500; "submitted" accepted) -> green 11/11.
+  Full harness: NLP 10/10, backend 19/19, frontend = same 5 CreateJob/Jobs CI warnings; sweep --check 0; restore-profiles twice identical.
+- Files changed: jobs.controller.js; tests/backend/{lib/testdb,lib/session,sweep,live-shortlist-authz}.mjs, run-suite.ps1, README, .env.example; tasks/T-0004..0007; ISSUES, WORKLOG.
+- Issues logged: I-0029 (malformed applicationId -> 500). I-0019 moved to Resolved.
+- Next: owner commits T-0004; then T-0005 (I-0020).

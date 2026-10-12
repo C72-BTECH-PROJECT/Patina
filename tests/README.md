@@ -62,6 +62,16 @@ if a username lacks the `t0001_` prefix, a role is wrong, or any single delete
 would exceed 50 rows/objects. `node tests/backend/sweep.mjs --check` is
 read-only.
 
+Cross-user tests (T-0004..T-0007) add `t0001_recr2` (and later `t0001_cand2`),
+set in `tests/.env` (see `.env.example`). When configured, the sweep and its
+guards cover them too: candidate ids for `scores/resumes/applications`/storage,
+recruiter ids for `[T-0001 TEST]` jobs, and all test ids for `notifications`.
+Every run snapshots the t0001_ `profiles` rows to
+`tests/.out/t0001-profile-snapshots.json`. `sweep.mjs --check` exits 1 with
+`profile-missing:<username>: 1` if a t0001_ profile row is gone, and
+`sweep.mjs --restore-profiles` upserts the rows back from the snapshot
+(idempotent).
+
 Known schema gaps this depends on (not fixed here): `resumes` bucket (I-0001),
 `scores` table (I-0007), `resumes` table (I-0013) exist only in the live
 project, not in migrations.

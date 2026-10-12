@@ -97,7 +97,13 @@ try {
     Write-Host "== backend suite"
     $env:BACKEND_BASE_URL = $beUrl
     $files = @((Join-Path $tests 'backend\smoke.test.mjs'))
-    if ($Live) { $files += (Join-Path $tests 'backend\live-analyze.test.mjs') }
+    if ($Live) {
+      $files += (Join-Path $tests 'backend\live-analyze.test.mjs')
+      # Cross-user authorization tests (T-0004..T-0007); they skip if the second accounts are not in tests\.env.
+      foreach ($f in 'live-shortlist-authz') {
+        $files += (Join-Path $tests "backend\$f.test.mjs")
+      }
+    }
     & node --test --test-concurrency=1 @files 2>&1 | Tee-Object (Join-Path $out "$Target-backend-tests.log")
     $results['backend'] = $LASTEXITCODE
   }

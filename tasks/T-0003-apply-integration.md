@@ -137,7 +137,69 @@ files are untracked, so `commit -a` would miss them.
 ---
 
 ## Result
-<Filled per phase below; final per-criterion lines at close-out.>
+
+**Final, per criterion** (close-out 2026-10-12, HEAD `5446ebe`). Owner commits:
+- `a7c74e4`: Phase 1
+- `e9e4592`: Phase 3
+- `5446ebe`: Phase 4
+
+The per-phase detail follows below.
+
+1. **PASS: NLP.** f1–f6 sha256 = baseline (`4338e6ca…`, `11399a83…`, `81d92b5e…`, `047bd608…`, `72d51441…`, `c6276fb1…`) in Phases 1, 3 and 4. The 3 private snapshots also match. `git diff 32905c1 HEAD -- nlp-engine` is empty. No row changes parser output, so the expected diff is none.
+2. **PASS: Tier 1.** 7/7 in Phases 1, 3 and 4.
+3. **PASS: Tier 2.** 200 with all keys in Phases 1, 3 and 4 (3.7 s / 4.6 s / 2.9 s). Teardown removed 1 score, 1 resume, 1 job and 1 storage object each time. At `4ed559d` it returned 500.
+4. **PASS: Sweep.** `sweep.mjs --check` was all 0 with exit 0 before Phase 1 and after every phase and every probe.
+5. **PASS: CI build.** Final state: exactly 5 warnings.
+   - The 5: `CreateJob.jsx:4` Plus and X; `Jobs.jsx:4` MapPin, Users and Sparkles.
+   - They are a strict subset of the baseline 6. Baseline's `Upload.jsx` SkillsSelector went away with R9's Upload.
+   - At `4ed559d` there were 21 warnings.
+   - No exceptions needed listing. `CandidateLayout.jsx:11` `user` was removed under the owner's lint rule (R33 touched that file).
+   - The exit code is still 1, as at baseline.
+6. **PASS: I-0009 resolved.** Tier 2 passes. `analysis.controller.js:2` imports `path`. The job lookup at `:243` runs before NLP at `:262` and before storage. No `allAnalyses`/`latestAnalysis` remain, so I-0022 is also resolved. Both have Evidence of resolution in ISSUES.md.
+7. **PASS: I-0018 resolved.** The grep for `update-password\|updateUserById\|updatePassword` finds nothing in backend or frontend/src. Live: `POST /api/auth/update-password` → 404, and `POST /api/auth/reset-password {}` → 400.
+8. **PASS: rows applied as decided, nothing else.** `git diff --stat` was recorded per phase, and every phase matched its expected file list exactly. Per row:
+   - **R5, R12:** `supabase.js` = `32905c1` blob.
+   - **R6:** see criterion 10.
+   - **R7:** `resolveContentType`, 500 on a status storage error, extension-only check (Phase 3, plus probe).
+   - **R8:** satisfied by R14. The baseline `analyzeResume` stores only after the job lookup and never touches the profile resume.
+   - **R10:** apply returns 500 on a storage error; JobDetail/Upload use `process.env`; score-id is the follow-up.
+   - **R11:** `index.js:91,105` exit(1); watchdog removed (plus probe).
+   - **R13:** baseline controller and routes; `ResetPassword.jsx` = `32905c1`.
+   - **R14, R29:** baseline `analyzeResume`/`getCandidateAnalysis`/`getAllCandidates` restored; diff vs `32905c1` was 197+/0- in Phase 1.
+   - **R16–R26, R28:** via the revert, each restored or deleted file checked with `git hash-object` against `32905c1` (Phase 1 table).
+   - **R19:** the migration is verbatim; its idempotency goes to the I-0010 batch.
+   - **R30:** fixes 1, 2, 4 and 5 (Phase 4, plus probe); fix 3 is covered by R19.
+   - **R31:** handler and route deleted; the path now returns 404.
+   - **R33:** env var switched; migration kept verbatim.
+   - **R38 + R2:** baseline Dashboard plus 04835ca's loader (3-line diff vs `32905c1`).
+   - **R39:** 3 files deleted.
+   - **KEEP rows** (R1, R3, R4, R27, R36, R37, R41): left as they are. Auto-merged hunks were checked: Login keeps R37; AuthContext keeps R1's logout.
+   - **Judgment calls, recorded:**
+     - signOut was dropped from the singleton auth handlers (Phase 1);
+     - the listen `error` handler exits(1) for every listen error, not only EADDRINUSE (Phase 3);
+     - a profiles-query error in `getAllApplicants` returns 500 (Phase 4).
+9. **PASS: out of scope untouched.**
+   - At HEAD, `notification.routes.js` (incl. `/send`) and `shortlistCandidate` are unchanged from `4ed559d`.
+   - `auth.Middleware.js` differs only by the revert's `requireRole` `await` → `return`.
+   - I-0016, I-0026, R40, AUDIT/CHECKLIST content: not touched. AUDIT.md and CHECKLIST.md are restored verbatim from `32905c1`; reconciling them with current status belongs to the tracker task (R24), so they were not edited.
+10. **PASS: R6.**
+    - `createUserScopedClient` is defined once (`auth.controller.js:23`) and called only in `resetPassword` (`:175`).
+    - `getSupabaseAuth()` appears only before `.auth.*`; the `(getSupabaseAuth()|authClient).(from|storage)` grep finds nothing.
+    - With `SUPABASE_ANON_KEY` removed: boot OK, `/api/health` 200, login → `500 {"message":"Authentication is not configured correctly. Set SUPABASE_ANON_KEY in backend/.env."}`, process alive. `.env` was restored (sha256 equal).
+11. **PASS: dependencies.** After Phase 1, `npm ls --depth=0` exits 0 in `backend/` and `frontend/` with nothing missing.
+
+**ISSUES.md at close-out:**
+- **Resolved, with evidence:** I-0007, I-0009, I-0011, I-0013, I-0018, I-0022, I-0023, I-0024.
+- **Notes added, still OPEN:**
+  - I-0001: the bucket insert is back, but the MIME allow-list and size cap are still in no migration.
+  - I-0010: both 20260903 migrations are unguarded.
+  - I-0012: no `import.meta.env` left; 3 files still hardcode `localhost:5000`.
+- **New:** I-0027, I-0028.
+- **Untouched:** I-0019, I-0020, I-0021 (Prompt 4b).
+
+**Not verified:**
+- the storage-error → 500 branches in `getMyResumeStatus`/`applyToJob` (that would need a simulated storage outage);
+- the browser UI of the restored pages (`tests/MANUAL_SMOKE.md` is left to the owner).
 
 ### Pre-flight (2026-10-12)
 - **Working tree:** clean at `9d76bb8` ("integration review and plan": docs + `tests/nlp/snapshots/current/` only, so the merge-tree simulation still holds).
