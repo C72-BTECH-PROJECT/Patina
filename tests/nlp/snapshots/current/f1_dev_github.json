@@ -1,0 +1,174 @@
+{
+  "entities": {
+    "candidate_name": null,
+    "education": [
+      "Software Engineering Intern - Bluebird Analytics (Jan 2022 - May 2022)",
+      "B.Tech in Computer Science - Example Institute of Technology (2018 - 2022)"
+    ],
+    "email": "maya.okafor@example.com",
+    "experience": [
+      {
+        "type": "organisation",
+        "value": "TX"
+      },
+      {
+        "type": "date",
+        "value": "3 years"
+      },
+      {
+        "type": "organisation",
+        "value": "ECS"
+      },
+      {
+        "type": "organisation",
+        "value": "Software Engineering Intern - Bluebird Analytics"
+      },
+      {
+        "type": "date",
+        "value": "Jan 2022 - May 2022"
+      },
+      {
+        "type": "organisation",
+        "value": "QueueBench"
+      },
+      {
+        "type": "organisation",
+        "value": "Computer Science - Example Institute of Technology"
+      },
+      {
+        "type": "date",
+        "value": "2018 - 2022"
+      }
+    ],
+    "github": "github.com/example-mokafor",
+    "linkedin": "linkedin.com/in/example-maya-okafor",
+    "phone": "+15550104477",
+    "projects": [
+      {
+        "description": "github.com/example-mokafor/ledgerly QueueBench - load-testing harness for job queues (Python, Redis)",
+        "title": "Ledgerly - personal finance tracker (React, FastAPI, PostgreSQL)"
+      }
+    ],
+    "skill_count": 15,
+    "skills": [
+      "python",
+      "javascript",
+      "react",
+      "django",
+      "fastapi",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "git",
+      "github",
+      "sql",
+      "pytest",
+      "rest",
+      "api"
+    ]
+  },
+  "filename": "f1_dev_github.pdf",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "maya okafor",
+      "tx\ngithub.com/example-mokafor",
+      "| linkedin.com/in/example-maya-okafor",
+      "3 years",
+      "experience building\npython web services",
+      "skills\npython",
+      "django",
+      "fastapi",
+      "react",
+      "javascript"
+    ],
+    "sentence_count": 4,
+    "token_count": 95,
+    "tokens_preview": [
+      "maya",
+      "okafor",
+      "austin",
+      "tx",
+      "summary",
+      "backend",
+      "lean",
+      "software",
+      "engineer",
+      "year",
+      "experience",
+      "build",
+      "python",
+      "web",
+      "service",
+      "react",
+      "end",
+      "skills",
+      "python",
+      "django"
+    ]
+  },
+  "raw_text_preview": "Maya Okafor\nmaya.okafor@example.com | +1 555 010 4477 | Austin, TX\ngithub.com/example-mokafor | linkedin.com/in/example-maya-okafor\nSUMMARY\nBackend-leaning software engineer with 3 years of experience building\nPython web services and React front ends.\nSKILLS\nPython, Django, FastAPI, React, JavaScrip",
+  "semantic_analysis": {
+    "focused_score": 0.7812,
+    "full_text_score": 0.7605,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "javascript",
+      "react",
+      "django",
+      "fastapi",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "sql",
+      "rest",
+      "api"
+    ],
+    "match_level": "Strong Match",
+    "match_reason": "Matched 13 of 14 recognised job skills; missing: kubernetes.",
+    "matched_skills": [
+      "python",
+      "javascript",
+      "react",
+      "django",
+      "fastapi",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "git",
+      "sql",
+      "rest",
+      "api"
+    ],
+    "missing_skills": [
+      "kubernetes"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "python",
+      "javascript",
+      "react",
+      "django",
+      "fastapi",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "git",
+      "github",
+      "sql",
+      "pytest",
+      "rest",
+      "api"
+    ],
+    "semantic_score": 0.774,
+    "similarity_score": 0.8668,
+    "skill_coverage": 0.9286
+  },
+  "status": "success"
+}

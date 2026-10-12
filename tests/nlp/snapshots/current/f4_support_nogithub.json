@@ -1,0 +1,140 @@
+{
+  "entities": {
+    "candidate_name": "Samuel Adeyemi",
+    "education": [
+      "HND in Computing - Example College Leeds (2015 - 2017)"
+    ],
+    "email": "samuel.adeyemi@example.com",
+    "experience": [
+      {
+        "type": "organisation",
+        "value": "Keeps"
+      },
+      {
+        "type": "organisation",
+        "value": "PL/SQL"
+      },
+      {
+        "type": "organisation",
+        "value": "Shell Scripting"
+      },
+      {
+        "type": "organisation",
+        "value": "Root Cause Analysis"
+      },
+      {
+        "type": "date",
+        "value": "May 2020 - Present"
+      },
+      {
+        "type": "date",
+        "value": "15-year-old"
+      },
+      {
+        "type": "date",
+        "value": "2017"
+      },
+      {
+        "type": "date",
+        "value": "2020"
+      },
+      {
+        "type": "organisation",
+        "value": "Computing - Example College Leeds"
+      },
+      {
+        "type": "date",
+        "value": "2015 - 2017"
+      }
+    ],
+    "github": null,
+    "linkedin": null,
+    "phone": null,
+    "projects": [],
+    "skill_count": 6,
+    "skills": [
+      "python",
+      "oracle",
+      "aws",
+      "jenkins",
+      "github",
+      "sql"
+    ]
+  },
+  "filename": "f4_support_nogithub.docx",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "samuel adeyemi",
+      "| +44 7700 900123 | leeds",
+      "uk\nprofile\nproduction support and maintenance engineer",
+      "legacy\nbilling systems",
+      "most work",
+      "github",
+      "core skills\nsql",
+      "oracle",
+      "pl/sql",
+      "shell scripting"
+    ],
+    "sentence_count": 8,
+    "token_count": 80,
+    "tokens_preview": [
+      "samuel",
+      "adeyemi",
+      "leeds",
+      "uk",
+      "profile",
+      "production",
+      "support",
+      "maintenance",
+      "engineer",
+      "keep",
+      "legacy",
+      "billing",
+      "system",
+      "run",
+      "work",
+      "internal",
+      "github",
+      "core",
+      "skills",
+      "sql"
+    ]
+  },
+  "raw_text_preview": "Samuel Adeyemi\nsamuel.adeyemi@example.com | +44 7700 900123 | Leeds, UK\nProfile\nProduction support and maintenance engineer. Keeps legacy\nbilling systems running; most work is internal and not on GitHub.\nCore Skills\nSQL, Oracle, PL/SQL, Shell Scripting, Python, Splunk,\nAWS CloudWatch, Jenkins, Root ",
+  "semantic_analysis": {
+    "focused_score": 0.6231,
+    "full_text_score": 0.6671,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "bash",
+      "oracle",
+      "linux",
+      "sql"
+    ],
+    "match_level": "Moderate Match",
+    "match_reason": "Matched 3 of 5 recognised job skills; missing: bash, linux.",
+    "matched_skills": [
+      "python",
+      "oracle",
+      "sql"
+    ],
+    "missing_skills": [
+      "bash",
+      "linux"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "python",
+      "oracle",
+      "aws",
+      "jenkins",
+      "github",
+      "sql"
+    ],
+    "semantic_score": 0.6385,
+    "similarity_score": 0.6154,
+    "skill_coverage": 0.6
+  },
+  "status": "success"
+}

@@ -36,6 +36,15 @@ diff you're already writing.
 | I-0015 | `ner.py` contact fields picked via `list(set(...))[0]` — nondeterministic across processes | `nlp-engine/app/ner.py` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0016 | Signup rejects one-word "Full Name" with a misleading "all fields required" message | `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0017 | Signup's explicit `profiles` insert duplicates the `on_auth_user_created` trigger and logs a pkey error on every signup | `backend/Controllers/auth.controller.js` | P3 | OPEN | 2026-10-12, T-0001 |
+| I-0018 | Unauthenticated `POST /api/auth/update-password` resets any user's password from a username (account takeover) | `backend/Routes/auth.routes.js`, `backend/Controllers/auth.controller.js` | P0 | OPEN | 2026-10-12, T-0002 |
+| I-0019 | `shortlistCandidate` has no ownership check: any recruiter can change any application's status | `backend/Controllers/jobs.controller.js` | P0 | OPEN | 2026-10-12, T-0002 |
+| I-0020 | `POST /api/notifications/send` lets any logged-in user send any message to any user | `backend/Routes/notification.routes.js` | P0 | OPEN | 2026-10-12, T-0002 |
+| I-0021 | `requireAuth` fails open when the profile lookup errors or the profile is missing | `backend/Middlewares/auth.Middleware.js` | P0 | OPEN | 2026-10-12, T-0002 |
+| I-0022 | In-memory `latestAnalysis` / `allAnalyses` would serve one candidate's analysis to every user (masked by I-0009) | `backend/Controllers/analysis.controller.js` | P0 | OPEN | 2026-10-12, T-0002 |
+| I-0023 | Backend swallows `uncaughtException` and never exits on EADDRINUSE (15 s watchdog loop) | `backend/index.js` | P2 | OPEN | 2026-10-12, T-0002 |
+| I-0024 | Boot log prints the last 6 characters of the service-role key | `backend/Config/supabase.js` | P2 | OPEN | 2026-10-12, T-0002 |
+| I-0025 | `multer.memoryStorage()` without `limits`: upload size is unbounded and buffered in memory | `backend/Controllers/analysis.controller.js` | P2 | OPEN | 2026-10-12, T-0002 |
+| I-0026 | Landing page's hardcoded demo score and "10000+ verified" stats read as real data | `frontend/src/pages/public/Landing.jsx` | P3 | OPEN | 2026-10-12, T-0002 |
 
 ---
 
@@ -61,6 +70,11 @@ with no migration to explain why.
 **Proposed fix:** Move bucket creation + MIME allow-list config into a
 migration (Supabase supports this via `storage.buckets` inserts or the
 management API in a migration script).
+**Note (2026-10-12, T-0002):**
+- **The bucket insert used to exist.** `20260903_create_resumes_and_scores.sql:14-16@32905c1` created it (`id/name/public` only). `314e494` deleted that migration.
+- **Never in any migration:** the MIME allow-list and the 10 MB cap.
+- **Live check:** read-only bucket listing on 2026-10-12: `resumes` is private, `allowed_mime_types` = pdf + docx.
+- See INTEGRATION_REVIEW.md R19 and §7.
 
 ---
 
@@ -82,6 +96,10 @@ practical scoring effect is small, but it's noise in a keyword list that
 should be an auditable source of truth for skill matching.
 **Proposed fix:** Audit `SKILL_KEYWORDS` for fabricated/duplicate entries and
 remove them.
+**Note (2026-10-12, T-0002):**
+- **Line numbers are current again:** at HEAD the pre-baseline parser is back (I-0011), so the lines cited above match.
+- **Duplicate "typescript" is back:** HEAD lists it twice (`ner.py:8`, `:53`). `32905c1` had removed it.
+- **Visible in output:** a real resume's skills come out with `typescript` twice (INTEGRATION_REVIEW.md §3.3, private#3).
 
 ---
 
@@ -152,6 +170,12 @@ implementation of that concept.
 and every credibility-score read/write will fail silently or error.
 **Proposed fix:** Add a migration for `scores` (columns at minimum:
 `candidate_id`, `job_id`, `composite_score`, timestamps).
+**Note (2026-10-12, T-0002): root cause found.**
+- **The migration existed and was deleted.** `scores` was created at `32905c1` by `20260903_create_resumes_and_scores.sql:41-63` (with RLS at `:71-100`). `314e494` deleted that file.
+- **The table is live.** A read-only count shows 3 rows.
+- **Fix:** restore the migration instead of writing a new one (INTEGRATION_REVIEW.md R19).
+- **Line numbers above are now from `ad4f694`.** The `:301-306,391` reads are its `getAllApplicants`/`getAllCandidates`.
+- **The schema has no unique `(candidate_id, job_id)`.** So those `.maybeSingle()` reads break after a second analysis (R30).
 
 ---
 
@@ -206,6 +230,10 @@ spec's MongoDB references belongs in the same tracker-reconciliation task.
 task, not a tracker reconciliation). Leave the tracker as-is until a
 dedicated tracker-reconciliation task; this entry exists so the drift is
 visible before anyone cites that section as current.
+**Note (2026-10-12, T-0002):** inputs for the tracker task are in INTEGRATION_REVIEW.md §8 and row R40:
+- **Missing docs:** CHECKLIST / AUDIT / `Docs/project_checklist.md` are missing at HEAD (deleted by `314e494`).
+- **Wrong claims:** the tracker also claims "MongoDB models", "Custom NER" and recruiter charts/alerts are done (`:44,50,31`).
+- **Name mismatch:** CLAUDE.md's doc names don't match the repo's.
 
 ---
 
@@ -223,11 +251,18 @@ visible before anyone cites that section as current.
   (`form.append('jd', job.description)`) but never defined in that scope.
 - NLP URL is hardcoded `http://localhost:8000/parse` at `:146` (the baseline
   read `NLP_PARSE_URL`).
-- Not present at baseline 32905c1 — introduced by `71c632d` and carried into
-  HEAD through the merges.
+- Not present at baseline 32905c1. ~~introduced by `71c632d`~~: **corrected in
+  T-0002**, see the note below.
 **Impact:** Candidate cannot analyse or upload a resume at HEAD.
 **Proposed fix:** Separate task; T-0001's backend live test will show this
 as the expected HEAD failure when run against current code.
+**Note (2026-10-12, T-0002): attribution corrected, and confirmed by the harness.**
+- **Who introduced it:**
+  - `71c632d` imports `path` (`analysis.controller.js:4@71c632d`) and defines `job` (`:138-146@71c632d`). `72451d1` still has both.
+  - **`ad4f694` removed both.** At HEAD this leaves `path.extname` at `:34` and a dangling `job` at `:137`, `:144`, `:215`.
+  - The hardcoded NLP URL predates both commits (`f270666:49`).
+- **Harness:** the tier 2 run against current returned `HTTP 500: {"message":"Analyze failed","error":"path is not defined"}` (`tests/.out/current-backend-tests.log`).
+- **Fix order:** restoring only the import and the lookup would re-enable I-0022. See INTEGRATION_REVIEW.md R29/R14.
 
 ---
 
@@ -297,6 +332,11 @@ was already built; docs describe code that isn't there.
 **Proposed fix:** Separate task — decide whether to restore 32905c1's NLP
 files (and re-apply anything genuinely new from 314e494). T-0001 snapshots
 give the before/after comparison.
+**Note (2026-10-12, T-0002):**
+- **Wider than NLP:** `314e494` is a **whole-tree reset**. `314e494^{tree}` == `71c632d^{tree}` (`f09d034b…`), so it contains nothing new to re-apply.
+- **HEAD NLP is pre-baseline:** it is byte-identical to `365a09e`.
+- **Fixture evidence:** the fixture-by-fixture comparison is in INTEGRATION_REVIEW.md §3.3. All four 32905c1 parsing fixes are overwritten at HEAD.
+- **Open question:** does Aaron have unpushed NLP work? (Q1 in INTEGRATION_REVIEW.md).
 
 ---
 
@@ -321,6 +361,11 @@ At 32905c1 all files used `process.env.REACT_APP_API_BASE_URL` (unified in
 against a backend on `localhost:5000`.
 **Proposed fix:** Separate task — standardise on
 `process.env.REACT_APP_API_BASE_URL` (one shared constant).
+**Note (2026-10-12, T-0002): mechanism confirmed.**
+- **Compiler:** the installed webpack 5.106.2 compiles `import.meta.env.<X>` to the constant `undefined` when `<X>` isn't defined (`frontend/node_modules/webpack/lib/dependencies/ImportMetaPlugin.js:366-376`).
+- **Effect:** the `|| 'http://localhost:5000'` fallback is always used.
+- **Bundle check:** the built bundle contains no `VITE_API_BASE_URL` string.
+- **Where the uses came from:** reintroduced by `314e494`; added by `71c632d` (`JobDetail.jsx`, `Upload.jsx`) and `ad4f694` (`CandidateLayout.jsx`, `Notifications.jsx`).
 
 ---
 
@@ -337,6 +382,10 @@ I-0001). The five files in `supabase/migrations/` create only `profiles`,
 **Impact:** Same as I-0007 — a fresh environment has no `resumes` table.
 **Proposed fix:** Fold into the I-0001/I-0007 migration work (not fixed in
 T-0001).
+**Note (2026-10-12, T-0002): root cause.**
+- **The migration was deleted.** `public.resumes` was created by `20260903_create_resumes_and_scores.sql:18+@32905c1`, which `314e494` deleted.
+- **The table is live.** A read-only count shows 3 rows.
+- **Fix:** restore the file (INTEGRATION_REVIEW.md R19).
 
 ---
 
@@ -403,6 +452,133 @@ the row from signup metadata. The controller then inserts the same `id` again
 only logged. The resulting profiles had correct username, role and names.
 **Impact:** A misleading error on every signup. If the trigger and the insert ever diverge, the insert's values are silently dropped.
 **Proposed fix:** Remove the controller insert, or make it an `upsert` and handle the error.
+
+---
+
+### I-0018 — Unauthenticated password reset by username (account takeover)
+**Status:** OPEN
+**Severity:** P0 (security)
+**Module:** `backend/Routes/auth.routes.js`, `backend/Controllers/auth.controller.js`, `frontend/src/pages/public/ResetPassword.jsx`
+**Spec ref:** NFR-8 area (authentication), PROJECT_SOURCE_DOCS.md
+**Evidence:**
+- **The hole:**
+  - `auth.routes.js:12`: `router.post('/update-password', updatePassword)`, with no auth middleware.
+  - `auth.controller.js:68-124` looks the user up by `username` (profiles, falling back to `auth.admin.listUsers`).
+  - It then calls `supabase.auth.admin.updateUserById(id, { password: newPassword, email_confirm: true })` with the service-role client.
+  - `ResetPassword.jsx:30` calls it directly.
+- **History:** `git log -S"update-password" -- backend/Routes/auth.routes.js` → added `97b7461`, removed `fdd22c3` (baseline uses the token-gated `request-password-reset`/`reset-password`, `auth.routes.js:51-52@32905c1`), re-added `314e494`.
+**Impact:** Anyone who knows or guesses a username can set that account's password and log in as them, including recruiters and the admin.
+**Proposed fix:** Restore the baseline token-gated flow (INTEGRATION_REVIEW.md R13). Until then, don't expose this backend beyond localhost.
+
+---
+
+### I-0019 — `shortlistCandidate` IDOR
+**Status:** OPEN
+**Severity:** P0 (security)
+**Module:** `backend/Controllers/jobs.controller.js`
+**Spec ref:** n/a (authorization)
+**Evidence:**
+- **Route:** `jobs.routes.js:19` requires only the RECRUITER role.
+- **Update:** `jobs.controller.js:229-234` runs `.update({ status }).eq('id', applicationId)` with the service-role client (RLS bypassed), with no check that the application's job belongs to `req.session.userId`.
+- Introduced by `ad4f694`.
+**Impact:** Any recruiter can shortlist or reject any candidate's application on another recruiter's job. A "shortlisted" notification is sent to the candidate.
+**Proposed fix:** Fetch the application with `job:jobs!inner(recruiter_id)` and require that it equals the session user. Return 404 on 0 rows (INTEGRATION_REVIEW.md R32).
+
+---
+
+### I-0020 — `POST /api/notifications/send` allows spoofed notifications
+**Status:** OPEN
+**Severity:** P0 (security)
+**Module:** `backend/Routes/notification.routes.js`
+**Spec ref:** n/a
+**Evidence:**
+- **Route:** `notification.routes.js:7-20` is guarded by `requireAuth` only. It inserts `{userId, type, message, data}` from the request body for any `userId`, through the service-role client.
+- **No caller:** nothing in the frontend calls it.
+- Introduced by `ad4f694`.
+**Impact:** Any logged-in user, a candidate included, can send arbitrary messages to any user's notification list. That is a phishing vector.
+**Proposed fix:** Delete the route. `shortlistCandidate` already sends notifications server-side (INTEGRATION_REVIEW.md R34).
+
+---
+
+### I-0021 — `requireAuth` fails open
+**Status:** OPEN
+**Severity:** P0 (security)
+**Module:** `backend/Middlewares/auth.Middleware.js`
+**Spec ref:** n/a
+**Evidence:**
+- **HEAD:** `auth.Middleware.js:10-28` wraps the profile query in `try/catch` and only blocks on `profile?.is_suspended`. supabase-js returns `{ error }` rather than throwing, so a query error or a missing profile lets the request through.
+- **Before:** `72451d1` and `32905c1` returned 401 on `error || !profile`.
+- Changed by `ad4f694`.
+**Impact:** During a DB or network error, and for users whose profile row was deleted, the suspension check and the profile requirement are skipped.
+**Proposed fix:** Restore the fail-closed check (INTEGRATION_REVIEW.md R35).
+
+---
+
+### I-0022 — In-memory analysis globals leak across users
+**Status:** OPEN (currently masked by I-0009)
+**Severity:** P0 (security, latent)
+**Module:** `backend/Controllers/analysis.controller.js`
+**Spec ref:** NFR (data privacy), CHECKLIST 0.2 @32905c1
+**Evidence:**
+- **The globals:** `analysis.controller.js:114-115` holds module-level `allAnalyses` and `latestAnalysis`, set at `:197-221`.
+- **The leak:** `getCandidateAnalysis` (`:229-236`) returns the global `latestAnalysis` to **any** candidate.
+- **Origin:** this is the pre-baseline in-memory design (`f270666`). The `e7bf01b` merge resolution brought it back; baseline `32905c1` had replaced it with Supabase queries scoped to the session user (`:258-336@32905c1`).
+- **Why it's masked:** analyze 500s at HEAD (I-0009), so the globals stay empty.
+**Impact:** As soon as I-0009 is fixed alone, the last uploaded candidate's parsed resume (contact details included) is served to whichever candidate opens their results.
+**Proposed fix:** Fix together with I-0009 by restoring the baseline scoped readers (INTEGRATION_REVIEW.md R14).
+
+---
+
+### I-0023 — Backend never exits on EADDRINUSE; swallows `uncaughtException`
+**Status:** OPEN
+**Severity:** P2
+**Module:** `backend/index.js`
+**Spec ref:** n/a
+**Evidence:**
+- **Swallowed errors:** `index.js:94-95` logs `uncaughtException` and continues.
+- **The loop:** a `setInterval` watchdog (`:106-119`) re-calls `server.listen` every 15 s and resets `process.exitCode = 0` (`:109`). The one-shot `error` listener (`:79-84`) only handles the first EADDRINUSE.
+- Added by `71c632d`.
+**Impact:** A port clash leaves a zombie process logging retries forever, and real crashes don't restart the process.
+**Proposed fix:** `process.exit(1)` on EADDRINUSE and after logging `uncaughtException`. Drop the watchdog and keep the graceful shutdown (INTEGRATION_REVIEW.md R11).
+
+---
+
+### I-0024 — Service-role key suffix written to logs
+**Status:** OPEN
+**Severity:** P2 (hygiene; not exploitable on its own)
+**Module:** `backend/Config/supabase.js`
+**Spec ref:** n/a
+**Evidence:**
+- **The log line:** `supabase.js:39` logs `key=...${supabaseServiceRoleKey.slice(-6)}` at boot.
+- **Where it ends up:** observed in `tests/.out/current-backend.out.log` (git-ignored). The suffix isn't repeated here.
+- Added by `71c632d`. Baseline logs only the role and project.
+**Impact:** Part of a secret ends up in log files and terminals.
+**Proposed fix:** Restore the baseline log line (INTEGRATION_REVIEW.md R5).
+
+---
+
+### I-0025 — Unbounded in-memory uploads
+**Status:** OPEN
+**Severity:** P2
+**Module:** `backend/Controllers/analysis.controller.js` (both baseline and HEAD)
+**Spec ref:** NFR-2 (concurrency)
+**Evidence:** `multer({ storage: multer.memoryStorage() })` with no `limits`, at HEAD and at `32905c1`. Only the storage bucket enforces 10 MB, and only after the whole file has been buffered in the Node process.
+**Impact:** Large uploads are held in memory before rejection, which is a memory-exhaustion risk under concurrent uploads.
+**Proposed fix:** `limits: { fileSize: 10 * 1024 * 1024 }`, plus a 413 response on `LIMIT_FILE_SIZE`.
+
+---
+
+### I-0026 — Landing page demo numbers read as real data
+**Status:** OPEN — team decision
+**Severity:** P3
+**Module:** `frontend/src/pages/public/Landing.jsx`
+**Spec ref:** GF-5 (explainability/honesty of scores), loosely
+**Evidence:**
+- **The demo widget:** `Landing.jsx:48` hardcodes `setScore(82)`, and `:129` shows "✓ Verified".
+- **The stats section:** it shows "10000+ Candidates Verified / 500+ Companies".
+- **History:** present at `32905c1` too. `04835ca` only added a loading spinner, which makes the fixed 82 look computed.
+**Impact:** A public page shows invented figures as if they were product results. This is a credibility risk in a guide review.
+**Proposed fix:** Label the widget "Example" and remove or qualify the stats. The team decides (INTEGRATION_REVIEW.md Q6).
 
 ---
 

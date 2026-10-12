@@ -1,0 +1,146 @@
+{
+  "entities": {
+    "candidate_name": "Lena Fischer",
+    "education": [
+      "B.Sc. in Information Systems - Example University Hamburg (2015 - 2018)"
+    ],
+    "email": "lena.fischer@example.com",
+    "experience": [
+      {
+        "type": "date",
+        "value": "5550 1234"
+      },
+      {
+        "type": "organisation",
+        "value": "ServiceNow"
+      },
+      {
+        "type": "organisation",
+        "value": "Nagios"
+      },
+      {
+        "type": "organisation",
+        "value": "Active Directory, Incident Management"
+      },
+      {
+        "type": "date",
+        "value": "2021"
+      },
+      {
+        "type": "date",
+        "value": "monthly"
+      },
+      {
+        "type": "organisation",
+        "value": "Windows"
+      },
+      {
+        "type": "organisation",
+        "value": "Woodgrove Bank"
+      },
+      {
+        "type": "date",
+        "value": "Jan 2019 - Feb 2021"
+      },
+      {
+        "type": "organisation",
+        "value": "ITIL 4 Foundation"
+      },
+      {
+        "type": "date",
+        "value": "2021"
+      },
+      {
+        "type": "organisation",
+        "value": "Information Systems - Example University"
+      },
+      {
+        "type": "date",
+        "value": "2015 - 2018"
+      }
+    ],
+    "github": null,
+    "linkedin": null,
+    "phone": null,
+    "projects": [],
+    "skill_count": 3,
+    "skills": [
+      "bash",
+      "linux",
+      "sql"
+    ]
+  },
+  "filename": "f3_support_nogithub.pdf",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "lena fischer",
+      "lena.fischer@example.com",
+      "| +49",
+      "1234 | hamburg",
+      "germany\nsummary\nit",
+      "incident management",
+      "production systems",
+      "no public code portfolio",
+      "skills\nlinux",
+      "windows server"
+    ],
+    "sentence_count": 6,
+    "token_count": 81,
+    "tokens_preview": [
+      "lena",
+      "fischer",
+      "hamburg",
+      "germany",
+      "summary",
+      "support",
+      "engineer",
+      "focus",
+      "incident",
+      "management",
+      "keep",
+      "production",
+      "system",
+      "healthy",
+      "public",
+      "code",
+      "portfolio",
+      "skills",
+      "linux",
+      "windows"
+    ]
+  },
+  "raw_text_preview": "Lena Fischer\nlena.fischer@example.com | +49 151 5550 1234 | Hamburg, Germany\nSUMMARY\nIT support engineer focused on incident management and keeping\nproduction systems healthy. No public code portfolio.\nSKILLS\nLinux, Windows Server, SQL, Bash, ServiceNow, Jira, ITIL,\nNagios, Active Directory, Inciden",
+  "semantic_analysis": {
+    "focused_score": 0.5914,
+    "full_text_score": 0.572,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "bash",
+      "oracle",
+      "linux",
+      "sql"
+    ],
+    "match_level": "Moderate Match",
+    "match_reason": "Matched 3 of 5 recognised job skills; missing: python, oracle.",
+    "matched_skills": [
+      "bash",
+      "linux",
+      "sql"
+    ],
+    "missing_skills": [
+      "python",
+      "oracle"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "bash",
+      "linux",
+      "sql"
+    ],
+    "semantic_score": 0.5846,
+    "similarity_score": 0.5938,
+    "skill_coverage": 0.6
+  },
+  "status": "success"
+}

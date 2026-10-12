@@ -1,0 +1,156 @@
+{
+  "entities": {
+    "candidate_name": "Rosa Delgado",
+    "education": [
+      "B.S. Computer Science",
+      "Example State University"
+    ],
+    "email": "rosa.delgado@example.com",
+    "experience": [
+      {
+        "type": "date",
+        "value": "9988"
+      },
+      {
+        "type": "organisation",
+        "value": "CO - Ran 40 Kubernetes"
+      },
+      {
+        "type": "organisation",
+        "value": "AWS EKS"
+      },
+      {
+        "type": "date",
+        "value": "2020 - Jan 2022"
+      },
+      {
+        "type": "organisation",
+        "value": "Python - Wrote Python"
+      }
+    ],
+    "github": "github.com/example-rdelgado",
+    "linkedin": null,
+    "phone": "+15550109988",
+    "projects": [
+      {
+        "description": "SQL infra-lint - Terraform policy checker Docker github.com/example-rdelgado/infra-lint Kubernetes",
+        "title": "PostgreSQL"
+      },
+      {
+        "description": "",
+        "title": "Terraform"
+      }
+    ],
+    "skill_count": 10,
+    "skills": [
+      "python",
+      "fastapi",
+      "postgresql",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "github",
+      "terraform",
+      "sql"
+    ]
+  },
+  "filename": "f5_multicolumn.pdf",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "rosa delgado\ncontact experience",
+      "platform engineer\n+1",
+      "proseware cloud",
+      "feb 2022 - present",
+      "denver",
+      "co - ran",
+      "kubernetes services",
+      "aws eks",
+      "terraform",
+      "github.com/example-rdelgado - built fastapi internal tools"
+    ],
+    "sentence_count": 7,
+    "token_count": 58,
+    "tokens_preview": [
+      "rosa",
+      "delgado",
+      "contact",
+      "experience",
+      "platform",
+      "engineer",
+      "proseware",
+      "cloud",
+      "feb",
+      "present",
+      "denver",
+      "co",
+      "ran",
+      "kubernetes",
+      "service",
+      "aws",
+      "eks",
+      "terraform",
+      "build",
+      "fastapi"
+    ]
+  },
+  "raw_text_preview": "Rosa Delgado\nCONTACT EXPERIENCE\nrosa.delgado@example.com Platform Engineer\n+1 555 010 9988 Proseware Cloud (Feb 2022 - Present)\nDenver, CO - Ran 40 Kubernetes services on AWS EKS with Terraform.\ngithub.com/example-rdelgado - Built FastAPI internal tools for deploy approvals.\nBackend Developer\nSKILLS",
+  "semantic_analysis": {
+    "focused_score": 0.714,
+    "full_text_score": 0.607,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "javascript",
+      "react",
+      "django",
+      "fastapi",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "sql",
+      "rest",
+      "api"
+    ],
+    "match_level": "Moderate Match",
+    "match_reason": "Matched 8 of 14 recognised job skills; missing: javascript, react, django, redis, rest, api.",
+    "matched_skills": [
+      "python",
+      "fastapi",
+      "postgresql",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "sql"
+    ],
+    "missing_skills": [
+      "javascript",
+      "react",
+      "django",
+      "redis",
+      "rest",
+      "api"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "python",
+      "fastapi",
+      "postgresql",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "github",
+      "terraform",
+      "sql"
+    ],
+    "semantic_score": 0.6765,
+    "similarity_score": 0.6134,
+    "skill_coverage": 0.5714
+  },
+  "status": "success"
+}

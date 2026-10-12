@@ -73,3 +73,28 @@ rollup per archived month at the top of this file.
 - Files changed: ISSUES.md, tasks/TEMPLATE.md, WORKLOG.md (mod); PROJECT_SOURCE_DOCS.md (new, untracked).
 - Issues logged: I-0014 resolved; I-0008, I-0010 updated. I-0010 auto-deploy setting is owner-reported, not verified.
 - Next: owner commits PROJECT_SOURCE_DOCS.md + docs changes.
+
+## L-0006 · 2026-10-12 · T-0002 integration review (baseline 32905c1 → HEAD)
+- Prompt: read-only INTEGRATION_REVIEW.md classifying every teammate commit/merge hunk, harness vs baseline, 5 owner additions.
+- Task: T-0002 (plan approved incl. additions 1-5).
+- Done: harness on current (ports 8200/5200, owner's dev stack left running); 2 read-only review subagents
+  (Aaron / Aditya), claims re-verified; 41-row table (9 KEEP, 7 KEEP-WITH-FIX, 20 REVERT, 5 NEEDS-TEAM-DECISION).
+- Key findings: 314e494 tree == 71c632d (reset, nothing new; HEAD NLP == 365a09e); I-0009 is from ad4f694, not 71c632d;
+  e7bf01b took Aaron's side in 4 files and could not boot; `git revert 314e494` alone also won't boot (auth exports).
+- Verification: NLP 10/10 ×2 (hashes equal), tier 1 7/7, tier 2 500 `path is not defined`, CI build 21 warnings, sweep --check all 0.
+- Files changed: ISSUES.md, WORKLOG.md (mod); INTEGRATION_REVIEW.md, tasks/T-0002-integration-review.md, tests/nlp/snapshots/current/ (new).
+- Issues logged: I-0018..I-0022 (P0 security), I-0023..I-0026; notes on I-0001/4/7/8/9/11/12/13.
+- Next: owner marks decisions in INTEGRATION_REVIEW.md §1; team answers Q1-Q6; then apply per §9.
+
+## L-0007 · 2026-10-12 · T-0002 owner decisions recorded in INTEGRATION_REVIEW.md
+- Prompt: fill the Owner decision column (R1-R41) and §11 answers with the team's final decisions (2026-10-12).
+- Task: T-0002 (decisions step; nothing applied).
+- Done: all 41 Owner decision cells filled verbatim from the prompt; "Answer (2026-10-12)" added under Q1-Q6;
+  §11 note that the team won't push to main until the integration PR is open.
+- Decisions of note: R6 = lazy supabaseAuth singleton (+ per-request client for session-setting reset);
+  R9/R15 = upload once, apply runs analyze (T-apply; score-on-apply follow-up); R38 = baseline view now;
+  R32/R34/R35 deferred to security task (I-0019/20/21, test-first); R40 to tracker task.
+- Verification: script asserted 41 rows filled and 6 answers inserted; no other text edited.
+- Files changed: INTEGRATION_REVIEW.md, WORKLOG.md (mod).
+- Issues logged: none.
+- Next: write task specs (T-apply, security, tracker, score-on-apply) for approval; then apply per §9.

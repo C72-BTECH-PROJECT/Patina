@@ -1,0 +1,170 @@
+{
+  "entities": {
+    "candidate_name": "Arjun Mehta",
+    "education": [
+      "B.E. in Information Technology - Example University of Pune (2015 - 2019)"
+    ],
+    "email": "arjun.mehta@example.com",
+    "experience": [
+      {
+        "type": "date",
+        "value": "98765 01234"
+      },
+      {
+        "type": "date",
+        "value": "4 years"
+      },
+      {
+        "type": "date",
+        "value": "2021"
+      },
+      {
+        "type": "date",
+        "value": "over 12 months"
+      },
+      {
+        "type": "organisation",
+        "value": "Developer - Fabrikam Software"
+      },
+      {
+        "type": "date",
+        "value": "2021"
+      },
+      {
+        "type": "organisation",
+        "value": "Built Express"
+      },
+      {
+        "type": "organisation",
+        "value": "Information Technology - Example University of Pune"
+      },
+      {
+        "type": "date",
+        "value": "2015 - 2019"
+      }
+    ],
+    "github": "github.com/example-arjunm",
+    "linkedin": null,
+    "phone": null,
+    "projects": [],
+    "skill_count": 14,
+    "skills": [
+      "java",
+      "javascript",
+      "nodejs",
+      "express",
+      "spring",
+      "mongodb",
+      "mysql",
+      "docker",
+      "kubernetes",
+      "jenkins",
+      "git",
+      "github",
+      "microservices",
+      "api"
+    ]
+  },
+  "filename": "f2_dev_github.docx",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "arjun mehta",
+      "github.com/example-arjunm\nsummary\njava",
+      "node.js developer",
+      "4 years",
+      "product companies",
+      "technical skills\njava",
+      "spring boot",
+      "node.js",
+      "express",
+      "mongodb"
+    ],
+    "sentence_count": 5,
+    "token_count": 67,
+    "tokens_preview": [
+      "arjun",
+      "mehta",
+      "pune",
+      "india",
+      "summary",
+      "java",
+      "developer",
+      "year",
+      "product",
+      "company",
+      "technical",
+      "skills",
+      "java",
+      "spring",
+      "boot",
+      "express",
+      "mongodb",
+      "mysql",
+      "kubernetes",
+      "docker"
+    ]
+  },
+  "raw_text_preview": "Arjun Mehta\narjun.mehta@example.com | +91 98765 01234 | Pune, India\ngithub.com/example-arjunm\nSummary\nJava and Node.js developer with 4 years in product companies.\nTechnical Skills\nJava, Spring Boot, Node.js, Express, MongoDB, MySQL, Kubernetes,\nDocker, Git, Jenkins, Microservices\nWork Experience\nSe",
+  "semantic_analysis": {
+    "focused_score": 0.659,
+    "full_text_score": 0.4616,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "javascript",
+      "react",
+      "django",
+      "fastapi",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "sql",
+      "rest",
+      "api"
+    ],
+    "match_level": "Weak Match",
+    "match_reason": "Matched 5 of 14 recognised job skills; missing: python, react, django, fastapi, postgresql, redis, aws, sql, rest.",
+    "matched_skills": [
+      "javascript",
+      "docker",
+      "kubernetes",
+      "git",
+      "api"
+    ],
+    "missing_skills": [
+      "python",
+      "react",
+      "django",
+      "fastapi",
+      "postgresql",
+      "redis",
+      "aws",
+      "sql",
+      "rest"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "java",
+      "javascript",
+      "nodejs",
+      "express",
+      "spring",
+      "mongodb",
+      "mysql",
+      "docker",
+      "kubernetes",
+      "jenkins",
+      "git",
+      "github",
+      "microservices",
+      "api"
+    ],
+    "semantic_score": 0.5899,
+    "similarity_score": 0.4502,
+    "skill_coverage": 0.3571
+  },
+  "status": "success"
+}

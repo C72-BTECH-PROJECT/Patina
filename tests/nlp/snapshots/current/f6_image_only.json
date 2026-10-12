@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "candidate_name": null,
+    "education": [],
+    "email": null,
+    "experience": [],
+    "github": null,
+    "linkedin": null,
+    "phone": null,
+    "projects": [],
+    "skill_count": 0,
+    "skills": []
+  },
+  "filename": "f6_image_only.pdf",
+  "preprocessing": {
+    "noun_chunks_preview": [],
+    "sentence_count": 0,
+    "token_count": 0,
+    "tokens_preview": []
+  },
+  "raw_text_preview": "",
+  "semantic_analysis": {
+    "focused_score": 0.0,
+    "full_text_score": 0.0,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "javascript",
+      "react",
+      "django",
+      "fastapi",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "sql",
+      "rest",
+      "api"
+    ],
+    "match_level": "Poor Match",
+    "match_reason": "Matched 0 of 14 recognised job skills; missing: python, javascript, react, django, fastapi, postgresql, redis, aws, docker, kubernetes, git, sql, rest, api.",
+    "matched_skills": [],
+    "missing_skills": [
+      "python",
+      "javascript",
+      "react",
+      "django",
+      "fastapi",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "sql",
+      "rest",
+      "api"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [],
+    "semantic_score": 0.0,
+    "similarity_score": 0.0,
+    "skill_coverage": 0.0
+  },
+  "status": "success"
+}
