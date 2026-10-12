@@ -120,3 +120,14 @@ rollup per archived month at the top of this file.
 - Files changed: analysis.controller.js, jobs.controller.js, index.js, JobDetail.jsx, Upload.jsx; task file, WORKLOG.md.
 - Issues logged: none new. The storage-error 500 branches are verified by diff only (no live outage).
 - Next: owner commits Phase 3; then Phase 4 (R30, R31, R33, R39 + import.meta.env check).
+
+## L-0010 · 2026-10-12 · T-0003 Phase 4 (R30, R31, R33, R39)
+- Prompt: continue (Phase 3 committed as e9e4592).
+- Task: T-0003 (Phase 4 done; close-out pending owner review).
+- Done: R30 getAllApplicants (no DEBUG, null not 0, latest score via limit(1), batched profile names, no email column);
+  R31 getAllApplications + route deleted; R33 env var in CandidateLayout/Notifications + unused `user` removed; R39 3 mock pages deleted.
+- Verification: NLP hashes = baseline; tier 1 7/7; tier 2 PASS; sweep 0; **CI = exactly the 5 baseline CreateJob/Jobs warnings**;
+  no import.meta.env left. Probe: unscored applicant → credibilityScore null; GET /api/jobs/applications → 404; swept to 0.
+- Files changed: analysis.controller.js, jobs.controller.js, jobs.routes.js, CandidateLayout.jsx, Notifications.jsx, 3 deleted; ISSUES.md, task, WORKLOG.
+- Issues logged: I-0028 (applicants email now empty; no caller).
+- Next: owner commits Phase 4; then close-out (final Result, ISSUES statuses).

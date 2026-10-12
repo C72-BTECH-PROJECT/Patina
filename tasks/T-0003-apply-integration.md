@@ -259,3 +259,56 @@ The snapshot files were rewritten by the harness with identical content, so ther
 - No `node.exe` processes were left running afterwards.
 
 **Remaining `import.meta.env`:** `CandidateLayout.jsx:7` and `Notifications.jsx:6` only (R33, Phase 4).
+
+**Owner commit:** Phase 3 was committed as `e9e4592`.
+
+### Phase 4: §9 steps 5–6, ad4f694 keepers (R30, R31, R33, R39) + env check, 2026-10-12
+
+**Applied**
+- **R30** (`getAllApplicants`):
+  - fix 1: the 4 `[DEBUG]` logs are removed (the failure log stays, without the prefix). The duplicate handler was already resolved in Phase 1: baseline `getAllCandidates`, with ad4f694's rewrite gone.
+  - fix 2: `credibilityScore` is `null` when there is no score row (was `Number(… ?? 0)`).
+  - fix 3: already satisfied by R19 (the `scores` migration is restored).
+  - fix 4: the score read adds `.order('created_at',{ascending:false}).limit(1)` before `.maybeSingle()`.
+  - fix 5: one `profiles` query (`select('id, first_name, last_name').in('id', candidateIds)`) with no `email`. The per-row `auth.admin` fallback now runs only for candidates without a profile row.
+  - **Judgment call:** a failed profiles query now returns 500 ("Failed to load applicant profiles"), matching the handler's jobs/applications errors. The old per-row `try/catch` never saw supabase errors (they are returned, not thrown).
+- **R31:** `getAllApplications` was deleted from `jobs.controller.js`, and its import and the `GET /applications` route were removed from `jobs.routes.js`. The shortlist route stays (R32 deferred). Its only caller, ad4f694's Dashboard fetch, went in Phase 1 (R38).
+- **R33:** `CandidateLayout.jsx:7` and `Notifications.jsx:6` now use `process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'`. Migration idempotency is deferred to the I-0010 batch.
+- **Owner lint rule:** `CandidateLayout.jsx:11` `const { logout, user }` became `const { logout }`. `user` had no other use in the file (grep).
+- **R39:** deleted `frontend/src/Recruiter/{AlertDashboard,CandidateRanking,components/ScoreExplainability}.jsx`; the directory is now empty and gone.
+  - A grep found no importers outside the trio.
+  - `CandidateRanking.jsx:7` still imported `../data/recruiter/mockData`, which was deleted in Phase 1. Unreachable files aren't bundled, so the build never saw that import.
+- **§9 step 6:** `grep -rn "import.meta.env" frontend/src` finds nothing. **PASS**
+
+**`git diff --stat HEAD`** (the expected 8 files + ISSUES.md for I-0028):
+```
+ ISSUES.md                                          |  15 ++
+ backend/Controllers/analysis.controller.js         |  38 +--
+ backend/Controllers/jobs.controller.js             |  77 ------
+ backend/Routes/jobs.routes.js                      |   2 -
+ frontend/src/Recruiter/AlertDashboard.jsx          | 283 ---------------------
+ frontend/src/Recruiter/CandidateRanking.jsx        | 268 -------------------
+ .../Recruiter/components/ScoreExplainability.jsx   | 261 -------------------
+ .../src/components/layouts/CandidateLayout.jsx     |   4 +-
+ frontend/src/pages/candidate/Notifications.jsx     |   2 +-
+ 9 files changed, 38 insertions(+), 912 deletions(-)
+```
+
+**Suites:** `run-suite.ps1 -Target current -Live`, log `tests/.out/t0003-p4-run.log`.
+
+| Criterion | Result | Evidence |
+|---|---|---|
+| 1 NLP | **PASS** | `10 passed in 3.01s`. f1–f6 and private 1–3 sha256 = baseline. |
+| 2 Tier 1 | **PASS** | 7/7 |
+| 3 Tier 2 | **PASS** | `✔ POST /api/analyze … (2945ms)`, `tests 8 / pass 8`. Teardown removed 1/1/1/1. Remaining all 0. |
+| 4 Sweep | **PASS** | All 0 after teardown and after the probe. `--check` exit 0. |
+| 5 CI build | **PASS** | Exactly 5 warnings: `CreateJob.jsx` Plus (4:10) and X (4:16); `Jobs.jsx` MapPin (4:21), Users (4:29) and Sparkles (4:50). A strict subset of the baseline 6 (SkillsSelector gone with R9). No listed exceptions needed. Exit is still 1, as at baseline. |
+
+**Probe** (scratch `probeP4.ps1`, backend :5300). It seeded 1 tagged job (`sweep.mjs --seed-job`) and then:
+- `t0001_cand`: login 200 → upload f1 200 → apply 201;
+- `t0001_recr`: login 200 → `GET /api/recruiter/applicants` **200**. The row for the seeded job has `credibilityScore: null`, name "T0001 Candidate" (from the batched profiles query) and status `submitted`. The keys are unchanged from before.
+- `GET /api/jobs/applications` → **404** `{"message":"Job not found."}`: the path now falls through to `/:id`.
+- Backend stderr is empty. 0 `[DEBUG]` lines in stdout.
+- The sweep removed applications 1, jobs 1, `storage:candidates/<C>/` 1, then `--check` all 0. No `node.exe` processes are left running.
+
+**New finding:** I-0028. The `candidateInfo.email` returned by `getAllApplicants` is now `''` for candidates who have a profile row. Before, it was filled only by accident, through the N+1 fallback that the nonexistent `profiles.email` column triggered. Nothing calls the endpoint today; the merged Dashboard follow-up has to decide the source.

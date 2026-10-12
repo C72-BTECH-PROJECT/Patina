@@ -444,13 +444,11 @@ export const getAllCandidates = async (req, res) => {
 export const getAllApplicants = async (req, res) => {
   try {
     const recruiterId = req.session.userId;
-    console.log('[DEBUG] getAllApplicants recruiterId=', recruiterId);
 
     const { data: jobRows, error: jobsError } = await supabase
       .from('jobs')
       .select('id, title, location')
       .eq('recruiter_id', recruiterId);
-    console.log('[DEBUG] jobs found=', jobRows?.length, 'jobsError=', jobsError?.message);
     if (jobsError) {
       return res.status(500).json({ message: 'Failed to load jobs', error: jobsError.message });
     }
@@ -463,7 +461,6 @@ export const getAllApplicants = async (req, res) => {
       .select('id, candidate_id, job_id, status, submitted_at')
       .in('job_id', jobRows.map((j) => j.id))
       .order('submitted_at', { ascending: false });
-    console.log('[DEBUG] applications found=', applicationRows?.length, 'applicationsError=', applicationsError?.message);
 
     if (applicationsError) {
       return res.status(500).json({ message: 'Failed to load applications', error: applicationsError.message });
@@ -471,21 +468,21 @@ export const getAllApplicants = async (req, res) => {
 
     const jobsById = new Map(jobRows.map((j) => [j.id, j]));
 
+    // One query for every applicant's name. `profiles` has no email column.
+    const candidateIds = [...new Set((applicationRows || []).map((app) => app.candidate_id))];
+    const { data: profileRows, error: profilesError } = candidateIds.length
+      ? await supabase.from('profiles').select('id, first_name, last_name').in('id', candidateIds)
+      : { data: [], error: null };
+    if (profilesError) {
+      return res.status(500).json({ message: 'Failed to load applicant profiles', error: profilesError.message });
+    }
+    const profilesById = new Map((profileRows || []).map((p) => [p.id, p]));
+
     const enriched = await Promise.all((applicationRows || []).map(async (app) => {
-      let profile = null;
+      const profile = profilesById.get(app.candidate_id) || null;
       let authUser = null;
 
-      try {
-        const profileResult = await supabase
-          .from('profiles')
-          .select('first_name, last_name, email')
-          .eq('id', app.candidate_id)
-          .maybeSingle();
-        profile = profileResult.data;
-      } catch (e) {
-        profile = null;
-      }
-
+      // Only a candidate without a profile row falls back to the auth record.
       if (!profile) {
         try {
           const authResult = await supabase.auth.admin.getUserById(app.candidate_id);
@@ -499,14 +496,18 @@ export const getAllApplicants = async (req, res) => {
       const firstName = profile?.first_name || meta.first_name || '';
       const lastName = profile?.last_name || meta.last_name || '';
       const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'Candidate';
-      const email = profile?.email || authUser?.email || meta.email || '';
+      const email = authUser?.email || meta.email || '';
       const location = jobsById.get(app.job_id)?.location || '—';
 
+      // A candidate can be analysed more than once for the same job; the most
+      // recent score is the current one.
       const { data: scoreRow } = await supabase
         .from('scores')
         .select('composite_score')
         .eq('candidate_id', app.candidate_id)
         .eq('job_id', app.job_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       return {
@@ -519,7 +520,8 @@ export const getAllApplicants = async (req, res) => {
           email,
           location,
         },
-        credibilityScore: Number(scoreRow?.composite_score ?? 0),
+        // null means "not scored yet", never a score of 0.
+        credibilityScore: scoreRow ? Number(scoreRow.composite_score) : null,
         skills: [],
         status: app.status,
         applicationId: app.id,
@@ -529,7 +531,7 @@ export const getAllApplicants = async (req, res) => {
 
     return res.json(enriched);
   } catch (err) {
-    console.error('[DEBUG] getAllApplicants failed:', err);
+    console.error('getAllApplicants failed:', err);
     return res.status(500).json({ message: 'Failed to load applicants', error: String(err?.message || err) });
   }
 };

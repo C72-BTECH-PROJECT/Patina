@@ -595,6 +595,21 @@ only logged. The resulting profiles had correct username, role and names.
 
 ---
 
+### I-0028 — `/api/recruiter/applicants` returns an empty email for most applicants
+**Status:** OPEN
+**Severity:** P3 (no caller today)
+**Module:** `backend/Controllers/analysis.controller.js` (`getAllApplicants`)
+**Spec ref:** FR-14 (recruiter view), loosely
+**Evidence:**
+- **Before T-0003 (ad4f694):** the handler selected `profiles.email`, which doesn't exist. Every profile lookup failed, so every row fell back to `auth.admin.getUserById`, which supplied the email (an N+1).
+- **After R30 fix 5 (T-0003 Phase 4):** names come from one `.in()` profiles query. Only candidates without a profile row fall back to the auth record, so `candidateInfo.email` is `''` for every candidate who has a profile.
+- **Live probe:** the `t0001_cand` application row returned `email empty: True` (`tasks/T-0003-apply-integration.md`, Phase 4).
+- **Callers:** nothing calls this endpoint now. The baseline Dashboard (R38) uses `/api/candidates`, whose email comes from the parsed resume contact.
+**Impact:** None today. The merged application-centric Dashboard (score-on-apply follow-up) would show blank emails if it relies on this field.
+**Proposed fix:** Decide in the score-on-apply task where applicant email comes from: the resume contact (as `serializeCandidate` does), or one batched auth lookup. Don't reintroduce a per-row N+1.
+
+---
+
 ## Resolved
 
 ### I-0002 — SkillsSelector hardcoded, never wired (RESOLVED)
