@@ -257,6 +257,11 @@ issue when that is done and the Preview check is verified.
 
 T-0003 kept them verbatim. R19 and R33 put their idempotency in this batch.
 
+**Note (2026-10-12, after the PR #3 merge):** the Supabase check still ran on merge commit `7c83293` (PR #3, `Anthony_V2` into `main`; parents `cc0e637` and `bef8f9e`), after production auto-deploy had been disabled. `gh api repos/C72-BTECH-PROJECT/Patina/commits/7c83293/check-runs`: `Supabase Preview | supabase | completed | failure`, 08:00:45Z to 08:00:54Z, summary `ERROR: type "patina_user_role" already exists (SQLSTATE 42710) At statement: 0`, the same error as on `32905c1` and `cc0e637`.
+- What this shows: disabling production auto-deploy did not stop the Preview check; the check is a separate replay of the migrations that still collides at statement 0. Nothing was applied (the error is at statement 0), so no schema reached production.
+- What it does not show: whether the dashboard setting is really off. That is still only the owner's report. The failure is the same one as before the setting changed, so it neither confirms nor contradicts it.
+- Consequence: the check will stay red on every push and merge until the migrations are idempotent. That is the remaining work above; the "Preview check is verified" close condition is still not met.
+
 ---
 
 ### I-0012 — HEAD frontend reads `import.meta.env` under CRA; hardcoded API URLs
