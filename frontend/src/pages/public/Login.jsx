@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Building2, Zap, Eye, EyeOff, ArrowRight, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
 // Animated Input Component
 const AnimatedInput = ({ icon: Icon, label, type = 'text', value, onChange, placeholder, required }) => {

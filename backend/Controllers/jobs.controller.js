@@ -84,15 +84,33 @@ export const getJobById = async (req, res) => {
     return res.status(404).json({ message: 'Job not found.' });
   }
 
-  return res.json(formatJob(job));
+  // Candidates also learn whether they already applied, so the UI can render
+  // the job as applied instead of leaving the Apply button clickable.
+  let applied = false;
+  if (req.session?.role === 'CANDIDATE') {
+    const { data: existing } = await supabase
+      .from('applications')
+      .select('id, status, submitted_at')
+      .eq('candidate_id', req.session.userId)
+      .eq('job_id', job.id)
+      .maybeSingle();
+    applied = Boolean(existing);
+  }
+
+  return res.json({ ...formatJob(job), applied });
 };
 export const applyToJob = async (req, res) => {
   const jobId = req.params.id;
 
   // Only allow applying if the candidate has a resume in Supabase Storage.
-  const { data: resumeFiles } = await supabase.storage
+  const { data: resumeFiles, error: resumeListError } = await supabase.storage
     .from('resumes')
     .list(`candidates/${req.session.userId}`, { limit: 100 });
+  // A storage outage must not be reported as "upload your resume first".
+  if (resumeListError) {
+    console.error('Apply resume check failed:', resumeListError.message);
+    return res.status(500).json({ message: 'Could not check your resume. Please try again.' });
+  }
   const hasResume =
     Array.isArray(resumeFiles) && resumeFiles.some((f) => f.name.startsWith('resume'));
 
@@ -137,83 +155,6 @@ export const applyToJob = async (req, res) => {
   return res.status(201).json(data);
 };
 
-export const getAllApplications = async (req, res) => {
-  try {
-    const recruiterId = req.session.userId;
-
-    const { data: jobRows, error: jobsError } = await supabase
-      .from('jobs')
-      .select('id, title')
-      .eq('recruiter_id', recruiterId);
-
-    if (jobsError) {
-      return res.status(500).json({ message: 'Failed to load jobs', error: jobsError.message });
-    }
-
-    if (!jobRows?.length) {
-      return res.json([]);
-    }
-
-    const { data: applicationRows, error: applicationsError } = await supabase
-      .from('applications')
-      .select('id, candidate_id, job_id, status, submitted_at')
-      .in('job_id', jobRows.map((j) => j.id))
-      .order('submitted_at', { ascending: false });
-
-    if (applicationsError) {
-      return res.status(500).json({ message: 'Failed to load applications', error: applicationsError.message });
-    }
-
-    const jobsById = new Map(jobRows.map((j) => [j.id, j]));
-
-    const enriched = await Promise.all((applicationRows || []).map(async (app) => {
-      let profile = null;
-      let authUser = null;
-
-      try {
-        const profileResult = await supabase
-          .from('profiles')
-          .select('first_name, last_name, email')
-          .eq('id', app.candidate_id)
-          .maybeSingle();
-        profile = profileResult.data;
-      } catch (e) {
-        profile = null;
-      }
-
-      if (!profile) {
-        try {
-          const authResult = await supabase.auth.admin.getUserById(app.candidate_id);
-          authUser = authResult.data?.user;
-        } catch (e) {
-          authUser = null;
-        }
-      }
-
-      const meta = authUser?.user_metadata || authUser?.raw_user_meta_data || {};
-      const firstName = profile?.first_name || meta.first_name || '';
-      const lastName = profile?.last_name || meta.last_name || '';
-      const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'Candidate';
-      const email = profile?.email || authUser?.email || meta.email || '';
-
-      return {
-        id: app.id,
-        candidateId: app.candidate_id,
-        jobId: app.job_id,
-        jobTitle: jobsById.get(app.job_id)?.title || 'Unknown Job',
-        candidateName: fullName,
-        candidateEmail: email,
-        status: app.status,
-        appliedAt: app.submitted_at,
-      };
-    }));
-
-    return res.json(enriched);
-  } catch (err) {
-    return res.status(500).json({ message: 'Failed to load applications', error: String(err?.message || err) });
-  }
-};
-
 export const shortlistCandidate = async (req, res) => {
   const { applicationId, status } = req.body || {};
 
@@ -221,9 +162,25 @@ export const shortlistCandidate = async (req, res) => {
     return res.status(400).json({ message: 'applicationId and status are required.' });
   }
 
-  const allowed = ['shortlisted', 'rejected', 'submitted'];
+  const allowed = ['shortlisted', 'rejected'];
   if (!allowed.includes(status)) {
     return res.status(400).json({ message: 'Invalid status.' });
+  }
+
+  // The application must belong to a job this recruiter owns. A missing row and
+  // someone else's row look the same (404) so ids can't be probed.
+  const { data: owned, error: lookupError } = await supabase
+    .from('applications')
+    .select('id, job:jobs!inner(recruiter_id)')
+    .eq('id', applicationId)
+    .maybeSingle();
+
+  if (lookupError) {
+    console.error('Shortlist lookup failed:', lookupError.message);
+    return res.status(500).json({ message: 'Could not update application status.' });
+  }
+  if (!owned || owned.job?.recruiter_id !== req.session.userId) {
+    return res.status(404).json({ message: 'Application not found.' });
   }
 
   const { data, error } = await supabase

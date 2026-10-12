@@ -1,0 +1,29 @@
+{
+  "_comment": "Synthetic fixtures for T-0001. jd -> file under jds/; skills mirror what the baseline backend forwards from jobs.required_skills / preferred_skills.",
+  "jds": {
+    "dev": {
+      "file": "jds/dev.txt",
+      "required_skills": ["python", "sql", "postgresql", "docker", "git", "rest api"],
+      "preferred_skills": ["react", "redis", "aws", "kubernetes"]
+    },
+    "support": {
+      "file": "jds/support.txt",
+      "required_skills": ["sql", "linux", "bash", "servicenow", "jira", "itil"],
+      "preferred_skills": ["splunk", "nagios", "oracle", "python"]
+    }
+  },
+  "fixtures": [
+    {"id": "f1_dev_github", "file": "f1_dev_github.pdf", "jd": "dev",
+     "covers": "FR-1 PDF; single column; GitHub + LinkedIn links"},
+    {"id": "f2_dev_github", "file": "f2_dev_github.docx", "jd": "dev",
+     "covers": "FR-1 DOCX; GitHub link; Java/Node profile vs Python JD"},
+    {"id": "f3_support_nogithub", "file": "f3_support_nogithub.pdf", "jd": "support",
+     "covers": "Feedback #3 support-only, #4 no GitHub; PDF"},
+    {"id": "f4_support_nogithub", "file": "f4_support_nogithub.docx", "jd": "support",
+     "covers": "Feedback #3 support-only, #4 no GitHub; DOCX; non-standard headings"},
+    {"id": "f5_multicolumn", "file": "f5_multicolumn.pdf", "jd": "dev",
+     "covers": "Two-column layout (sidebar contact/skills)"},
+    {"id": "f6_image_only", "file": "f6_image_only.pdf", "jd": "dev",
+     "covers": "Feedback #2 OCR: image-only PDF, no text layer"}
+  ]
+}

@@ -4,11 +4,17 @@ import cors from 'cors';
 import authRoutes from './Routes/auth.routes.js';
 import jobsRoutes from './Routes/jobs.routes.js';
 import analysisRoutes from './Routes/analysis.routes.js';
-import parseRoutes from './Routes/parse.routes.js';
 import adminRoutes from './Routes/admin.routes.js';
 import notificationRoutes from './Routes/notification.routes.js';
 
 import session from 'express-session';
+
+if (!process.env.SESSION_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET environment variable must be set in production.');
+  }
+  console.warn('[WARNING] SESSION_SECRET is not set. Using an insecure default — set SESSION_SECRET in backend/.env before deploying.');
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -47,10 +53,9 @@ app.use('/api/jobs', jobsRoutes);
 // analysisRoutes defines:
 // POST /analyze
 // GET  /candidate-analysis
+// GET  /candidates
 app.use('/api', analysisRoutes);
 
-// parseRoutes defines POST / (mounted at /api/parse)
-app.use('/api/parse', parseRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 
@@ -71,7 +76,7 @@ const server = app.listen(PORT);
 server.once('listening', () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(
-    `API endpoints:\n- GET  /api/jobs\n- POST /api/jobs\n- POST /api/analyze\n- GET  /api/candidate-analysis\n- POST /api/parse`
+    `API endpoints:\n- GET  /api/jobs\n- POST /api/jobs\n- POST /api/analyze\n- GET  /api/candidate-analysis\n- GET  /api/candidates`
   );
 });
 
@@ -81,11 +86,14 @@ server.once('error', (error) => {
   } else {
     console.error('HTTP server failed:', error);
   }
-  process.exitCode = 1;
+  // A backend that can't listen is useless; exit so it never lingers as a
+  // zombie and a supervisor (or the developer) sees the failure.
+  process.exit(1);
 });
 // ---------------------------------------------------------------------------
 // Crash guards: log unhandled rejections and uncaught exceptions so the
 // process never shuts down silently and the log always explains what happened.
+// After an uncaught exception the process state is unknown, so log and exit.
 // ---------------------------------------------------------------------------
 process.on('unhandledRejection', (reason) => {
   console.error('[unhandledRejection]', reason);
@@ -94,31 +102,8 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (error) => {
   console.error('[uncaughtException]', error);
   console.error(error?.stack || '');
+  process.exit(1);
 });
-
-// ---------------------------------------------------------------------------
-// Watchdog: if the listener ever stops, log it and rebind automatically so the
-// backend heals without a manual restart. Also keeps the event loop alive,
-// which a running HTTP server needs anyway.
-// ---------------------------------------------------------------------------
-let rebindAttempts = 0;
-
-setInterval(() => {
-  if (server.listening) {
-    rebindAttempts = 0;
-    process.exitCode = 0;
-    return;
-  }
-
-  rebindAttempts += 1;
-  console.error(`[watchdog] Server not listening - rebinding on port ${PORT} (attempt ${rebindAttempts})...`);
-
-  try {
-    server.listen(PORT);
-  } catch (error) {
-    console.error('[watchdog] Rebinding failed:', error.message);
-  }
-}, 15000);
 
 // ---------------------------------------------------------------------------
 // Graceful shutdown: release the port immediately on Ctrl+C / SIGTERM so the

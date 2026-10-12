@@ -24,9 +24,11 @@ export const getOverview = async (_req, res) => {
     supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_suspended', true),
   ]);
 
+  const queryNames = ['profiles', 'jobs', 'suspended'];
   const result = [profilesResult, jobs, suspended];
-  if (result.some(({ error }) => error)) {
-    console.error('Admin overview failed:', result.find(({ error }) => error).error.message);
+  const failures = result.map((r, i) => r.error ? `[${queryNames[i]}] ${r.error.message}` : null).filter(Boolean);
+  if (failures.length > 0) {
+    failures.forEach((msg) => console.error('Admin overview query failed:', msg));
     return res.status(500).json({ message: 'Could not load dashboard metrics. Apply the latest Supabase migration first.' });
   }
 
@@ -49,6 +51,7 @@ export const getOverview = async (_req, res) => {
     users: { candidates, recruiters },
   });
 };
+
 
 export const getUsers = async (req, res) => {
   const role = String(req.query.role || '').toLowerCase();

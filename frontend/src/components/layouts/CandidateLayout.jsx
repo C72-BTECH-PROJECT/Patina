@@ -4,11 +4,11 @@ import { motion } from "framer-motion";
 import { Briefcase, LayoutDashboard, LogOut, User, Zap, Bell } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
 function CandidateLayout() {
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
+  const { logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const navItems = [
     { to: "/candidate/dashboard", icon: LayoutDashboard, label: "About" },

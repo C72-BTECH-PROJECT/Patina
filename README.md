@@ -149,9 +149,8 @@ The frontend runs at `http://localhost:3000`, the API at `http://localhost:5000`
 | `GET` | `/api/jobs` | Returns jobs from the in-memory job store. |
 | `POST` | `/api/jobs` | Creates a job in the in-memory job store. |
 | `POST` | `/api/analyze` | Sends an uploaded resume to the NLP service for the selected job. |
-| `GET` | `/api/candidate-analysis` | Returns the most recent in-memory analysis. |
-| `GET` | `/api/candidates` | Returns analyses created since the server started. |
-| `POST` | `/api/parse` | Proxies a resume and job description directly to the NLP service. |
+| `GET` | `/api/candidate-analysis` | Returns the signed-in candidate's most recent persisted analysis. |
+| `GET` | `/api/candidates` | Returns the recruiter's candidates, ranked by composite credibility score. |
 | `GET` | `/api/health` | Returns API health information. |
 
 ## Supabase and security
