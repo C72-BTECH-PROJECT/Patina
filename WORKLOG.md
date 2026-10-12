@@ -176,3 +176,14 @@ rollup per archived month at the top of this file.
 - Files changed: backend/Middlewares/auth.Middleware.js; tests/backend/live-auth-failclosed.test.mjs, tests/run-suite.ps1; tasks/T-0006; ISSUES, WORKLOG.
 - Issues logged: none new. I-0021 moved to Resolved.
 - Next: owner commits T-0006; then T-0007 (I-0022 guard; needs t0001_cand2 created first).
+
+## L-0015 · 2026-10-12 · T-0007 analysis-isolation regression guard (I-0022)
+- Prompt: T-0006 committed; continue with T-0007.
+- Task: T-0007 (complete: all 5 criteria PASS). No production code changed; no red run (I-0022 was already fixed in T-0003).
+- Done: created `t0001_cand2` (plus-alias email, admin-confirmed, password in tests/.env only); `live-analysis-isolation.test.mjs` (3 tests, real analyze via NLP);
+  added to `-Live` in run-suite.ps1; I-0022 note in ISSUES.md.
+- Verification: passes at HEAD 3/3. Detector check: filter removed temporarily → cand2 got 200 with C's email/GitHub/id; restored, controller diff empty.
+  Full harness: NLP 10/10, backend 27/27, frontend = same 5 CreateJob/Jobs CI warnings; sweep --check 0; no allAnalyses/latestAnalysis.
+- Files changed: tests/backend/live-analysis-isolation.test.mjs, tests/run-suite.ps1, tests/README.md; tasks/T-0007; ISSUES, WORKLOG.
+- Issues logged: none new.
+- Next: owner commits T-0007. Remaining from L-0011: tracker task (R40, AUDIT/CHECKLIST), score-on-apply + merged Dashboard (R9/R38, I-0028); I-0029 (bad UUID 500) is open.

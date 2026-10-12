@@ -667,6 +667,7 @@ T-0001).
 **Evidence of resolution** (verified at HEAD `5446ebe`, 2026-10-12):
 - `grep -n "allAnalyses\|latestAnalysis" backend/Controllers/analysis.controller.js` finds nothing.
 - `getCandidateAnalysis` reads `scores` filtered by `.eq('candidate_id', req.session.userId)`, which is the same as `32905c1`.
+- **Regression guard (T-0007, working tree 2026-10-12, not yet committed):** `tests/backend/live-analysis-isolation.test.mjs` runs a real analyze as `t0001_cand`, then asserts `t0001_cand2` gets 404 with none of C's id/email/GitHub in the response, C still gets their own analysis, recruiters get 403 and `t0001_recr2` (no jobs) sees `[]` applicants. It passed at HEAD (no red run exists for an already-fixed issue). Detector check: with the `.eq('candidate_id', candidateId)` filter temporarily removed, the test failed (`tests/.out/t0007-mutation.log`: cand2 received 200 with C's email, GitHub handle and id); the controller was restored and `git diff` on it is empty.
 
 ### I-0023 — Backend never exits on EADDRINUSE; swallows `uncaughtException` (RESOLVED)
 **Status:** RESOLVED T-0003: R11 applied (committed in `e9e4592`).
