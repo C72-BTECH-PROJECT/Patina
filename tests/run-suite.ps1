@@ -100,7 +100,7 @@ try {
     if ($Live) {
       $files += (Join-Path $tests 'backend\live-analyze.test.mjs')
       # Cross-user authorization tests (T-0004..T-0007); they skip if the second accounts are not in tests\.env.
-      foreach ($f in 'live-shortlist-authz', 'live-notifications-authz') {
+      foreach ($f in 'live-shortlist-authz', 'live-notifications-authz', 'live-auth-failclosed') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
     }

@@ -164,3 +164,15 @@ rollup per archived month at the top of this file.
 - Files changed: backend/Routes/notification.routes.js; tests/backend/live-notifications-authz.test.mjs, tests/run-suite.ps1; tasks/T-0005; ISSUES, WORKLOG.
 - Issues logged: none new. I-0020 moved to Resolved.
 - Next: owner commits T-0005; then T-0006 (I-0021, fail-closed requireAuth).
+
+## L-0014 · 2026-10-12 · T-0006 requireAuth fail-closed (I-0021), test-first
+- Prompt: T-0005 committed; continue with T-0006.
+- Task: T-0006 (complete: criteria 1-3, 5 PASS; 4 verified by diff only, as planned).
+- Done: `live-auth-failclosed.test.mjs` (deletes/restores t0001_recr2's profile with snapshot + upsert-in-finally + after() restore);
+  `requireAuth` now returns 401 on query error, thrown exception or missing profile.
+- Verification: red (profile deleted) → jobs/mine 200 and notifications 200; green → 401/401, 200 again after restore.
+  Crash recovery simulated: `--check` exit 1 with profile-missing:t0001_recr2: 1, `--restore-profiles` fixed it, `--check` exit 0.
+  Full harness: NLP 10/10, backend 24/24, frontend = same 5 CreateJob/Jobs CI warnings; sweep --check 0.
+- Files changed: backend/Middlewares/auth.Middleware.js; tests/backend/live-auth-failclosed.test.mjs, tests/run-suite.ps1; tasks/T-0006; ISSUES, WORKLOG.
+- Issues logged: none new. I-0021 moved to Resolved.
+- Next: owner commits T-0006; then T-0007 (I-0022 guard; needs t0001_cand2 created first).

@@ -32,7 +32,6 @@ diff you're already writing.
 | I-0015 | `ner.py` contact fields picked via `list(set(...))[0]` — nondeterministic across processes | `nlp-engine/app/ner.py` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0016 | Signup rejects one-word "Full Name" with a misleading "all fields required" message | `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0017 | Signup's explicit `profiles` insert duplicates the `on_auth_user_created` trigger and logs a pkey error on every signup | `backend/Controllers/auth.controller.js` | P3 | OPEN | 2026-10-12, T-0001 |
-| I-0021 | `requireAuth` fails open when the profile lookup errors or the profile is missing | `backend/Middlewares/auth.Middleware.js` | P0 | OPEN | 2026-10-12, T-0002 |
 | I-0025 | `multer.memoryStorage()` without `limits`: upload size is unbounded and buffered in memory | `backend/Controllers/analysis.controller.js` | P2 | OPEN | 2026-10-12, T-0002 |
 | I-0026 | Landing page's hardcoded demo score and "10000+ verified" stats read as real data | `frontend/src/pages/public/Landing.jsx` | P3 | OPEN | 2026-10-12, T-0002 |
 | I-0027 | 404 handler always says "Cannot GET", whatever the method | `backend/index.js` | P3 | OPEN | 2026-10-12, T-0003 |
@@ -362,20 +361,6 @@ only logged. The resulting profiles had correct username, role and names.
 
 ---
 
-### I-0021 — `requireAuth` fails open
-**Status:** OPEN
-**Severity:** P0 (security)
-**Module:** `backend/Middlewares/auth.Middleware.js`
-**Spec ref:** n/a
-**Evidence:**
-- **HEAD:** `auth.Middleware.js:10-28` wraps the profile query in `try/catch` and only blocks on `profile?.is_suspended`. supabase-js returns `{ error }` rather than throwing, so a query error or a missing profile lets the request through.
-- **Before:** `72451d1` and `32905c1` returned 401 on `error || !profile`.
-- Changed by `ad4f694`.
-**Impact:** During a DB or network error, and for users whose profile row was deleted, the suspension check and the profile requirement are skipped.
-**Proposed fix:** Restore the fail-closed check (INTEGRATION_REVIEW.md R35).
-
----
-
 ### I-0025 — Unbounded in-memory uploads
 **Status:** OPEN
 **Severity:** P2
@@ -441,6 +426,19 @@ only logged. The resulting profiles had correct username, role and names.
 ---
 
 ## Resolved
+
+### I-0021 — `requireAuth` fails open (RESOLVED)
+**Status:** RESOLVED T-0006: fail-closed check restored (R35).
+**Severity (at time of finding):** P0 (security)
+**Module:** `backend/Middlewares/auth.Middleware.js`
+**Spec ref:** n/a
+**Original entry:** the profile query was wrapped in `try/catch` and only `profile?.is_suspended` blocked, so a query `{ error }` or a missing profile row let the request through. Baselines `72451d1`/`32905c1` returned 401 on `error || !profile`. Changed by `ad4f694`.
+**Evidence of resolution** (working tree, 2026-10-12; not yet committed):
+- `auth.Middleware.js`: `lookupFailed` is set from `result.error` or a thrown exception; `lookupFailed || !profile` returns 401 `Session is no longer valid.` (same body as `32905c1`); the suspended branch is unchanged.
+- **Red run** (`tests/.out/t0006-red.log`): with `t0001_recr2`'s profile row deleted, `GET /api/jobs/mine` and `GET /api/notifications` returned `{"jobsMine":200,"notifications":200}`.
+- **Green run** (`tests/.out/t0006-green.log`): both 401; the same cookie returns 200 again after the row is restored.
+- **Not verified live:** the query-error and thrown-exception branches (cannot be forced); checked by diff only.
+- Full harness: NLP 10/10, backend 24/24, frontend = the same 5 CreateJob/Jobs CI warnings; `sweep.mjs --check` exit 0.
 
 ### I-0020 — `POST /api/notifications/send` allows spoofed notifications (RESOLVED)
 **Status:** RESOLVED T-0005: route deleted (R34).

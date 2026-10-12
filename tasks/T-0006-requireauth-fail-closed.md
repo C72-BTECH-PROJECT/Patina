@@ -33,4 +33,10 @@ T-0004/T-0005 live files, tier 1/2, NLP, frontend build, sweep `--check`.
 ---
 
 ## Result
-(filled at the end)
+1. PASS — red `tests/.out/t0006-red.log`: `{"jobsMine":200,"notifications":200}` with the profile deleted; green `tests/.out/t0006-green.log`: both 401.
+2. PASS — control before the delete: `GET /api/jobs/mine` 200; after the upsert restore the same cookie gives 200 again (session not destroyed by the 401).
+3. PASS — (a) `deleteTestProfile` refuses unless the username starts `t0001_` and the account has 0 jobs/applications/notifications; (b) `snapshotProfiles` writes `tests/.out/t0001-profile-snapshots.json` first; (c) restore is an upsert in `finally`, asserted afterwards, and again in `after()`; (d) simulated crash: deleted the R2 row, then `sweep.mjs --check` printed `profile-missing:t0001_recr2: 1` and exited 1; `sweep.mjs --restore-profiles` restored `[t0001_cand, t0001_recr, t0001_recr2]`; `--check` then exited 0.
+4. NOT VERIFIED LIVE (as planned) — the `result.error` and thrown-exception branches are covered by reading the diff only.
+5. PASS — `tests/.out/t0006-full-harness.log`: NLP 10/10, backend 24/24, frontend CI build exits 1 on the same 5 CreateJob/Jobs warnings; `sweep.mjs --check` exit 0 with `profile-missing:*` all 0.
+
+Production change: `auth.Middleware.js` only.
