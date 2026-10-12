@@ -7,40 +7,34 @@
     "email": "arjun.mehta@example.com",
     "experience": [
       {
-        "type": "date",
-        "value": "98765 01234"
+        "dates": "Aug 2021 – Present",
+        "highlights": [],
+        "organisation": "Contoso Retail Tech ()",
+        "title": "Senior Developer"
       },
       {
-        "type": "date",
-        "value": "4 years"
+        "dates": null,
+        "highlights": [],
+        "organisation": null,
+        "title": "Split a monolith into six Spring Boot microservices on Kubernetes."
       },
       {
-        "type": "date",
-        "value": "2021"
+        "dates": null,
+        "highlights": [],
+        "organisation": null,
+        "title": "Owned the order service: 99.95% availability over 12 months."
       },
       {
-        "type": "date",
-        "value": "over 12 months"
+        "dates": "Jul 2019 – Jul 2021",
+        "highlights": [],
+        "organisation": "Fabrikam Software ()",
+        "title": "Developer"
       },
       {
-        "type": "organisation",
-        "value": "Developer - Fabrikam Software"
-      },
-      {
-        "type": "date",
-        "value": "2021"
-      },
-      {
-        "type": "organisation",
-        "value": "Built Express"
-      },
-      {
-        "type": "organisation",
-        "value": "Information Technology - Example University of Pune"
-      },
-      {
-        "type": "date",
-        "value": "2015 - 2019"
+        "dates": null,
+        "highlights": [],
+        "organisation": null,
+        "title": "Built Express APIs backed by MongoDB for a logistics dashboard."
       }
     ],
     "github": "github.com/example-arjunm",
@@ -106,44 +100,41 @@
   },
   "raw_text_preview": "Arjun Mehta\narjun.mehta@example.com | +91 98765 01234 | Pune, India\ngithub.com/example-arjunm\nSummary\nJava and Node.js developer with 4 years in product companies.\nTechnical Skills\nJava, Spring Boot, Node.js, Express, MongoDB, MySQL, Kubernetes,\nDocker, Git, Jenkins, Microservices\nWork Experience\nSe",
   "semantic_analysis": {
-    "focused_score": 0.659,
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
+    "focused_score": 0.6664,
     "full_text_score": 0.4616,
     "jd_embedding_size": 384,
     "jd_skills": [
       "python",
-      "javascript",
-      "react",
-      "django",
-      "fastapi",
+      "sql",
       "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react",
       "redis",
       "aws",
-      "docker",
-      "kubernetes",
-      "git",
-      "sql",
-      "rest",
-      "api"
+      "kubernetes"
     ],
+    "jd_source": "structured_skills",
     "match_level": "Weak Match",
-    "match_reason": "Matched 5 of 14 recognised job skills; missing: python, react, django, fastapi, postgresql, redis, aws, sql, rest.",
+    "match_reason": "Matched 4 of 10 job skills (from the role's listed required/preferred skills); missing: python, sql, postgresql, react, redis, aws.",
     "matched_skills": [
-      "javascript",
       "docker",
-      "kubernetes",
       "git",
-      "api"
+      "rest api",
+      "kubernetes"
     ],
     "missing_skills": [
       "python",
-      "react",
-      "django",
-      "fastapi",
-      "postgresql",
-      "redis",
-      "aws",
       "sql",
-      "rest"
+      "postgresql",
+      "react",
+      "redis",
+      "aws"
     ],
     "resume_embedding_size": 384,
     "resume_skills": [
@@ -160,11 +151,11 @@
       "git",
       "github",
       "microservices",
-      "api"
+      "rest api"
     ],
-    "semantic_score": 0.5899,
-    "similarity_score": 0.4502,
-    "skill_coverage": 0.3571
+    "semantic_score": 0.5947,
+    "similarity_score": 0.4779,
+    "skill_coverage": 0.4
   },
   "status": "success"
 }

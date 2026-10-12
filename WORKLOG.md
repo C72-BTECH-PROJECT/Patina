@@ -98,3 +98,14 @@ rollup per archived month at the top of this file.
 - Files changed: INTEGRATION_REVIEW.md, WORKLOG.md (mod).
 - Issues logged: none.
 - Next: write task specs (T-apply, security, tracker, score-on-apply) for approval; then apply per §9.
+
+## L-0008 · 2026-10-12 · T-0003 spec + Phase 1 (revert 314e494, hand-merge 4 backend files)
+- Prompt: write the T-0003 apply-integration spec (+ owner criteria 10/11), then apply phase by phase, stopping after each.
+- Task: T-0003 (Phase 1 done; Phases 3–4 and close-out pending owner review).
+- Done: `git revert --no-commit 314e494` → `git reset -q` (nothing staged). Dashboard = 32905c1 + 04835ca loader.
+  supabase.js restored; supabaseAuth lazy getter; auth.controller = baseline + R6 client swap; analysis.controller = baseline + HEAD storage handlers/getAllApplicants verbatim (197+/0-).
+- Verification: NLP 10/10, f1–f6 + 3 private hashes = baseline; tier 1 7/7; **tier 2 PASS** (was 500); sweep 0 before/after;
+  CI build 6 warnings (5 baseline + CandidateLayout:11, due in Phase 4); I-0018 probes 404/400; R6 no-anon-key probe 500 JSON, server up; npm ls OK.
+- Files changed: 44 (38 tracked + 6 restored untracked), ISSUES.md, WORKLOG.md; new tasks/T-0003-apply-integration.md.
+- Issues logged: I-0027 (404 handler always says "GET"). Issue statuses are updated at close-out.
+- Next: owner reviews + commits Phase 1; then Phase 3 (§9 step 4: R7, R10, R11).

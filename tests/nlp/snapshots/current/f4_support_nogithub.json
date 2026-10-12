@@ -7,44 +7,31 @@
     "email": "samuel.adeyemi@example.com",
     "experience": [
       {
-        "type": "organisation",
-        "value": "Keeps"
+        "dates": "May 2020 – Present",
+        "highlights": [],
+        "organisation": "Litware Billing ()",
+        "title": "Production Support Engineer"
       },
       {
-        "type": "organisation",
-        "value": "PL/SQL"
+        "dates": null,
+        "highlights": [
+          "Automated nightly health checks in Python and Splunk alerts.",
+          "Led 20+ root-cause analyses; reduced repeat incidents by 40%."
+        ],
+        "organisation": null,
+        "title": "Primary on-call for a 15-year-old Oracle billing platform."
       },
       {
-        "type": "organisation",
-        "value": "Shell Scripting"
+        "dates": "Jun 2017 – Apr 2020",
+        "highlights": [],
+        "organisation": "Adventure Works IT ()",
+        "title": "Maintenance Engineer"
       },
       {
-        "type": "organisation",
-        "value": "Root Cause Analysis"
-      },
-      {
-        "type": "date",
-        "value": "May 2020 - Present"
-      },
-      {
-        "type": "date",
-        "value": "15-year-old"
-      },
-      {
-        "type": "date",
-        "value": "2017"
-      },
-      {
-        "type": "date",
-        "value": "2020"
-      },
-      {
-        "type": "organisation",
-        "value": "Computing - Example College Leeds"
-      },
-      {
-        "type": "date",
-        "value": "2015 - 2017"
+        "dates": null,
+        "highlights": [],
+        "organisation": null,
+        "title": "Patched and maintained PL/SQL batch jobs and shell scripts."
       }
     ],
     "github": null,
@@ -102,26 +89,41 @@
   },
   "raw_text_preview": "Samuel Adeyemi\nsamuel.adeyemi@example.com | +44 7700 900123 | Leeds, UK\nProfile\nProduction support and maintenance engineer. Keeps legacy\nbilling systems running; most work is internal and not on GitHub.\nCore Skills\nSQL, Oracle, PL/SQL, Shell Scripting, Python, Splunk,\nAWS CloudWatch, Jenkins, Root ",
   "semantic_analysis": {
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
     "focused_score": 0.6231,
     "full_text_score": 0.6671,
     "jd_embedding_size": 384,
     "jd_skills": [
-      "python",
-      "bash",
-      "oracle",
+      "sql",
       "linux",
-      "sql"
-    ],
-    "match_level": "Moderate Match",
-    "match_reason": "Matched 3 of 5 recognised job skills; missing: bash, linux.",
-    "matched_skills": [
-      "python",
+      "bash",
+      "servicenow",
+      "jira",
+      "itil",
+      "splunk",
+      "nagios",
       "oracle",
-      "sql"
+      "python"
+    ],
+    "jd_source": "structured_skills",
+    "match_level": "Weak Match",
+    "match_reason": "Matched 3 of 10 job skills (from the role's listed required/preferred skills); missing: linux, bash, servicenow, jira, itil, splunk, nagios.",
+    "matched_skills": [
+      "sql",
+      "oracle",
+      "python"
     ],
     "missing_skills": [
+      "linux",
       "bash",
-      "linux"
+      "servicenow",
+      "jira",
+      "itil",
+      "splunk",
+      "nagios"
     ],
     "resume_embedding_size": 384,
     "resume_skills": [
@@ -133,8 +135,8 @@
       "sql"
     ],
     "semantic_score": 0.6385,
-    "similarity_score": 0.6154,
-    "skill_coverage": 0.6
+    "similarity_score": 0.4354,
+    "skill_coverage": 0.3
   },
   "status": "success"
 }

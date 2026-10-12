@@ -2,53 +2,33 @@
   "entities": {
     "candidate_name": null,
     "education": [
-      "Software Engineering Intern - Bluebird Analytics (Jan 2022 - May 2022)",
       "B.Tech in Computer Science - Example Institute of Technology (2018 - 2022)"
     ],
     "email": "maya.okafor@example.com",
     "experience": [
       {
-        "type": "organisation",
-        "value": "TX"
+        "dates": "Jun 2022 – Present",
+        "highlights": [
+          "Built REST APIs in Django and FastAPI serving 40k daily users.",
+          "Cut p95 latency by 35% by adding Redis caching and query indexes.",
+          "Containerised services with Docker and deployed to AWS ECS."
+        ],
+        "organisation": "Northwind Labs ()",
+        "title": "Software Engineer"
       },
       {
-        "type": "date",
-        "value": "3 years"
-      },
-      {
-        "type": "organisation",
-        "value": "ECS"
-      },
-      {
-        "type": "organisation",
-        "value": "Software Engineering Intern - Bluebird Analytics"
-      },
-      {
-        "type": "date",
-        "value": "Jan 2022 - May 2022"
-      },
-      {
-        "type": "organisation",
-        "value": "QueueBench"
-      },
-      {
-        "type": "organisation",
-        "value": "Computer Science - Example Institute of Technology"
-      },
-      {
-        "type": "date",
-        "value": "2018 - 2022"
+        "dates": "Jan 2022 – May 2022",
+        "highlights": [
+          "Wrote ETL jobs in Python and SQL for the reporting warehouse."
+        ],
+        "organisation": "Software Engineering Intern",
+        "title": "Bluebird Analytics ()"
       }
     ],
     "github": "github.com/example-mokafor",
     "linkedin": "linkedin.com/in/example-maya-okafor",
     "phone": "+15550104477",
-    "projects": [
-      {
-        "description": "github.com/example-mokafor/ledgerly QueueBench - load-testing harness for job queues (Python, Redis)",
-        "title": "Ledgerly - personal finance tracker (React, FastAPI, PostgreSQL)"
-      }
-    ],
+    "projects": [],
     "skill_count": 15,
     "skills": [
       "python",
@@ -109,41 +89,38 @@
   },
   "raw_text_preview": "Maya Okafor\nmaya.okafor@example.com | +1 555 010 4477 | Austin, TX\ngithub.com/example-mokafor | linkedin.com/in/example-maya-okafor\nSUMMARY\nBackend-leaning software engineer with 3 years of experience building\nPython web services and React front ends.\nSKILLS\nPython, Django, FastAPI, React, JavaScrip",
   "semantic_analysis": {
-    "focused_score": 0.7812,
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
+    "focused_score": 0.7765,
     "full_text_score": 0.7605,
     "jd_embedding_size": 384,
     "jd_skills": [
       "python",
-      "javascript",
-      "react",
-      "django",
-      "fastapi",
+      "sql",
       "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react",
       "redis",
       "aws",
-      "docker",
-      "kubernetes",
-      "git",
-      "sql",
-      "rest",
-      "api"
+      "kubernetes"
     ],
+    "jd_source": "structured_skills",
     "match_level": "Strong Match",
-    "match_reason": "Matched 13 of 14 recognised job skills; missing: kubernetes.",
+    "match_reason": "Matched 9 of 10 job skills (from the role's listed required/preferred skills); missing: kubernetes.",
     "matched_skills": [
       "python",
-      "javascript",
-      "react",
-      "django",
-      "fastapi",
+      "sql",
       "postgresql",
-      "redis",
-      "aws",
       "docker",
       "git",
-      "sql",
-      "rest",
-      "api"
+      "rest api",
+      "react",
+      "redis",
+      "aws"
     ],
     "missing_skills": [
       "kubernetes"
@@ -163,12 +140,11 @@
       "github",
       "sql",
       "pytest",
-      "rest",
-      "api"
+      "rest api"
     ],
-    "semantic_score": 0.774,
-    "similarity_score": 0.8668,
-    "skill_coverage": 0.9286
+    "semantic_score": 0.7709,
+    "similarity_score": 0.8484,
+    "skill_coverage": 0.9
   },
   "status": "success"
 }

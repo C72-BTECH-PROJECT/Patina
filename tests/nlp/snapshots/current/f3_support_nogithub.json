@@ -7,56 +7,22 @@
     "email": "lena.fischer@example.com",
     "experience": [
       {
-        "type": "date",
-        "value": "5550 1234"
+        "dates": "Mar 2021 – Present",
+        "highlights": [
+          "Resolved 600+ L2 tickets with a 96% SLA hit rate.",
+          "Wrote Bash and SQL runbooks that cut mean time to resolve by 30%.",
+          "Ran monthly patching for 120 Linux and Windows servers."
+        ],
+        "organisation": "Tailspin Logistics ()",
+        "title": "Application Support Engineer"
       },
       {
-        "type": "organisation",
-        "value": "ServiceNow"
-      },
-      {
-        "type": "organisation",
-        "value": "Nagios"
-      },
-      {
-        "type": "organisation",
-        "value": "Active Directory, Incident Management"
-      },
-      {
-        "type": "date",
-        "value": "2021"
-      },
-      {
-        "type": "date",
-        "value": "monthly"
-      },
-      {
-        "type": "organisation",
-        "value": "Windows"
-      },
-      {
-        "type": "organisation",
-        "value": "Woodgrove Bank"
-      },
-      {
-        "type": "date",
-        "value": "Jan 2019 - Feb 2021"
-      },
-      {
-        "type": "organisation",
-        "value": "ITIL 4 Foundation"
-      },
-      {
-        "type": "date",
-        "value": "2021"
-      },
-      {
-        "type": "organisation",
-        "value": "Information Systems - Example University"
-      },
-      {
-        "type": "date",
-        "value": "2015 - 2018"
+        "dates": "Jan 2019 – Feb 2021",
+        "highlights": [
+          "First-line support for 800 staff; managed Active Directory accounts."
+        ],
+        "organisation": "Woodgrove Bank ()",
+        "title": "IT Helpdesk Analyst"
       }
     ],
     "github": null,
@@ -111,26 +77,41 @@
   },
   "raw_text_preview": "Lena Fischer\nlena.fischer@example.com | +49 151 5550 1234 | Hamburg, Germany\nSUMMARY\nIT support engineer focused on incident management and keeping\nproduction systems healthy. No public code portfolio.\nSKILLS\nLinux, Windows Server, SQL, Bash, ServiceNow, Jira, ITIL,\nNagios, Active Directory, Inciden",
   "semantic_analysis": {
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
     "focused_score": 0.5914,
     "full_text_score": 0.572,
     "jd_embedding_size": 384,
     "jd_skills": [
-      "python",
+      "sql",
+      "linux",
       "bash",
+      "servicenow",
+      "jira",
+      "itil",
+      "splunk",
+      "nagios",
       "oracle",
-      "linux",
-      "sql"
+      "python"
     ],
-    "match_level": "Moderate Match",
-    "match_reason": "Matched 3 of 5 recognised job skills; missing: python, oracle.",
+    "jd_source": "structured_skills",
+    "match_level": "Weak Match",
+    "match_reason": "Matched 3 of 10 job skills (from the role's listed required/preferred skills); missing: servicenow, jira, itil, splunk, nagios, oracle, python.",
     "matched_skills": [
-      "bash",
+      "sql",
       "linux",
-      "sql"
+      "bash"
     ],
     "missing_skills": [
-      "python",
-      "oracle"
+      "servicenow",
+      "jira",
+      "itil",
+      "splunk",
+      "nagios",
+      "oracle",
+      "python"
     ],
     "resume_embedding_size": 384,
     "resume_skills": [
@@ -139,8 +120,8 @@
       "sql"
     ],
     "semantic_score": 0.5846,
-    "similarity_score": 0.5938,
-    "skill_coverage": 0.6
+    "similarity_score": 0.4138,
+    "skill_coverage": 0.3
   },
   "status": "success"
 }

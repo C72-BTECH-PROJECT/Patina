@@ -582,6 +582,19 @@ only logged. The resulting profiles had correct username, role and names.
 
 ---
 
+### I-0027 — 404 handler always says "Cannot GET", whatever the method
+**Status:** OPEN
+**Severity:** P3 (misleading message only)
+**Module:** `backend/index.js`
+**Spec ref:** n/a
+**Evidence:** `index.js:68` (`:66@32905c1`, the same line) returns
+`{ message: \`Cannot GET ${req.url}\` }` for every unmatched route. Found by the T-0003 probe:
+`POST /api/auth/update-password` → `404 {"message":"Cannot GET /api/auth/update-password"}`.
+**Impact:** A POST/PUT/DELETE to a missing route reports "GET", which misleads anyone debugging.
+**Proposed fix:** Use `` `Cannot ${req.method} ${req.originalUrl}` ``. Not fixed in T-0003 (no row covers it).
+
+---
+
 ## Resolved
 
 ### I-0002 — SkillsSelector hardcoded, never wired (RESOLVED)
