@@ -35,9 +35,10 @@ nlp-engine\venv\Scripts\python tests\fixtures\make_fixtures.py
 ## Running
 
 ```powershell
-powershell -File tests\run-suite.ps1 -Target baseline                 # nlp + backend tier 1 + frontend build
+powershell -File tests\run-suite.ps1 -Target baseline                 # nlp + backend tier 1 + frontend build + docs
 powershell -File tests\run-suite.ps1 -Target baseline -Suites nlp
 powershell -File tests\run-suite.ps1 -Target baseline -Suites backend -Live   # + tier 2 (writes to Supabase)
+powershell -File tests\run-suite.ps1 -Target current -Suites docs           # CHECKLIST/AUDIT/CLAUDE.md drift check (T-0008), no services
 ```
 
 The script starts NLP (`PYTHONHASHSEED=0`, HF offline) and the backend from

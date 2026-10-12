@@ -15,11 +15,13 @@
   current  = this repo, ports NLP 8000 / backend 5000 (HEAD hardcodes both).
   -Live adds tests\backend\live-analyze.test.mjs, which writes to the shared
   Supabase project (scoped to the t0001_ test accounts; see tests\README.md).
+  docs     = tests\docs\check-trackers.mjs (T-0008): CHECKLIST/AUDIT/CLAUDE.md drift check.
+             Read-only, starts no services, always checks the current repo's files.
   Logs go to tests\.out\ (git-ignored).
 #>
 param(
   [Parameter(Mandatory = $true)][ValidateSet('baseline', 'current')][string]$Target,
-  [ValidateSet('nlp', 'backend', 'frontend')][string[]]$Suites = @('nlp', 'backend', 'frontend'),
+  [ValidateSet('nlp', 'backend', 'frontend', 'docs')][string[]]$Suites = @('nlp', 'backend', 'frontend', 'docs'),
   [switch]$Live
 )
 
@@ -106,6 +108,14 @@ try {
     }
     & node --test --test-concurrency=1 @files 2>&1 | Tee-Object (Join-Path $out "$Target-backend-tests.log")
     $results['backend'] = $LASTEXITCODE
+  }
+
+  if ($Suites -contains 'docs') {
+    Write-Host "== docs suite (tracker drift check)"
+    # cmd.exe merges stderr so PowerShell 5.1 does not raise NativeCommandError on the script's problem list.
+    $docsScript = Join-Path $tests 'docs\check-trackers.mjs'
+    & cmd.exe /c "node `"$docsScript`" 2>&1" | Tee-Object (Join-Path $out "$Target-docs.log")
+    $results['docs'] = $LASTEXITCODE
   }
 
   if ($Suites -contains 'frontend') {

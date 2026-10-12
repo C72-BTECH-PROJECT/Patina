@@ -1,16 +1,21 @@
 # AI-Automated Skill Validation and Credibility Framework — Project Memory
 
 Read this file at the start of every session. It contains only stable facts
-about the project — not feature status. For "what should exist," read
-IDEAL_CHECKLIST.md. For "what actually exists and its real condition," read
-AUDIT.md. Neither of those files exists yet on a first run; if they don't
-exist, say so and stop rather than guessing.
+about the project — not feature status.
 
-Do NOT treat project_checklist.md as accurate. It reflects what the team
-*thinks* is done, not a verified state — checked boxes there are not
-evidence of correct or complete implementation. Use it only as a rough
-pointer to which files/areas relate to which features, never as a
-correctness signal.
+## Source of truth (one file per question)
+- **What should exist:** `CHECKLIST.md` (root). Spec-derived item list with
+  ids (0.1 ... 6.8, `GF-n`, `GR-n`). The only place item ids are defined.
+- **What actually exists and its real condition:** `AUDIT.md` (root). One row
+  per CHECKLIST id: status, evidence, spec id, delivered-by task/commit.
+- **A status of DONE_CORRECTLY needs `file:line` evidence plus a test name or
+  harness result.** Same bar for every author. Code read at HEAD but with no
+  test is `CODE_REVIEWED_UNTESTED` (the row names the test that would promote it);
+  a claim nobody has checked is `CLAIMED_UNVERIFIED`. `node tests/docs/check-trackers.mjs` (the `docs`
+  suite of `tests/run-suite.ps1`) enforces this; run it after editing either file.
+- `Docs/archive/project_checklist.md` and `Docs/archive/IMPLEMENTATION-TRACKER.md`
+  are archived team self-reports (T-0008). Do NOT treat them as accurate:
+  checked boxes there are not evidence. They are history, not a pointer.
 
 ## What this project is
 Replaces keyword-based ATS with a multi-layer pipeline: resume parsing (NLP)
@@ -29,16 +34,24 @@ Full spec: PROJECT_SOURCE_DOCS.md.
 - External APIs: GitHub API, an LLM provider (OpenAI/Gemini)
 
 ## Known guide feedback (must eventually be reflected somewhere in the plan)
+Numbered 1-5 here = `GF-1`..`GF-5` in CHECKLIST.md/AUDIT.md.
 1. LinkedIn + certificate validation
 2. OCR is a must
 3. Fair scoring for support/maintenance-only candidates, not just development
 4. GitHub must be optional
 5. Score explainability is crucial
 
+Guide-review items, owner-reported (no written source in the repo):
+- `GR-1` (guide review, Sep 2026): before the LLM/PFQS assessment module is
+  built, design a mechanism that prevents candidates from cheating on it.
+- `GR-2` (guide feedback, Oct 2026): identify the API gateway and verify the
+  system actually follows the microservices architecture claimed in the SRS;
+  fix it if it doesn't. Unverified until the architecture-audit task.
+
 ## Working agreements for this repo
 - Never mark something as done, correct, or complete without actually
-  reading the relevant code first. "It's checked in project_checklist.md"
-  is not sufficient evidence.
+  reading the relevant code first. A checked box in any team checklist
+  (including the archived ones) is not sufficient evidence.
 - When auditing or building, use a subagent for file-reading/grepping across
   many files so the main session context only receives a summary, not raw
   file contents.

@@ -26,7 +26,6 @@ diff you're already writing.
 | I-0004 | AI-cruft / hallucinated entries in `SKILL_KEYWORDS` | `nlp-engine/app/ner.py` | P3 | OPEN | pre-WORKLOG (after an NLP fix, exact date not recorded) |
 | I-0005 | `Assessment.jsx` unrouted, no backend, silently serves mock data | `frontend/src/pages/candidate/Assessment.jsx` | P1 | OPEN | pre-WORKLOG (after an NLP fix, exact date not recorded) |
 | I-0006 | Upload.jsx: neither Choose-File nor drag-drop validates file type on selection, only at submit | `frontend/src/pages/candidate/Upload.jsx` | P2 | OPEN | 2026-10-12, L-0001 |
-| I-0008 | `Docs/IMPLEMENTATION-TRACKER.md` Firestore/MongoDB sections are stale doc drift | `Docs/IMPLEMENTATION-TRACKER.md` | P2 | OPEN | 2026-10-12, L-0001 |
 | I-0010 | Supabase Preview check fails on `main`; fixing it naively turns on auto-apply of migrations to production — **decision needed** | `supabase/migrations/`, Supabase GitHub integration | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0012 | HEAD frontend reads `import.meta.env.VITE_*` under CRA; 5 pages hardcode `localhost:5000` | `frontend/src/**` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0015 | `ner.py` contact fields picked via `list(set(...))[0]` — nondeterministic across processes | `nlp-engine/app/ner.py` | P1 | OPEN | 2026-10-12, T-0001 |
@@ -37,6 +36,10 @@ diff you're already writing.
 | I-0027 | 404 handler always says "Cannot GET", whatever the method | `backend/index.js` | P3 | OPEN | 2026-10-12, T-0003 |
 | I-0028 | `/api/recruiter/applicants` returns an empty email for applicants who have a profile | `backend/Controllers/analysis.controller.js` | P3 | OPEN | 2026-10-12, T-0003 |
 | I-0029 | `shortlistCandidate` returns 500 (not 400/404) for a malformed, non-UUID `applicationId` | `backend/Controllers/jobs.controller.js` | P3 | OPEN | 2026-10-12, T-0004 |
+| I-0030 | `CODE_MAP.md` describes the pre-T-0003 flow (Upload -> `/api/analyze`); no mention of upload/apply/applicants routes | `CODE_MAP.md` | P2 | OPEN | 2026-10-12, T-0008 |
+| I-0031 | `REVIEW_BRIEF.md` rests on CODE_MAP/old AUDIT claims and predates the upload-once/apply flow | `REVIEW_BRIEF.md` | P2 | OPEN | 2026-10-12, T-0008 |
+| I-0032 | `README.md` says tables are pending and jobs are in-memory (both false); API and env tables incomplete | `README.md` | P2 | OPEN | 2026-10-12, T-0008 |
+| I-0033 | `PROJECT_SOURCE_DOCS.md` names MongoDB as the data layer; the code uses Supabase | `PROJECT_SOURCE_DOCS.md` | P3 | OPEN | 2026-10-12, T-0008 |
 
 ---
 
@@ -67,6 +70,7 @@ management API in a migration script).
 - **Never in any migration:** the MIME allow-list and the 10 MB cap.
 - **Live check:** read-only bucket listing on 2026-10-12: `resumes` is private, `allowed_mime_types` = pdf + docx.
 - See INTEGRATION_REVIEW.md R19 and §7.
+**Note (2026-10-12, T-0008):** partly stale at HEAD `2e87d44`. The bucket insert is back in `supabase/migrations/20260903_create_resumes_and_scores.sql:14-16` (restored by `a7c74e4`). What is still missing from any migration is the MIME allow-list and the 10 MB cap. Left OPEN for that; not re-verified against the live project.
 **Note (2026-10-12, T-0003): still OPEN.**
 - **The bucket insert is back:** the restored `20260903_create_resumes_and_scores.sql:14` has `insert into storage.buckets (id, name, public)` (committed in `a7c74e4`, R19).
 - **Still in no migration:** the MIME allow-list (pdf/docx) and the 10 MB size cap. A fresh environment gets a bucket without them.
@@ -147,64 +151,6 @@ issue (validation does still happen before any upload call is made).
 `Upload.jsx` was rewritten (commit `71c632d`, 2026-09-03) into a different
 flow where the original asymmetric-validation bug no longer exists, but this
 new, related gap was found in its place.
-
----
-
-### I-0008 — `Docs/IMPLEMENTATION-TRACKER.md` Firestore/MongoDB sections are stale doc drift
-**Status:** OPEN
-**Severity:** P2
-**Module:** `Docs/IMPLEMENTATION-TRACKER.md`
-**Spec ref:** n/a (documentation accuracy, not a feature)
-**Evidence (verified 2026-10-12 per user request before filing):**
-- Repo-wide case-insensitive grep for `firebase|firestore` across all
-  `.js/.jsx/.json/.py/.env*/.txt/.md` files (excluding `node_modules`,
-  `venv`, `.git`) found **zero** Firebase/Firestore dependencies or
-  integration code anywhere. The only hit outside the tracker doc itself is
-  `nlp-engine/app/ner.py:19`, where `"firebase"` is just a generic string in
-  the `SKILL_KEYWORDS` list (for matching it on resumes) — not a project
-  dependency.
-- `git log -S "Firestore" -- Docs/IMPLEMENTATION-TRACKER.md` resolves to a
-  single commit, `ad4f694` ("merge: integrate Aaron, Anthony, and
-  aditya-ui-work into main") — a merge commit. The file has no prior history
-  on either merge parent in this branch's log, so the exact original
-  authoring commit isn't resolvable from current history; it entered `main`
-  as part of that three-way branch integration.
-- Per CLAUDE.md, Supabase is the authoritative DB (the SRS originally
-  specified MongoDB; Supabase was the actual implementation choice) — so the
-  tracker's "Database (Document): Firebase Firestore" row and the
-  MongoDB-to-Supabase-"+Firestore" migration section (lines 17, 60-118,
-  165-169, 180-182, 249) describe a plan that was never implemented and
-  isn't the current direction.
-- Cross-check of the Firestore collections the tracker names against actual
-  Supabase tables (`supabase/migrations/*.sql`):
-  | Tracker concept | Actual Supabase equivalent |
-  |---|---|
-  | `users` | `auth.users` (Supabase Auth) + `public.profiles` |
-  | `audit_logs` | **missing** — no migration |
-  | `job_descriptions` | `public.jobs` (relational, not document — same data shape, different storage model) |
-  | `parsed_profiles` | **missing** — no table for NLP output (skills/experience/education/projects/noun_chunks/similarity_score) |
-  | `github_metrics` | **missing** |
-  | `assessments` | **missing** (`public.applications` has a status enum only, no assessment data; see I-0005) |
-  | `credibility_scores` | partially exists as an undocumented `public.scores` table — see [I-0007](#i-0007--scores-table-referenced-by-backend-but-not-in-any-migration) |
-**Impact:** Low direct runtime impact (no code depends on this doc), but it
-risks misleading anyone writing a task spec who cites this section as the
-current DB plan, and it's the apparent source of the `credibility_scores`
-naming that doesn't match the real `scores` table.
-**Note (2026-10-12, L-0005) — `PROJECT_SOURCE_DOCS.md` (restored verbatim from
-`32905c1`) also disagrees with the code, left unedited on purpose:** line 106
-says "Data (MongoDB, though implementation has moved to Supabase — ..." and
-the spec's database wording is MongoDB-based while the code uses Supabase
-(Firestore appears only in `Docs/IMPLEMENTATION-TRACKER.md`, not in the spec —
-grep of the spec finds no `firestore`/`firebase`). Any reconciliation of the
-spec's MongoDB references belongs in the same tracker-reconciliation task.
-**Proposed fix:** Out of scope for this session (documentation-only setup
-task, not a tracker reconciliation). Leave the tracker as-is until a
-dedicated tracker-reconciliation task; this entry exists so the drift is
-visible before anyone cites that section as current.
-**Note (2026-10-12, T-0002):** inputs for the tracker task are in INTEGRATION_REVIEW.md §8 and row R40:
-- **Missing docs:** CHECKLIST / AUDIT / `Docs/project_checklist.md` are missing at HEAD (deleted by `314e494`).
-- **Wrong claims:** the tracker also claims "MongoDB models", "Custom NER" and recruiter charts/alerts are done (`:44,50,31`).
-- **Name mismatch:** CLAUDE.md's doc names don't match the repo's.
 
 ---
 
@@ -430,7 +376,125 @@ only logged. The resulting profiles had correct username, role and names.
 
 ---
 
+### I-0030 — `CODE_MAP.md` describes the pre-T-0003 flow
+**Status:** OPEN
+**Severity:** P2
+**Module:** `CODE_MAP.md`
+**Spec ref:** n/a (documentation accuracy)
+**Evidence (re-checked at HEAD `2e87d44`, 2026-10-12):**
+- `CODE_MAP.md:10` says "Upload → /api/analyze → FastAPI /parse → explainability.js → Supabase → dashboards". At HEAD the Upload page only calls `/api/resume/upload` (`frontend/src/pages/candidate/Upload.jsx:157`, which stores the file and parses nothing); Apply only inserts an `applications` row (`backend/Controllers/jobs.controller.js:102-146`); `/api/analyze` has no reachable caller (AUDIT 5.14).
+- `CODE_MAP.md:386` documents `Processing.jsx` as reached from Upload with `location.state.{file, jobId}`; nothing navigates to it any more.
+- `grep -c` for `resume/upload`, `/apply`, `recruiter/applicants`, `notifications` finds 0 matches in `CODE_MAP.md` (`shortlist`: 1). These routes exist at HEAD.
+- Its facts about the restored NLP and scoring code (`explainability.js`, `split_sections`, `jd_source`) are accurate again after T-0003. Earlier note: I-0002.
+**Impact:** Someone using it to find the scoring entry point is sent down a path the app no longer takes.
+**Proposed fix:** Regenerate against HEAD after score-on-apply (5.14) lands, so it is written once. Not edited in T-0008 (list only).
+
+---
+
+### I-0031 — `REVIEW_BRIEF.md` is built on stale claims
+**Status:** OPEN
+**Severity:** P2
+**Module:** `REVIEW_BRIEF.md`
+**Spec ref:** n/a (documentation accuracy)
+**Evidence (re-checked at HEAD `2e87d44`, 2026-10-12):**
+- It says every claim traces to `AUDIT.md` or `CODE_MAP.md` (INTEGRATION_REVIEW §8). `AUDIT.md` was rewritten in T-0008 (rows it would cite changed; see the status-change report in T-0008's Result) and `CODE_MAP.md` is stale (I-0030).
+- `grep -c` for `resume/upload`, `/apply`, `recruiter/applicants`, `notifications` finds 0 matches.
+- `REVIEW_BRIEF.md:330-334` answers "why Supabase, not MongoDB" correctly; `:604` still describes removing Mongoose models, which is done.
+**Impact:** A guide-review brief that overstates what works (for example that dashboards show scored candidates from the upload flow).
+**Proposed fix:** Rewrite from the new `AUDIT.md` before the next guide review. Not edited in T-0008 (list only).
+
+---
+
+### I-0032 — `README.md` describes an older state
+**Status:** OPEN
+**Severity:** P2
+**Module:** `README.md`
+**Spec ref:** n/a (documentation accuracy)
+**Evidence (re-checked at HEAD `2e87d44`, 2026-10-12):**
+- Persistence "pending" or "in memory": `README.md:5, 38, 40, 50, 149-150, 160, 173, 198`. False: six tables have migrations (`supabase/migrations/`) and jobs persist (`backend/Controllers/jobs.controller.js:57` inserts into Supabase).
+- The API table (`:138-154`) omits routes that exist: `GET /api/jobs/mine`, `GET /api/jobs/:id`, `POST /api/jobs/:id/apply`, `POST /api/jobs/applications/shortlist`, `GET /api/recruiter/applicants`, `GET /api/resume/status`, `POST /api/resume/upload`, `POST /api/auth/resend-confirmation`, `/request-password-reset`, `/reset-password`, `GET /api/notifications`, `POST /api/notifications/:id/read`.
+- The env block (`:100-107`) and `backend/.env.example` omit `NLP_PARSE_URL`, `CREDIBILITY_WEIGHTS`, `NODE_ENV`, `SESSION_SECRET`, `PORT`; the frontend variable `REACT_APP_API_BASE_URL` is not mentioned.
+- Corrupted tree glyphs in the repository-structure block (`:76-78`) and a change log that ends on 2026-09-01.
+**Impact:** New teammates are told the project is earlier than it is and miss required env vars.
+**Proposed fix:** Rewrite the status, API and env sections from `AUDIT.md`. Not edited in T-0008 (list only).
+
+---
+
+### I-0033 — `PROJECT_SOURCE_DOCS.md` names MongoDB as the data layer
+**Status:** OPEN
+**Severity:** P3
+**Module:** `PROJECT_SOURCE_DOCS.md`
+**Spec ref:** SRS §2.1 architecture (the spec itself)
+**Evidence:** `PROJECT_SOURCE_DOCS.md:106` — "Data (MongoDB, though implementation has moved to Supabase — treat Supabase as the actual data layer)". The code uses Supabase only (AUDIT "Data model"). CLAUDE.md and `CHECKLIST.md` 0.2 already say Supabase supersedes the SRS wording.
+**Impact:** Low: the line carries its own caveat. The risk is someone reading the SRS excerpt alone.
+**Proposed fix:** Owner decides whether the spec file is edited (it is restored verbatim from `32905c1` on purpose) or the caveat stays. Not edited in T-0008.
+
+---
+
 ## Resolved
+
+### I-0008 — `Docs/IMPLEMENTATION-TRACKER.md` Firestore/MongoDB sections are stale doc drift (RESOLVED)
+**Status:** RESOLVED T-0008: tracker archived, Firestore/MongoDB content replaced by the verified Supabase data model in `AUDIT.md`.
+**Severity:** P2
+**Module:** `Docs/IMPLEMENTATION-TRACKER.md`
+**Spec ref:** n/a (documentation accuracy, not a feature)
+**Evidence (verified 2026-10-12 per user request before filing):**
+- Repo-wide case-insensitive grep for `firebase|firestore` across all
+  `.js/.jsx/.json/.py/.env*/.txt/.md` files (excluding `node_modules`,
+  `venv`, `.git`) found **zero** Firebase/Firestore dependencies or
+  integration code anywhere. The only hit outside the tracker doc itself is
+  `nlp-engine/app/ner.py:19`, where `"firebase"` is just a generic string in
+  the `SKILL_KEYWORDS` list (for matching it on resumes) — not a project
+  dependency.
+- `git log -S "Firestore" -- Docs/IMPLEMENTATION-TRACKER.md` resolves to a
+  single commit, `ad4f694` ("merge: integrate Aaron, Anthony, and
+  aditya-ui-work into main") — a merge commit. The file has no prior history
+  on either merge parent in this branch's log, so the exact original
+  authoring commit isn't resolvable from current history; it entered `main`
+  as part of that three-way branch integration.
+- Per CLAUDE.md, Supabase is the authoritative DB (the SRS originally
+  specified MongoDB; Supabase was the actual implementation choice) — so the
+  tracker's "Database (Document): Firebase Firestore" row and the
+  MongoDB-to-Supabase-"+Firestore" migration section (lines 17, 60-118,
+  165-169, 180-182, 249) describe a plan that was never implemented and
+  isn't the current direction.
+- Cross-check of the Firestore collections the tracker names against actual
+  Supabase tables (`supabase/migrations/*.sql`):
+  | Tracker concept | Actual Supabase equivalent |
+  |---|---|
+  | `users` | `auth.users` (Supabase Auth) + `public.profiles` |
+  | `audit_logs` | **missing** — no migration |
+  | `job_descriptions` | `public.jobs` (relational, not document — same data shape, different storage model) |
+  | `parsed_profiles` | **missing** — no table for NLP output (skills/experience/education/projects/noun_chunks/similarity_score) |
+  | `github_metrics` | **missing** |
+  | `assessments` | **missing** (`public.applications` has a status enum only, no assessment data; see I-0005) |
+  | `credibility_scores` | partially exists as an undocumented `public.scores` table — see [I-0007](#i-0007--scores-table-referenced-by-backend-but-not-in-any-migration) |
+**Impact:** Low direct runtime impact (no code depends on this doc), but it
+risks misleading anyone writing a task spec who cites this section as the
+current DB plan, and it's the apparent source of the `credibility_scores`
+naming that doesn't match the real `scores` table.
+**Note (2026-10-12, L-0005) — `PROJECT_SOURCE_DOCS.md` (restored verbatim from
+`32905c1`) also disagrees with the code, left unedited on purpose:** line 106
+says "Data (MongoDB, though implementation has moved to Supabase — ..." and
+the spec's database wording is MongoDB-based while the code uses Supabase
+(Firestore appears only in `Docs/IMPLEMENTATION-TRACKER.md`, not in the spec —
+grep of the spec finds no `firestore`/`firebase`). Any reconciliation of the
+spec's MongoDB references belongs in the same tracker-reconciliation task.
+**Proposed fix:** Out of scope for this session (documentation-only setup
+task, not a tracker reconciliation). Leave the tracker as-is until a
+dedicated tracker-reconciliation task; this entry exists so the drift is
+visible before anyone cites that section as current.
+**Note (2026-10-12, T-0002):** inputs for the tracker task are in INTEGRATION_REVIEW.md §8 and row R40:
+- **Missing docs:** CHECKLIST / AUDIT / `Docs/project_checklist.md` are missing at HEAD (deleted by `314e494`).
+- **Wrong claims:** the tracker also claims "MongoDB models", "Custom NER" and recruiter charts/alerts are done (`:44,50,31`).
+- **Name mismatch:** CLAUDE.md's doc names don't match the repo's.
+**Evidence of resolution** (T-0008, verified at HEAD `2e87d44`, 2026-10-12):
+- `Docs/IMPLEMENTATION-TRACKER.md` and `Docs/project_checklist.md` moved to `Docs/archive/` with headers saying why (Firestore plan never implemented; three done-claims contradicted by code). Its missing-feature list was diffed into `CHECKLIST.md`: every item maps to an id or to Appendix A (X-1, X-2).
+- The verified Supabase tables replace the Firestore/MongoDB content: `AUDIT.md` "Data model". Corrections to the table in this entry: `credibility_scores` is `public.scores` (`supabase/migrations/20260903_create_resumes_and_scores.sql:41`; I-0007 is resolved) and `parsed_profiles` is columns on `public.resumes` (`:18`), not a missing table. Still no table for `audit_logs` (X-1), `github_metrics` (2.11) or `assessments` (3.12).
+- The note above that CHECKLIST, AUDIT and `project_checklist` are "missing at HEAD" is out of date: restored by `a7c74e4`, reconciled in T-0008. CLAUDE.md's file names are fixed.
+- INTEGRATION_REVIEW §8 lists `Docs/Architecture.md` as present; `a7c74e4` deleted it again (it is not in `Docs/`).
+- `grep -rniE "firestore|firebase|mongo" *.md` outside `Docs/archive/` now hits only: explanations that the SRS said MongoDB (CHECKLIST 0.2, CLAUDE.md), the AUDIT statement that none exists, `REVIEW_BRIEF.md` (I-0031), `PROJECT_SOURCE_DOCS.md:106` (I-0033), history in ISSUES, WORKLOG, tasks and INTEGRATION_REVIEW, and a lockfile note in `tests/BASELINE_RESULTS.md:25`.
+- The spec's own MongoDB wording moved to I-0033.
 
 ### I-0021 — `requireAuth` fails open (RESOLVED)
 **Status:** RESOLVED T-0006: fail-closed check restored (R35).

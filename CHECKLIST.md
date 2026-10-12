@@ -1,13 +1,18 @@
 # CHECKLIST.md — Ground-Truth Feature List
 
-Derived **only** from `PROJECT_SOURCE_DOCS.md` (Objectives + SRS + Literature
-Review). This describes what the system **should** be if built correctly. It is
-not a status report — nothing here is claimed to exist. Every item states what
-"done correctly" means per the spec, not merely that a feature is present.
+Derived from `PROJECT_SOURCE_DOCS.md` (Objectives + SRS + Literature Review),
+plus the clearly marked additions below. This describes what the system
+**should** be if built correctly. It is not a status report — nothing here is
+claimed to exist. Every item states what "done correctly" means per the spec,
+not merely that a feature is present. Status lives in `AUDIT.md`, one row per
+id in this file (`node tests/docs/check-trackers.mjs` enforces it).
 
-Traceability tags: `FR-n` / `NFR-n` from the SRS, `GF-n` from guide feedback,
-`M-n` from the four methodology algorithms, `LR` from literature-review design
-implications.
+Traceability tags: `FR-n` / `NFR-n` from the SRS, `GF-n` from guide feedback
+(CLAUDE.md "Known guide feedback" 1-5; unnumbered in the spec), `M-n` from the
+four methodology algorithms, `LR` from literature-review design implications.
+Additions that are **not** in `PROJECT_SOURCE_DOCS.md` are marked in their row:
+`GR-n` (guide review, owner-reported), `R9`/`R38` (INTEGRATION_REVIEW
+decisions), `X-n` (team-proposed, archived tracker; Appendix A).
 
 **The project's actual contribution is the integration of all four modules into
 one explainable pipeline (LR: Research Gap).** A module that works in isolation
@@ -53,6 +58,9 @@ Spec: FR-1..FR-3, NFR-1, NFR-5, NFR-6, M-1, GF-2, LR.
 | 1.12 | Skill classification quality (NFR-6, LR) | Skill classification F1 ≥0.80, measured. |
 | 1.13 | Latency (FR-3, NFR-1, LR) | ≤10s per resume end-to-end for parsing (target band 5–10s), measured. |
 | 1.14 | Parsing sub-score emitted (§3.1) | Produces a **Parsing Semantic Alignment** sub-score (semantic proximity of candidate skills to the target role/JD), persisted to the Score entity — parsing is not done if it only writes entities and contributes nothing to the composite. |
+| 1.15 | Unreadable input is signalled (GF-2, NFR-12) | An image-only, empty or unreadable resume is reported as unreadable (an explicit status the candidate and recruiter can see), never returned as a successful parse with an "available" score of 0.0. Evidence: `tests/BASELINE_RESULTS.md:81` (f6). Pairs with 1.2. |
+| 1.16 | LinkedIn URL and certificates extracted (GF-1, Objective 1) | The LinkedIn URL is captured as a structured field and certificates (name, issuer, credential id where present) are extracted from the resume as structured entities, so 4.10 has something to validate. Regex capture of the URL alone does not satisfy the certificate half. |
+| 1.17 | Support/maintenance skill coverage (GF-3) | The skill vocabulary recognises the tools and practices of support/maintenance/operations roles (ITSM, ticketing, monitoring, directory services, shell/PL-SQL) so a well-matched support candidate is not scored down for vocabulary the parser does not know. Evidence of the failure: `tests/BASELINE_RESULTS.md:78-79` (f3, f4). |
 
 ---
 
@@ -117,6 +125,7 @@ Spec: FR-12, FR-13, M-4, §3.1, GF-3, GF-5, GF-1, §7 Risk table, LR.
 | 4.9 | Bias mitigation (Objective 4, §7 Risk "Biased evaluation") | Scoring evaluates technical merit only; the explainability layer is the stated mitigation for biased ranking and must therefore be auditable per candidate. |
 | 4.10 | LinkedIn + certificate validation (GF-1) | Additional evidence sources — LinkedIn profile and certificates — validated and folded into the evidence set feeding the composite, with their own explainable contribution. Explicit guide requirement; the design must accommodate it. |
 | 4.11 | Determinism / auditability | The same inputs reproduce the same composite, and a stored score can be re-explained after the fact from persisted sub-scores and evidence (pairs with 0.3). |
+| 4.12 | Fairness of support-role scores is measured (GF-3) | A support/maintenance candidate whose resume matches a support JD scores no lower than an equally well-matched developer on a development JD, **measured** on paired fixtures and recorded. Evidence of the current gap: f3 0.4138 and f4 0.4354 score below the off-profile Java developer f2 at 0.48 (`tests/BASELINE_RESULTS.md:78-79,89-92`). |
 
 ---
 
@@ -145,6 +154,14 @@ Spec: FR-14, FR-15, §2.2, Use Case, Scope Input/Output layers, GF-5.
 | 5.10 | Evidence-limited candidates displayed fairly (GF-4) | A candidate without GitHub renders with a clear "assessment-only / evidence limited" indication rather than an unexplained low or blank section. |
 | 5.11 | Skill breakdown visualisation (Objective 4) | Skill-level breakdown visualised, not only an aggregate — recruiters see per-skill confidence. |
 | 5.12 | Bias-free presentation (Objective 4) | Presentation surfaces technical merit only; no non-technical or demographic signals in the ranking view. |
+| 5.13 | Certificates and LinkedIn shown with their evidence (GF-1) | The recruiter view shows the candidate's LinkedIn and certificate evidence and how it contributed to the score, with the same drill-down as other sources (pairs with 1.16, 4.10). |
+
+### 5C. Integration decisions (not in the spec; INTEGRATION_REVIEW 2026-10-12)
+
+| # | Item | "Done correctly" means |
+|---|---|---|
+| 5.14 | Score-on-apply (R9, FR-12, FR-14) | A candidate uploads a resume once; applying to a job runs analysis against that job and persists a score **linked to the application** (not only to a candidate/job pair). A candidate who applied always has a score or a visible reason there is none. Source: INTEGRATION_REVIEW R9 and Q2 ("upload once, apply runs analyze"). |
+| 5.15 | Merged application-centric recruiter dashboard (R38, FR-14, FR-15) | One recruiter view per application showing score, status, shortlist/reject actions and the explanation drill-down; applicants appear whether or not scored. Shortlist/reject is reachable from the UI and owner-scoped (T-0004). Source: INTEGRATION_REVIEW R38 and Q4. |
 
 ---
 
@@ -170,11 +187,34 @@ targets are not "done". Grouped here so the metrics are not lost inside modules.
 
 | GF | Requirement | Covered by |
 |---|---|---|
-| GF-1 | LinkedIn + certificate validation | 4.10 |
-| GF-2 | OCR is a must | 1.2 |
-| GF-3 | Fair scoring for support/maintenance candidates | 2.9, 4.8 |
+| GF-1 | LinkedIn + certificate validation | 1.16, 4.10, 5.13 |
+| GF-2 | OCR is a must | 1.2, 1.15 |
+| GF-3 | Fair scoring for support/maintenance candidates | 1.17, 2.9, 4.8, 4.12 |
 | GF-4 | GitHub must be optional | 2.7, 2.8, 4.7, 5.2, 5.10, 3.13 |
 | GF-5 | Score explainability is crucial | 4.4, 4.5, 5.7, 5.8, 5.9 |
+
+## Guide-review items (owner-reported; no written source in the repo)
+
+Recorded as stated by the owner on 2026-10-12. Not in `PROJECT_SOURCE_DOCS.md`.
+
+| # | Item | "Done correctly" means |
+|---|---|---|
+| GR-1 | Assessment anti-cheat (guide review, Sep 2026) | "Before the LLM/PFQS assessment module is built, design a mechanism that prevents candidates from cheating on it." Done = a written design for the mechanism exists **before** Module 3 is built, and the built module implements it. Spec hook: 3.2 means non-reusable questions only; it does not cover candidate behaviour. |
+| GR-2 | Microservices / API gateway verified (guide feedback, Oct 2026) | "Identify the API gateway and verify the system actually follows the microservices architecture claimed in the SRS; fix it if it doesn't." Done = the gateway is named, each claimed service is checked against 0.1 / NFR-3, and gaps are fixed or recorded. Extends 0.1. Pending the architecture-audit task. |
+
+## Appendix A: team-proposed items not in the spec
+
+From the archived `Docs/archive/IMPLEMENTATION-TRACKER.md` (diffed in T-0008).
+These are proposals, not requirements; they are tracked so nothing in the old
+tracker is silently dropped. Everything else in that file maps to an id above
+(database migration → 0.2/0.3; GitHub integration → 2.x; assessment engine →
+3.x; scoring engine and explainability → 4.x, 5.7; OAuth → 0.4, 2.2; assessment
+UI → 5.3; OCR → 1.2; LinkedIn/certificates/support scoring → 1.16, 4.10, 4.8).
+
+| # | Item | "Done correctly" means |
+|---|---|---|
+| X-1 | Recruiter audit log | Recruiter actions (view/shortlist/reject) are recorded in a persisted audit log (who, which candidate, action, time). Archived tracker, original line numbers 62, 71-72, 131. |
+| X-2 | Code-originality signals | Plagiarism score (MOSS), AI-generated-code detection (CodeBERT) and repository diversity as additional GitHub-evidence metrics. Archived tracker, original line numbers 97-99, 81-83. Not in the SRS. |
 
 ## Integration Requirement (the actual contribution — LR Research Gap)
 

@@ -210,3 +210,15 @@ rollup per archived month at the top of this file.
 - Files changed: PR_DESCRIPTION.md (new, untracked by request), tests/MANUAL_SMOKE.md, WORKLOG.md.
 - Issues logged: none.
 - Next: owner opens the PR; then tracker task and score-on-apply.
+
+## L-0018 · 2026-10-12 · T-0008 tracker reconciliation (CHECKLIST / AUDIT / archive)
+- Prompt: one source of truth for exists/should-exist; owner answered D1 as recommended and added GR-1, GR-2 and the `docs` suite.
+- Task: T-0008 (complete: 12/12 criteria PASS).
+- Done: CHECKLIST = spec list, AUDIT = verified status (91 rows, added Spec/Delivered-by, CODE_REVIEWED_UNTESTED + CLAIMED_UNVERIFIED, data model); trackers to Docs/archive/ with headers;
+  CLAUDE.md names fixed; new items 1.15-1.17, 4.12, 5.13-5.15, GR-1, GR-2, X-1, X-2; `tests/docs/check-trackers.mjs` + `docs` suite in run-suite.ps1.
+- Verification: docs suite green (91/91); red 85 problems before the rewrite; red again with one CHECKLIST id removed, then restored. 25 status changes in the task Result.
+  Four read-only agents re-verified rows at 2e87d44; I re-read the DONE rows and the apply/upload/App.jsx cites. Full harness not run (docs only).
+- Findings: no score is produced through the UI at HEAD (Upload stores a file, Apply inserts a row, `/api/analyze` has no reachable caller); 12 rows lost DONE_CORRECTLY, 9 only for lack of a test (now CODE_REVIEWED_UNTESTED, each naming its promoting test; only GR-2 is CLAIMED_UNVERIFIED).
+- Files changed: AUDIT.md, CHECKLIST.md, CLAUDE.md, ISSUES.md, tests/run-suite.ps1, tests/README.md; new tasks/T-0008, tests/docs/, Docs/archive/; two Docs/ files moved.
+- Issues logged: I-0030 (CODE_MAP), I-0031 (REVIEW_BRIEF), I-0032 (README), I-0033 (spec MongoDB wording); I-0008 resolved; note on I-0001.
+- Next: owner commits T-0008; then the architecture audit (GR-2), score-on-apply and merged dashboard (5.14, 5.15).
