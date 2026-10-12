@@ -86,11 +86,14 @@ server.once('error', (error) => {
   } else {
     console.error('HTTP server failed:', error);
   }
-  process.exitCode = 1;
+  // A backend that can't listen is useless; exit so it never lingers as a
+  // zombie and a supervisor (or the developer) sees the failure.
+  process.exit(1);
 });
 // ---------------------------------------------------------------------------
 // Crash guards: log unhandled rejections and uncaught exceptions so the
 // process never shuts down silently and the log always explains what happened.
+// After an uncaught exception the process state is unknown, so log and exit.
 // ---------------------------------------------------------------------------
 process.on('unhandledRejection', (reason) => {
   console.error('[unhandledRejection]', reason);
@@ -99,31 +102,8 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (error) => {
   console.error('[uncaughtException]', error);
   console.error(error?.stack || '');
+  process.exit(1);
 });
-
-// ---------------------------------------------------------------------------
-// Watchdog: if the listener ever stops, log it and rebind automatically so the
-// backend heals without a manual restart. Also keeps the event loop alive,
-// which a running HTTP server needs anyway.
-// ---------------------------------------------------------------------------
-let rebindAttempts = 0;
-
-setInterval(() => {
-  if (server.listening) {
-    rebindAttempts = 0;
-    process.exitCode = 0;
-    return;
-  }
-
-  rebindAttempts += 1;
-  console.error(`[watchdog] Server not listening - rebinding on port ${PORT} (attempt ${rebindAttempts})...`);
-
-  try {
-    server.listen(PORT);
-  } catch (error) {
-    console.error('[watchdog] Rebinding failed:', error.message);
-  }
-}, 15000);
 
 // ---------------------------------------------------------------------------
 // Graceful shutdown: release the port immediately on Ctrl+C / SIGTERM so the

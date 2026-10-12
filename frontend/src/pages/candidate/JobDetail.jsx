@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Briefcase, MapPin, Layers, Sparkles, CheckCircle, Loader2, FileUp } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
 function CandidateJobDetail() {
   const { id } = useParams();

@@ -151,7 +151,7 @@ const saveResumeToStorage = async (userId, file) => {
   const { error } = await supabase.storage
     .from('resumes')
     .upload(storagePath, file.buffer, {
-      contentType: file.mimetype || 'application/pdf',
+      contentType: resolveContentType(file),
       upsert: true,
     });
 
@@ -170,9 +170,15 @@ const saveResumeToStorage = async (userId, file) => {
 
 // Returns whether the current candidate has a resume in Supabase Storage.
 export const getMyResumeStatus = async (req, res) => {
-  const { data: files } = await supabase.storage
+  const { data: files, error } = await supabase.storage
     .from('resumes')
     .list(`candidates/${req.session.userId}`, { limit: 100 });
+
+  // A storage outage must not read as "no resume uploaded".
+  if (error) {
+    logPersistenceError('resume status storage list', error);
+    return res.status(500).json({ message: 'Could not check your resume. Please try again.' });
+  }
 
   const resumeFile = Array.isArray(files)
     ? files.find((f) => f.name.startsWith('resume'))
@@ -196,14 +202,10 @@ export const uploadResume = [
         return res.status(400).json({ message: 'No resume file uploaded' });
       }
 
-      const isPdf =
-        req.file.mimetype === 'application/pdf' ||
-        (req.file.originalname || '').toLowerCase().endsWith('.pdf');
-      const isDocx =
-        req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-        (req.file.originalname || '').toLowerCase().endsWith('.docx');
-
-      if (!isPdf && !isDocx) {
+      // The extension decides: it is also what the stored path and content type
+      // are derived from, and the client-reported mimetype is unreliable.
+      const ext = path.extname(req.file.originalname || '').toLowerCase();
+      if (!MIME_BY_EXT[ext]) {
         return res.status(400).json({ message: 'Only PDF or DOCX resumes are supported.' });
       }
 

@@ -103,9 +103,14 @@ export const applyToJob = async (req, res) => {
   const jobId = req.params.id;
 
   // Only allow applying if the candidate has a resume in Supabase Storage.
-  const { data: resumeFiles } = await supabase.storage
+  const { data: resumeFiles, error: resumeListError } = await supabase.storage
     .from('resumes')
     .list(`candidates/${req.session.userId}`, { limit: 100 });
+  // A storage outage must not be reported as "upload your resume first".
+  if (resumeListError) {
+    console.error('Apply resume check failed:', resumeListError.message);
+    return res.status(500).json({ message: 'Could not check your resume. Please try again.' });
+  }
   const hasResume =
     Array.isArray(resumeFiles) && resumeFiles.some((f) => f.name.startsWith('resume'));
 

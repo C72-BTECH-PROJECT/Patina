@@ -109,3 +109,14 @@ rollup per archived month at the top of this file.
 - Files changed: 44 (38 tracked + 6 restored untracked), ISSUES.md, WORKLOG.md; new tasks/T-0003-apply-integration.md.
 - Issues logged: I-0027 (404 handler always says "GET"). Issue statuses are updated at close-out.
 - Next: owner reviews + commits Phase 1; then Phase 3 (§9 step 4: R7, R10, R11).
+
+## L-0009 · 2026-10-12 · T-0003 Phase 3 (R7, R10, R11)
+- Prompt: continue (Phase 1 committed as a7c74e4).
+- Task: T-0003 (Phase 3 done; Phase 4 and close-out pending owner review).
+- Done: R7: resolveContentType, 500 on a status storage error, extension-only check. R10: apply returns 500 on a storage error;
+  JobDetail/Upload use REACT_APP_API_BASE_URL. R11: exit(1) on listen error and uncaughtException; watchdog removed.
+- Verification: NLP 10/10, all hashes = baseline; tier 1 7/7; tier 2 PASS; sweep 0; CI still 6 warnings (same set).
+  Probes: busy-port backend exits with code 1; .txt → 400; DOCX as octet-stream → 200 stored; status hasResume; swept to 0.
+- Files changed: analysis.controller.js, jobs.controller.js, index.js, JobDetail.jsx, Upload.jsx; task file, WORKLOG.md.
+- Issues logged: none new. The storage-error 500 branches are verified by diff only (no live outage).
+- Next: owner commits Phase 3; then Phase 4 (R30, R31, R33, R39 + import.meta.env check).

@@ -205,3 +205,57 @@ started on the same port printed "Could not start: port 5300 is already in use" 
 alive** (PID 21784, no listening port). That is I-0023's current behaviour. I stopped it by hand.
 
 **New finding:** I-0027 (the 404 handler always says "Cannot GET"; also at baseline; P3).
+
+**Owner commit:** Phase 1 was committed as `a7c74e4` ("restore scoring, NLP, auth reset, migration, docs").
+
+### Phase 3: §9 step 4, Aaron's flow (R7, R10, R11), 2026-10-12
+(§9 step 2, the security fixes R32/R34/R35, is skipped: out of scope, Prompt 4b.)
+
+**Applied**
+- **R7** (`analysis.controller.js`):
+  - `saveResumeToStorage` uses `contentType: resolveContentType(file)` instead of `file.mimetype || 'application/pdf'`;
+  - `getMyResumeStatus` reads the `error` from `storage.list` and returns 500 (logged via `logPersistenceError`);
+  - `uploadResume` accepts only extensions in `MIME_BY_EXT` (`.pdf`/`.docx`), replacing the mimetype-OR-extension check.
+  - (R7(2) "return 500 on a storage error" for `uploadResume` was already in place: `saved === false` → 500.)
+- **R10:**
+  - `jobs.controller.applyToJob` returns 500 on a `storage.list` error instead of "upload your resume first";
+  - `JobDetail.jsx:6` and `Upload.jsx:16` use `process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'`;
+  - score id on the application: not added (score-on-apply follow-up).
+- **R11** (`index.js`):
+  - the listen `error` handler calls `process.exit(1)`, both for EADDRINUSE and other listen errors, since both mean no server;
+  - `uncaughtException` logs, then `process.exit(1)`;
+  - the 15 s watchdog `setInterval` was removed;
+  - the listen split, the `unhandledRejection` logger and the graceful shutdown were kept.
+
+**`git diff --stat HEAD`** (exactly the expected 5 files):
+```
+ backend/Controllers/analysis.controller.js | 22 ++++++++++++----------
+ backend/Controllers/jobs.controller.js     |  7 ++++++-
+ backend/index.js                           | 30 +++++-------------------------
+ frontend/src/pages/candidate/JobDetail.jsx |  2 +-
+ frontend/src/pages/candidate/Upload.jsx    |  2 +-
+ 5 files changed, 25 insertions(+), 38 deletions(-)
+```
+The snapshot files were rewritten by the harness with identical content, so there is no diff.
+
+**Suites:** `run-suite.ps1 -Target current -Live`, log `tests/.out/t0003-p3-run.log`.
+
+| Criterion | Result | Evidence |
+|---|---|---|
+| 1 NLP | **PASS** | `10 passed in 4.17s`. f1–f6 and private 1–3 sha256 = baseline (all MATCH). |
+| 2 Tier 1 | **PASS** | 7/7 |
+| 3 Tier 2 | **PASS** | `✔ POST /api/analyze … (4610ms)`, `tests 8 / pass 8`. Teardown removed scores 1, resumes 1, jobs 1, `storage:<C>/` 1. Remaining all 0. |
+| 4 Sweep | **PASS** | All 0 before the run (Phase 1 end), after teardown, and after the probes. `--check` exit 0. |
+| 5 CI build | unchanged, as expected | The same 6 warnings as Phase 1 (5 baseline + `CandidateLayout.jsx:11`, due in Phase 4). No new warning from `JobDetail.jsx` or `Upload.jsx`. |
+
+**Probes** (scratch `probeP3.ps1`, backend on :5300, run after the harness):
+- **R11:** a second backend started on the busy port exits within 20 s with **exit code 1**. Stderr: "Could not start: port 5300 is already in use…". In Phase 1 the same scenario left a zombie process.
+- **R7**, as `t0001_cand`, logged in with 200:
+  - `.txt` upload → **400** "Only PDF or DOCX resumes are supported.";
+  - `f2_dev_github.docx` sent as `application/octet-stream` → **200**, stored, so the content type was resolved from the extension (the bucket allows only pdf/docx);
+  - `GET /api/resume/status` → `{"hasResume":true,"fileName":"resume.docx",…}`;
+  - sweep removed `storage:candidates/<C>/` 1, then `--check` all 0.
+- **Not exercised live:** the storage-error → 500 branches in `getMyResumeStatus` and `applyToJob` (that would need a simulated storage outage). The evidence is the diff above.
+- No `node.exe` processes were left running afterwards.
+
+**Remaining `import.meta.env`:** `CandidateLayout.jsx:7` and `Notifications.jsx:6` only (R33, Phase 4).
