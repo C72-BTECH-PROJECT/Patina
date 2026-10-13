@@ -1,3 +1,18 @@
+> **ARCHIVED 2026-10-12 (T-0008). Do not use as evidence or as the DB plan.**
+> Why archived:
+> - The Firebase Firestore database plan (lines 17, 60-118, 165-169, 180-182,
+>   249) was never implemented: no Firebase/Firestore dependency or code exists
+>   (ISSUES I-0008). The actual store is Supabase Postgres; the verified table
+>   list is in `AUDIT.md` (Data model).
+> - Three "done" claims are contradicted by the code: "MongoDB models" (line 44;
+>   Mongoose was deleted, no MongoDB), "Custom NER extraction" (line 50; stock
+>   `en_core_web_sm` plus a keyword list, AUDIT 1.5), and recruiter
+>   "charts, alerts" (line 31; alerts are not computed, AUDIT 4.6/5.9).
+> - Its missing-feature list was diffed into `CHECKLIST.md` (every item has a
+>   CHECKLIST id, or is listed in CHECKLIST Appendix A as a team-proposed
+>   non-spec item).
+> Superseded by `AUDIT.md` and `CHECKLIST.md`. Content below is unchanged.
+
 # Patina — Implementation Tracker
 
 ## Project Overview

@@ -26,7 +26,6 @@ diff you're already writing.
 | I-0004 | AI-cruft / hallucinated entries in `SKILL_KEYWORDS` | `nlp-engine/app/ner.py` | P3 | OPEN | pre-WORKLOG (after an NLP fix, exact date not recorded) |
 | I-0005 | `Assessment.jsx` unrouted, no backend, silently serves mock data | `frontend/src/pages/candidate/Assessment.jsx` | P1 | OPEN | pre-WORKLOG (after an NLP fix, exact date not recorded) |
 | I-0006 | Upload.jsx: neither Choose-File nor drag-drop validates file type on selection, only at submit | `frontend/src/pages/candidate/Upload.jsx` | P2 | OPEN | 2026-10-12, L-0001 |
-| I-0008 | `Docs/IMPLEMENTATION-TRACKER.md` Firestore/MongoDB sections are stale doc drift | `Docs/IMPLEMENTATION-TRACKER.md` | P2 | OPEN | 2026-10-12, L-0001 |
 | I-0010 | Supabase Preview check fails on `main`; fixing it naively turns on auto-apply of migrations to production — **decision needed** | `supabase/migrations/`, Supabase GitHub integration | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0012 | HEAD frontend reads `import.meta.env.VITE_*` under CRA; 5 pages hardcode `localhost:5000` | `frontend/src/**` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0015 | `ner.py` contact fields picked via `list(set(...))[0]` — nondeterministic across processes | `nlp-engine/app/ner.py` | P1 | OPEN | 2026-10-12, T-0001 |
@@ -37,6 +36,16 @@ diff you're already writing.
 | I-0027 | 404 handler always says "Cannot GET", whatever the method | `backend/index.js` | P3 | OPEN | 2026-10-12, T-0003 |
 | I-0028 | `/api/recruiter/applicants` returns an empty email for applicants who have a profile | `backend/Controllers/analysis.controller.js` | P3 | OPEN | 2026-10-12, T-0003 |
 | I-0029 | `shortlistCandidate` returns 500 (not 400/404) for a malformed, non-UUID `applicationId` | `backend/Controllers/jobs.controller.js` | P3 | OPEN | 2026-10-12, T-0004 |
+| I-0030 | `CODE_MAP.md` describes the pre-T-0003 flow (Upload -> `/api/analyze`); no mention of upload/apply/applicants routes | `CODE_MAP.md` | P2 | OPEN | 2026-10-12, T-0008 |
+| I-0031 | `REVIEW_BRIEF.md` rests on CODE_MAP/old AUDIT claims and predates the upload-once/apply flow | `REVIEW_BRIEF.md` | P2 | OPEN | 2026-10-12, T-0008 |
+| I-0032 | `README.md` says tables are pending and jobs are in-memory (both false); API and env tables incomplete | `README.md` | P2 | OPEN | 2026-10-12, T-0008 |
+| I-0033 | `PROJECT_SOURCE_DOCS.md` names MongoDB as the data layer; the code uses Supabase | `PROJECT_SOURCE_DOCS.md` | P3 | OPEN | 2026-10-12, T-0008 |
+| I-0034 | NLP service is unauthenticated, allows every CORS origin and exposes `/docs`; analyze forwards any file type to it | `nlp-engine/app/main.py`, `backend/Controllers/analysis.controller.js` | P2 | OPEN | 2026-10-12, T-0009 |
+| I-0035 | Core can run only as one process: sessions in the in-process MemoryStore, in-memory rate limiter, no session regeneration at login | `backend/index.js`, `backend/Routes/auth.routes.js`, `backend/Controllers/auth.controller.js` | P2 | OPEN | 2026-10-12, T-0009 |
+| I-0036 | NLP outage handling: 500 with raw error text, 502 echoes the upstream body, no timeout or retry, health blind to dependencies | `backend/Controllers/analysis.controller.js`, `backend/index.js` | P2 | OPEN | 2026-10-12, T-0009 |
+| I-0037 | NLP `/parse` is `async def` but CPU-bound: parses run one at a time and block `GET /` | `nlp-engine/app/main.py` | P2 | OPEN | 2026-10-12, T-0009 |
+| I-0038 | Unpinned `requirements.txt`; three Python venvs, one without the spaCy model; Python 3.14 vs README 3.11 | `nlp-engine/requirements.txt`, `README.md` | P2 | OPEN | 2026-10-12, T-0009 |
+| I-0039 | Backend cruft: unused `bcrypt`, two empty middleware files, unused OAuth env vars, empty `backend/uploads/`, tracked `dev/null` | `backend/`, `dev/` | P3 | OPEN | 2026-10-12, T-0009 |
 
 ---
 
@@ -67,6 +76,7 @@ management API in a migration script).
 - **Never in any migration:** the MIME allow-list and the 10 MB cap.
 - **Live check:** read-only bucket listing on 2026-10-12: `resumes` is private, `allowed_mime_types` = pdf + docx.
 - See INTEGRATION_REVIEW.md R19 and §7.
+**Note (2026-10-12, T-0008):** partly stale at HEAD `2e87d44`. The bucket insert is back in `supabase/migrations/20260903_create_resumes_and_scores.sql:14-16` (restored by `a7c74e4`). What is still missing from any migration is the MIME allow-list and the 10 MB cap. Left OPEN for that; not re-verified against the live project.
 **Note (2026-10-12, T-0003): still OPEN.**
 - **The bucket insert is back:** the restored `20260903_create_resumes_and_scores.sql:14` has `insert into storage.buckets (id, name, public)` (committed in `a7c74e4`, R19).
 - **Still in no migration:** the MIME allow-list (pdf/docx) and the 10 MB size cap. A fresh environment gets a bucket without them.
@@ -150,64 +160,6 @@ new, related gap was found in its place.
 
 ---
 
-### I-0008 — `Docs/IMPLEMENTATION-TRACKER.md` Firestore/MongoDB sections are stale doc drift
-**Status:** OPEN
-**Severity:** P2
-**Module:** `Docs/IMPLEMENTATION-TRACKER.md`
-**Spec ref:** n/a (documentation accuracy, not a feature)
-**Evidence (verified 2026-10-12 per user request before filing):**
-- Repo-wide case-insensitive grep for `firebase|firestore` across all
-  `.js/.jsx/.json/.py/.env*/.txt/.md` files (excluding `node_modules`,
-  `venv`, `.git`) found **zero** Firebase/Firestore dependencies or
-  integration code anywhere. The only hit outside the tracker doc itself is
-  `nlp-engine/app/ner.py:19`, where `"firebase"` is just a generic string in
-  the `SKILL_KEYWORDS` list (for matching it on resumes) — not a project
-  dependency.
-- `git log -S "Firestore" -- Docs/IMPLEMENTATION-TRACKER.md` resolves to a
-  single commit, `ad4f694` ("merge: integrate Aaron, Anthony, and
-  aditya-ui-work into main") — a merge commit. The file has no prior history
-  on either merge parent in this branch's log, so the exact original
-  authoring commit isn't resolvable from current history; it entered `main`
-  as part of that three-way branch integration.
-- Per CLAUDE.md, Supabase is the authoritative DB (the SRS originally
-  specified MongoDB; Supabase was the actual implementation choice) — so the
-  tracker's "Database (Document): Firebase Firestore" row and the
-  MongoDB-to-Supabase-"+Firestore" migration section (lines 17, 60-118,
-  165-169, 180-182, 249) describe a plan that was never implemented and
-  isn't the current direction.
-- Cross-check of the Firestore collections the tracker names against actual
-  Supabase tables (`supabase/migrations/*.sql`):
-  | Tracker concept | Actual Supabase equivalent |
-  |---|---|
-  | `users` | `auth.users` (Supabase Auth) + `public.profiles` |
-  | `audit_logs` | **missing** — no migration |
-  | `job_descriptions` | `public.jobs` (relational, not document — same data shape, different storage model) |
-  | `parsed_profiles` | **missing** — no table for NLP output (skills/experience/education/projects/noun_chunks/similarity_score) |
-  | `github_metrics` | **missing** |
-  | `assessments` | **missing** (`public.applications` has a status enum only, no assessment data; see I-0005) |
-  | `credibility_scores` | partially exists as an undocumented `public.scores` table — see [I-0007](#i-0007--scores-table-referenced-by-backend-but-not-in-any-migration) |
-**Impact:** Low direct runtime impact (no code depends on this doc), but it
-risks misleading anyone writing a task spec who cites this section as the
-current DB plan, and it's the apparent source of the `credibility_scores`
-naming that doesn't match the real `scores` table.
-**Note (2026-10-12, L-0005) — `PROJECT_SOURCE_DOCS.md` (restored verbatim from
-`32905c1`) also disagrees with the code, left unedited on purpose:** line 106
-says "Data (MongoDB, though implementation has moved to Supabase — ..." and
-the spec's database wording is MongoDB-based while the code uses Supabase
-(Firestore appears only in `Docs/IMPLEMENTATION-TRACKER.md`, not in the spec —
-grep of the spec finds no `firestore`/`firebase`). Any reconciliation of the
-spec's MongoDB references belongs in the same tracker-reconciliation task.
-**Proposed fix:** Out of scope for this session (documentation-only setup
-task, not a tracker reconciliation). Leave the tracker as-is until a
-dedicated tracker-reconciliation task; this entry exists so the drift is
-visible before anyone cites that section as current.
-**Note (2026-10-12, T-0002):** inputs for the tracker task are in INTEGRATION_REVIEW.md §8 and row R40:
-- **Missing docs:** CHECKLIST / AUDIT / `Docs/project_checklist.md` are missing at HEAD (deleted by `314e494`).
-- **Wrong claims:** the tracker also claims "MongoDB models", "Custom NER" and recruiter charts/alerts are done (`:44,50,31`).
-- **Name mismatch:** CLAUDE.md's doc names don't match the repo's.
-
----
-
 ### I-0010 — Supabase Preview check fails on `main`; auto-apply decision needed
 **Status:** OPEN — decision made (option a, 2026-10-12); stays OPEN until the migrations themselves are fixed
 **Severity:** P1 (not tech debt: see Impact)
@@ -257,6 +209,11 @@ issue when that is done and the Preview check is verified.
 
 T-0003 kept them verbatim. R19 and R33 put their idempotency in this batch.
 
+**Note (2026-10-12, after the PR #3 merge):** the Supabase check still ran on merge commit `7c83293` (PR #3, `Anthony_V2` into `main`; parents `cc0e637` and `bef8f9e`), after production auto-deploy had been disabled. `gh api repos/C72-BTECH-PROJECT/Patina/commits/7c83293/check-runs`: `Supabase Preview | supabase | completed | failure`, 08:00:45Z to 08:00:54Z, summary `ERROR: type "patina_user_role" already exists (SQLSTATE 42710) At statement: 0`, the same error as on `32905c1` and `cc0e637`.
+- What this shows: disabling production auto-deploy did not stop the Preview check; the check is a separate replay of the migrations that still collides at statement 0. Nothing was applied (the error is at statement 0), so no schema reached production.
+- What it does not show: whether the dashboard setting is really off. That is still only the owner's report. The failure is the same one as before the setting changed, so it neither confirms nor contradicts it.
+- Consequence: the check will stay red on every push and merge until the migrations are idempotent. That is the remaining work above; the "Preview check is verified" close condition is still not met.
+
 ---
 
 ### I-0012 — HEAD frontend reads `import.meta.env` under CRA; hardcoded API URLs
@@ -292,6 +249,12 @@ against a backend on `localhost:5000`.
   - R33 switched CandidateLayout and Notifications.
 - **Still hardcoded `http://localhost:5000`:** `ResetPassword.jsx:6` (as at `32905c1`), `Assessment.jsx:61,104` and `CreateJob.jsx:211`. No T-0003 row covered these.
 - **Not done:** the "one shared constant" from the proposed fix. Each file still declares its own `API_BASE_URL`.
+
+**Note (2026-10-12, T-0009): re-counted at `8e8e498`, and now step M2 of ARCHITECTURE.md §5.**
+- **Declarations:** 14 files declare `API_BASE_URL` (`git grep -nE "const API_BASE_URL\s*=" -- frontend/src` → 14). 13 use the env fallback; `ResetPassword.jsx:6` is a hardcoded literal.
+- **Calls env cannot redirect:** 5 (ResetPassword ×2, `CreateJob.jsx:211`, `Assessment.jsx:61,104`).
+- **Full call table:** all 29 calls by origin are listed in ARCHITECTURE.md §1.6. None goes to :8000 or to Supabase directly.
+- **Proposed shape (M2):** one `src/config/api.js` with a relative base, the CRA `proxy` in dev, and the `window.fetch` patch (`AuthContext.jsx:23-36`) removed.
 
 ---
 
@@ -425,7 +388,243 @@ only logged. The resulting profiles had correct username, role and names.
 
 ---
 
+### I-0030 — `CODE_MAP.md` describes the pre-T-0003 flow
+**Status:** OPEN
+**Severity:** P2
+**Module:** `CODE_MAP.md`
+**Spec ref:** n/a (documentation accuracy)
+**Evidence (re-checked at HEAD `2e87d44`, 2026-10-12):**
+- `CODE_MAP.md:10` says "Upload → /api/analyze → FastAPI /parse → explainability.js → Supabase → dashboards". At HEAD the Upload page only calls `/api/resume/upload` (`frontend/src/pages/candidate/Upload.jsx:157`, which stores the file and parses nothing); Apply only inserts an `applications` row (`backend/Controllers/jobs.controller.js:102-146`); `/api/analyze` has no reachable caller (AUDIT 5.14).
+- `CODE_MAP.md:386` documents `Processing.jsx` as reached from Upload with `location.state.{file, jobId}`; nothing navigates to it any more.
+- `grep -c` for `resume/upload`, `/apply`, `recruiter/applicants`, `notifications` finds 0 matches in `CODE_MAP.md` (`shortlist`: 1). These routes exist at HEAD.
+- Its facts about the restored NLP and scoring code (`explainability.js`, `split_sections`, `jd_source`) are accurate again after T-0003. Earlier note: I-0002.
+**Impact:** Someone using it to find the scoring entry point is sent down a path the app no longer takes.
+**Proposed fix:** Regenerate against HEAD after score-on-apply (5.14) lands, so it is written once. Not edited in T-0008 (list only).
+
+---
+
+### I-0031 — `REVIEW_BRIEF.md` is built on stale claims
+**Status:** OPEN
+**Severity:** P2
+**Module:** `REVIEW_BRIEF.md`
+**Spec ref:** n/a (documentation accuracy)
+**Evidence (re-checked at HEAD `2e87d44`, 2026-10-12):**
+- It says every claim traces to `AUDIT.md` or `CODE_MAP.md` (INTEGRATION_REVIEW §8). `AUDIT.md` was rewritten in T-0008 (rows it would cite changed; see the status-change report in T-0008's Result) and `CODE_MAP.md` is stale (I-0030).
+- `grep -c` for `resume/upload`, `/apply`, `recruiter/applicants`, `notifications` finds 0 matches.
+- `REVIEW_BRIEF.md:330-334` answers "why Supabase, not MongoDB" correctly; `:604` still describes removing Mongoose models, which is done.
+**Impact:** A guide-review brief that overstates what works (for example that dashboards show scored candidates from the upload flow).
+**Proposed fix:** Rewrite from the new `AUDIT.md` before the next guide review. Not edited in T-0008 (list only).
+**Note (2026-10-12, T-0009):** the architecture claims overstate what exists.
+- `REVIEW_BRIEF.md:21-23` says "three-tier microservice split … an independently deployable Python FastAPI service".
+- `REVIEW_BRIEF.md:309-313` says "The spec also mandates independently deployable services".
+
+ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "independently deployable" is PARTIAL: no deploy artefact exists. The rewrite should take its architecture answer from ARCHITECTURE.md §0 and §2.
+
+---
+
+### I-0032 — `README.md` describes an older state
+**Status:** OPEN
+**Severity:** P2
+**Module:** `README.md`
+**Spec ref:** n/a (documentation accuracy)
+**Evidence (re-checked at HEAD `2e87d44`, 2026-10-12):**
+- Persistence "pending" or "in memory": `README.md:5, 38, 40, 50, 149-150, 160, 173, 198`. False: six tables have migrations (`supabase/migrations/`) and jobs persist (`backend/Controllers/jobs.controller.js:57` inserts into Supabase).
+- The API table (`:138-154`) omits routes that exist: `GET /api/jobs/mine`, `GET /api/jobs/:id`, `POST /api/jobs/:id/apply`, `POST /api/jobs/applications/shortlist`, `GET /api/recruiter/applicants`, `GET /api/resume/status`, `POST /api/resume/upload`, `POST /api/auth/resend-confirmation`, `/request-password-reset`, `/reset-password`, `GET /api/notifications`, `POST /api/notifications/:id/read`.
+- The env block (`:100-107`) and `backend/.env.example` omit `NLP_PARSE_URL`, `CREDIBILITY_WEIGHTS`, `NODE_ENV`, `SESSION_SECRET`, `PORT`; the frontend variable `REACT_APP_API_BASE_URL` is not mentioned.
+- Corrupted tree glyphs in the repository-structure block (`:76-78`) and a change log that ends on 2026-09-01.
+**Impact:** New teammates are told the project is earlier than it is and miss required env vars.
+**Proposed fix:** Rewrite the status, API and env sections from `AUDIT.md`. Not edited in T-0008 (list only).
+**Note (2026-10-12, T-0009):**
+- `README.md:61` lists "Passport" in the backend stack; `backend/package.json:15-25` has no Passport (`CODE_MAP.md:500` already says so).
+- The port diagram at `README.md:46-52` is correct apart from "tables pending".
+- `README.md:87` says Python 3.11, while every local venv is 3.14 (I-0038).
+- Architecture facts for the rewrite: ARCHITECTURE.md §1.
+
+---
+
+### I-0033 — `PROJECT_SOURCE_DOCS.md` names MongoDB as the data layer
+**Status:** OPEN
+**Severity:** P3
+**Module:** `PROJECT_SOURCE_DOCS.md`
+**Spec ref:** SRS §2.1 architecture (the spec itself)
+**Evidence:** `PROJECT_SOURCE_DOCS.md:106` — "Data (MongoDB, though implementation has moved to Supabase — treat Supabase as the actual data layer)". The code uses Supabase only (AUDIT "Data model"). CLAUDE.md and `CHECKLIST.md` 0.2 already say Supabase supersedes the SRS wording.
+**Impact:** Low: the line carries its own caveat. The risk is someone reading the SRS excerpt alone.
+**Proposed fix:** Owner decides whether the spec file is edited (it is restored verbatim from `32905c1` on purpose) or the caveat stays. Not edited in T-0008.
+**Note (2026-10-12, T-0009):** the SRS itself (`Docs/C72_Activity-3_LY-Project_2025-27.docx`, §3 System Architecture) reads "A structural view of the **MERN stack** application … the Data Layer (MongoDB)". The excerpt at `PROJECT_SOURCE_DOCS.md:104-107` keeps "MongoDB" but drops "MERN stack". The SRS names no API gateway anywhere. ARCHITECTURE.md §3.2 now records the deviations (AD-1 Supabase for MongoDB; AD-2 an added gateway), so the spec text can stay verbatim.
+
+---
+
+### I-0034 — NLP service is unauthenticated, allows every origin, and analyze forwards any file type to it
+**Status:** OPEN
+**Severity:** P2 (P1 once NLP listens on anything but loopback, e.g. a container with a published port)
+**Module:** `nlp-engine/app/main.py`, `backend/Controllers/analysis.controller.js`
+**Spec ref:** NFR-9, GR-2 (ARCHITECTURE.md §1.4)
+**Evidence (T-0009, `8e8e498`):**
+- `nlp-engine/app/main.py:19-24`: `allow_origins=["*"]`, all methods and headers.
+- `grep` over `nlp-engine/app` finds no `Depends`, `Header`, API key or token check.
+- FastAPI's `/docs`, `/redoc` and `/openapi.json` are on because `main.py:13-17` does not disable them.
+- The only protection is that uvicorn binds 127.0.0.1 (`README.md:123` uses the default host; `tests/run-suite.ps1:74`).
+- **Related, and in AUDIT 1.1's evidence:** the extension check at `backend/Controllers/analysis.controller.js:207-209` belongs to the **upload** handler (`:197-227`). `analyzeResume` (`:229-262`) checks only that a file and a `jobId` exist, then forwards any file type. NLP then raises `ValueError` for anything but `.pdf`/`.docx` (`nlp-engine/app/extractor.py:29`), uncaught, so it returns 500. The backend maps that to a 502 that echoes NLP's body (`analysis.controller.js:263-268`). AUDIT 1.1 cites `:209` as "rejects other types", which is true for upload only. Not edited in T-0009; out of scope.
+
+**Impact:** anything that can reach :8000 can run CPU-heavy parses. With `CORS *`, a web page in the user's browser can call a locally running NLP directly.
+**Proposed fix:**
+- ARCHITECTURE.md M3/M4: NLP becomes internal only (compose network, port not published) and its CORS middleware is removed.
+- Optionally, a shared internal token header checked by NLP.
+- Validate the extension in `analyzeResume` too (or remove analyze once score-on-apply replaces it).
+
+---
+
+### I-0035 — Core can run only as one process
+**Status:** OPEN
+**Severity:** P2
+**Module:** `backend/index.js`, `backend/Routes/auth.routes.js`, `backend/Controllers/auth.controller.js`
+**Spec ref:** NFR-3, NFR-11 (ARCHITECTURE.md §2 "Independent scaling": FAIL)
+**Evidence (T-0009, `8e8e498`):**
+- `express-session` is configured without a `store` (`backend/index.js:30-41`), so it uses the default in-process MemoryStore. Sessions vanish on every restart, and a second process would not see them.
+- The only rate limiter is a module-level `Map` keyed on `req.ip` (`backend/Routes/auth.routes.js:17-21`).
+- Login writes `userId`, `email` and `role` into the existing session without `req.session.regenerate` (`backend/Controllers/auth.controller.js:347-349`). That is the usual session-fixation guard. The risk is low here because `saveUninitialized: false` means no pre-login session ID exists to plant.
+
+**Impact:** core cannot be scaled or restarted without logging everyone out; NFR-3 cannot be met.
+**Proposed fix:** ARCHITECTURE.md §4.3 / M5: stateless Supabase-JWT cookies replace the session (rate limiting moves to the gateway in M3). The roadmap task decides when.
+
+---
+
+### I-0036 — NLP outage handling: raw 500, echoed 502, no timeout or retry, health blind to dependencies
+**Status:** OPEN
+**Severity:** P2
+**Module:** `backend/Controllers/analysis.controller.js`, `backend/index.js`
+**Spec ref:** NFR-12, §7 risk "API failure → retry + fallback" (AUDIT 0.7)
+**Evidence (T-0009, measured by `tests/arch/nlp-outage-probe.mjs`, ARCHITECTURE.md Appendix A):**
+- **P-1, NLP down:** `POST /api/analyze` → **500** `{"message":"Analyze failed","error":"request to http://localhost:8000/parse failed, reason: "}`. The internal URL leaks (`analysis.controller.js:357-359`). AUDIT 0.7 said "502"; corrected in T-0009.
+- **P-2, NLP accepts the connection but never answers:** no response within the 20 s client limit. `node-fetch` is called with no timeout or `signal` (`analysis.controller.js:262`).
+- **A non-2xx from NLP:** 502 whose `error` echoes the NLP response body (`analysis.controller.js:263-268`).
+- **No retry anywhere.**
+- **`/api/health` says `ok` during both outages:** it checks neither NLP nor Supabase (`backend/index.js:62-64`).
+- **What works:** login, `GET /api/jobs`, `GET /api/resume/status` and `POST /api/resume/upload` stay 200 throughout (P-1, P-2).
+
+**Impact:** scoring fails noisily and can hang; monitoring cannot see the outage.
+**Proposed fix:** ARCHITECTURE.md M1 (timeout, one retry on connect errors only, `503 {"error":"nlp_unavailable"}` + `Retry-After`, no raw text). M3 adds the aggregated health (`degraded` when NLP is down).
+
+---
+
+### I-0037 — NLP `/parse` blocks the event loop
+**Status:** OPEN
+**Severity:** P2
+**Module:** `nlp-engine/app/main.py`
+**Spec ref:** NFR-1, NFR-2, NFR-3
+**Evidence (T-0009):**
+- `parse_resume` is declared `async def` (`nlp-engine/app/main.py:49`) but calls synchronous, CPU-bound code (`extract_text`, spaCy, S-BERT; `:66-77`) directly. FastAPI therefore runs it on the event loop instead of the thread pool.
+- **Probe P-3:** `GET /` takes 2 ms idle but 92 ms when sent 150 ms into a 249 ms parse, so it waited for the parse to finish. Two concurrent parses finished at 253 and 558 ms, i.e. one after the other.
+
+**Impact:**
+- One NLP process serves one parse at a time. With real resumes at 0.88–1.16 s each (`tests/BASELINE_RESULTS.md:64-65`), the tenth simultaneous analyze waits about 10 s (NFR-1).
+- A health probe with a short timeout can report NLP as down while it is busy.
+
+**Proposed fix:** ARCHITECTURE.md M1: declare the handler `def` (FastAPI runs it in its thread pool). Add workers only after measuring, because each worker loads its own models.
+
+---
+
+### I-0038 — Python environment not reproducible
+**Status:** OPEN
+**Severity:** P2
+**Module:** `nlp-engine/requirements.txt`, `README.md`, local venvs
+**Spec ref:** GR-2 "independently deployable" (ARCHITECTURE.md §2)
+**Evidence (T-0009):**
+- `nlp-engine/requirements.txt:2-21` lists packages with no versions. `python-dotenv` (`:21`) is never imported.
+- The spaCy model is a separate manual step (`:12-13`).
+- Three venvs exist:
+  - `nlp-engine/venv`, used by `tests/run-suite.ps1:43`;
+  - `nlp-engine/.venv`;
+  - a root `.venv` with newer packages and **no** `en_core_web_sm`, so the app fails at `spacy.load` there.
+- All three are Python 3.14, while `README.md:87` says "Python 3.11 or compatible".
+
+**Impact:** a clean machine or a container build can install different versions than the ones tested. Which venv is canonical is tribal knowledge.
+**Proposed fix:** ARCHITECTURE.md M4: pin versions (`pip freeze` from the tested `nlp-engine/venv`, CPU-only torch), install the spaCy model in the image, pick one Python version (3.11/3.12 for wheel availability), and delete the two extra venvs.
+
+---
+
+### I-0039 — Backend cruft found during the architecture audit
+**Status:** OPEN
+**Severity:** P3
+**Module:** `backend/`, `dev/`
+**Spec ref:** n/a (cleanup)
+**Evidence (T-0009, `8e8e498`):**
+- `bcrypt` is a dependency (`backend/package.json:17`) that nothing imports (grep `from 'bcrypt'`: 0).
+- `backend/Middlewares/authCand.Middleware.js` and `authRec.Middleware.js` are tracked, 0-byte files.
+- `backend/.env` defines `GOOGLE_CLIENT_ID/SECRET` and `GITHUB_CLIENT_ID/SECRET`, but no code reads them (grep: 0). They hint at OAuth that was never built (AUDIT 0.4).
+- `backend/uploads/` is an empty local directory that no code references.
+- `dev/null` is a tracked empty file (added in `f2a135c`), probably a shell redirect committed by accident on Windows.
+- `backend/Controllers/githubAggregator.js` is already recorded as dead code (AUDIT 2.3).
+
+**Impact:** confusion only; the unused env vars suggest OAuth exists.
+**Proposed fix:** delete in a cleanup task; keep the OAuth variables only once M5/OAuth uses them.
+
+---
+
 ## Resolved
+
+### I-0008 — `Docs/IMPLEMENTATION-TRACKER.md` Firestore/MongoDB sections are stale doc drift (RESOLVED)
+**Status:** RESOLVED T-0008: tracker archived, Firestore/MongoDB content replaced by the verified Supabase data model in `AUDIT.md`.
+**Severity:** P2
+**Module:** `Docs/IMPLEMENTATION-TRACKER.md`
+**Spec ref:** n/a (documentation accuracy, not a feature)
+**Evidence (verified 2026-10-12 per user request before filing):**
+- Repo-wide case-insensitive grep for `firebase|firestore` across all
+  `.js/.jsx/.json/.py/.env*/.txt/.md` files (excluding `node_modules`,
+  `venv`, `.git`) found **zero** Firebase/Firestore dependencies or
+  integration code anywhere. The only hit outside the tracker doc itself is
+  `nlp-engine/app/ner.py:19`, where `"firebase"` is just a generic string in
+  the `SKILL_KEYWORDS` list (for matching it on resumes) — not a project
+  dependency.
+- `git log -S "Firestore" -- Docs/IMPLEMENTATION-TRACKER.md` resolves to a
+  single commit, `ad4f694` ("merge: integrate Aaron, Anthony, and
+  aditya-ui-work into main") — a merge commit. The file has no prior history
+  on either merge parent in this branch's log, so the exact original
+  authoring commit isn't resolvable from current history; it entered `main`
+  as part of that three-way branch integration.
+- Per CLAUDE.md, Supabase is the authoritative DB (the SRS originally
+  specified MongoDB; Supabase was the actual implementation choice) — so the
+  tracker's "Database (Document): Firebase Firestore" row and the
+  MongoDB-to-Supabase-"+Firestore" migration section (lines 17, 60-118,
+  165-169, 180-182, 249) describe a plan that was never implemented and
+  isn't the current direction.
+- Cross-check of the Firestore collections the tracker names against actual
+  Supabase tables (`supabase/migrations/*.sql`):
+  | Tracker concept | Actual Supabase equivalent |
+  |---|---|
+  | `users` | `auth.users` (Supabase Auth) + `public.profiles` |
+  | `audit_logs` | **missing** — no migration |
+  | `job_descriptions` | `public.jobs` (relational, not document — same data shape, different storage model) |
+  | `parsed_profiles` | **missing** — no table for NLP output (skills/experience/education/projects/noun_chunks/similarity_score) |
+  | `github_metrics` | **missing** |
+  | `assessments` | **missing** (`public.applications` has a status enum only, no assessment data; see I-0005) |
+  | `credibility_scores` | partially exists as an undocumented `public.scores` table — see [I-0007](#i-0007--scores-table-referenced-by-backend-but-not-in-any-migration) |
+**Impact:** Low direct runtime impact (no code depends on this doc), but it
+risks misleading anyone writing a task spec who cites this section as the
+current DB plan, and it's the apparent source of the `credibility_scores`
+naming that doesn't match the real `scores` table.
+**Note (2026-10-12, L-0005) — `PROJECT_SOURCE_DOCS.md` (restored verbatim from
+`32905c1`) also disagrees with the code, left unedited on purpose:** line 106
+says "Data (MongoDB, though implementation has moved to Supabase — ..." and
+the spec's database wording is MongoDB-based while the code uses Supabase
+(Firestore appears only in `Docs/IMPLEMENTATION-TRACKER.md`, not in the spec —
+grep of the spec finds no `firestore`/`firebase`). Any reconciliation of the
+spec's MongoDB references belongs in the same tracker-reconciliation task.
+**Proposed fix:** Out of scope for this session (documentation-only setup
+task, not a tracker reconciliation). Leave the tracker as-is until a
+dedicated tracker-reconciliation task; this entry exists so the drift is
+visible before anyone cites that section as current.
+**Note (2026-10-12, T-0002):** inputs for the tracker task are in INTEGRATION_REVIEW.md §8 and row R40:
+- **Missing docs:** CHECKLIST / AUDIT / `Docs/project_checklist.md` are missing at HEAD (deleted by `314e494`).
+- **Wrong claims:** the tracker also claims "MongoDB models", "Custom NER" and recruiter charts/alerts are done (`:44,50,31`).
+- **Name mismatch:** CLAUDE.md's doc names don't match the repo's.
+**Evidence of resolution** (T-0008, verified at HEAD `2e87d44`, 2026-10-12):
+- `Docs/IMPLEMENTATION-TRACKER.md` and `Docs/project_checklist.md` moved to `Docs/archive/` with headers saying why (Firestore plan never implemented; three done-claims contradicted by code). Its missing-feature list was diffed into `CHECKLIST.md`: every item maps to an id or to Appendix A (X-1, X-2).
+- The verified Supabase tables replace the Firestore/MongoDB content: `AUDIT.md` "Data model". Corrections to the table in this entry: `credibility_scores` is `public.scores` (`supabase/migrations/20260903_create_resumes_and_scores.sql:41`; I-0007 is resolved) and `parsed_profiles` is columns on `public.resumes` (`:18`), not a missing table. Still no table for `audit_logs` (X-1), `github_metrics` (2.11) or `assessments` (3.12).
+- The note above that CHECKLIST, AUDIT and `project_checklist` are "missing at HEAD" is out of date: restored by `a7c74e4`, reconciled in T-0008. CLAUDE.md's file names are fixed.
+- INTEGRATION_REVIEW §8 lists `Docs/Architecture.md` as present; `a7c74e4` deleted it again (it is not in `Docs/`).
+- `grep -rniE "firestore|firebase|mongo" *.md` outside `Docs/archive/` now hits only: explanations that the SRS said MongoDB (CHECKLIST 0.2, CLAUDE.md), the AUDIT statement that none exists, `REVIEW_BRIEF.md` (I-0031), `PROJECT_SOURCE_DOCS.md:106` (I-0033), history in ISSUES, WORKLOG, tasks and INTEGRATION_REVIEW, and a lockfile note in `tests/BASELINE_RESULTS.md:25`.
+- The spec's own MongoDB wording moved to I-0033.
 
 ### I-0021 — `requireAuth` fails open (RESOLVED)
 **Status:** RESOLVED T-0006: fail-closed check restored (R35).
