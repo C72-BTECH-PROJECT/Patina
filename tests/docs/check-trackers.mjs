@@ -13,6 +13,10 @@
 //  - CLAIMED_UNVERIFIED is for claims nobody has checked: no code-read implied
 //  - AUDIT.md says which commit it was verified at; GF-1..GF-5 and the required
 //    new items are present; CLAUDE.md only names files that exist
+//  - ARCHITECTURE.md (T-0009): every file:line cite resolves; every row of a table
+//    with an "Evidence" column cites a file:line or a probe id (P-n); "Verdict"
+//    cells are PASS/PARTIAL/FAIL; its "Verified at commit" is a real commit.
+//    This proves the cites exist, not that they still say what the doc claims.
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
@@ -131,6 +135,41 @@ for (const m of read('CLAUDE.md').matchAll(/`([^`\s]+\.md)`/g)) {
   if (!existsSync(resolve(root, p))) fail(`CLAUDE.md names a file that does not exist: ${p}`);
 }
 
+// ---- ARCHITECTURE.md (T-0009)
+const isCommit = (sha) => {
+  try { execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: root, stdio: 'ignore' }); return true; }
+  catch { return false; }
+};
+let archCites = 0;
+if (!existsSync(resolve(root, 'ARCHITECTURE.md'))) fail('ARCHITECTURE.md is missing');
+else {
+  const arch = read('ARCHITECTURE.md');
+  for (const m of arch.matchAll(citeRe)) {
+    const p = m[1].replace(/\\/g, '/');
+    const n = lines(p);
+    const last = Number(m[3] ?? m[2]);
+    if (n < 0) fail(`ARCHITECTURE.md: cited file does not exist: ${p}`);
+    else if (last > n || Number(m[2]) < 1) fail(`ARCHITECTURE.md: cite ${p}:${m[2]}${m[3] ? '-' + m[3] : ''} is past end of file (${n} lines)`);
+    else archCites++;
+  }
+  for (const t of tables(arch)) {
+    const iEv = col(t, 'evidence'), iVer = col(t, 'verdict');
+    for (const r of t.rows) {
+      if (iEv >= 0) {
+        const ev = r[iEv] ?? '';
+        if (![...ev.matchAll(citeRe)].length && !/\bP-\d+[a-z]?\b/.test(ev)) fail(`ARCHITECTURE.md: row "${r[0]}" has no file:line or P-n in its Evidence cell`);
+      }
+      if (iVer >= 0) {
+        const verdict = (r[iVer] ?? '').replace(/[*`]/g, '').trim();
+        if (!/^(PASS|PARTIAL|FAIL)$/.test(verdict)) fail(`ARCHITECTURE.md: row "${r[0]}" has verdict "${verdict}" (want PASS, PARTIAL or FAIL)`);
+      }
+    }
+  }
+  const av = arch.match(/Verified at commit:\s*`?([0-9a-f]{7,40})`?/i);
+  if (!av) fail('ARCHITECTURE.md has no "Verified at commit: <hash>" line');
+  else if (!isCommit(av[1])) fail(`ARCHITECTURE.md "Verified at commit" ${av[1]} is not a commit in this repo`);
+}
+
 // ---- status changes vs AUDIT@32905c1
 if (process.argv.includes('--changes')) {
   let old = '';
@@ -171,4 +210,4 @@ if (problems.length) {
   for (const p of problems) console.error(`  - ${p}`);
   process.exit(1);
 }
-console.log(`check-trackers: ids ${checkIds.length}/${auditIds.length} matched, ${rows.length} rows OK, verified at ${v[1]}`);
+console.log(`check-trackers: ids ${checkIds.length}/${auditIds.length} matched, ${rows.length} rows OK, verified at ${v[1]}; ARCHITECTURE.md ${archCites} cites OK`);

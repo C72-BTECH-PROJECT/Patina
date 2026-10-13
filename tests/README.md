@@ -38,7 +38,8 @@ nlp-engine\venv\Scripts\python tests\fixtures\make_fixtures.py
 powershell -File tests\run-suite.ps1 -Target baseline                 # nlp + backend tier 1 + frontend build + docs
 powershell -File tests\run-suite.ps1 -Target baseline -Suites nlp
 powershell -File tests\run-suite.ps1 -Target baseline -Suites backend -Live   # + tier 2 (writes to Supabase)
-powershell -File tests\run-suite.ps1 -Target current -Suites docs           # CHECKLIST/AUDIT/CLAUDE.md drift check (T-0008), no services
+powershell -File tests\run-suite.ps1 -Target current -Suites docs           # CHECKLIST/AUDIT/CLAUDE.md/ARCHITECTURE.md drift check (T-0008, T-0009), no services
+node tests\arch\nlp-outage-probe.mjs                                          # NLP down/hung/busy probe (T-0009); starts its own backend and NLP, ports 5000/8000 must be free
 ```
 
 The script starts NLP (`PYTHONHASHSEED=0`, HF offline) and the backend from
@@ -53,6 +54,8 @@ logs to `tests/.out/` (git-ignored).
 | Backend tier 1 | `backend/smoke.test.mjs` | No writes; one `profiles` read (unknown-username login). |
 | Backend tier 2 | `backend/live-analyze.test.mjs` | **Live.** Dedicated `t0001_cand` / `t0001_recr` accounts (`tests/.env`), a job tagged `[T-0001 TEST]`, sweep before and after. |
 | Frontend | `CI=true npm run build` | None. |
+| Docs | `docs/check-trackers.mjs` | None. Also checks that every `file:line` in `ARCHITECTURE.md` resolves (T-0009). |
+| Architecture probe (not in the default suites) | `arch/nlp-outage-probe.mjs` | **Live.** One `[T-0001 TEST]` job and one upload under `resumes/candidates/<C>/`, swept before and after. With NLP down or hung, analyze stops before any write; P-1/P-2 refuse to run if :8000 answers. Prints a table only, asserts nothing (T-0009). |
 | Manual | `MANUAL_SMOKE.md` | Live, via the UI — finish with `node tests/backend/sweep.mjs`. |
 
 The sweep (`backend/lib/testdb.mjs`) deletes only: `scores`, `resumes`,

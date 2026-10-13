@@ -200,7 +200,7 @@ Recorded as stated by the owner on 2026-10-12. Not in `PROJECT_SOURCE_DOCS.md`.
 | # | Item | "Done correctly" means |
 |---|---|---|
 | GR-1 | Assessment anti-cheat (guide review, Sep 2026) | "Before the LLM/PFQS assessment module is built, design a mechanism that prevents candidates from cheating on it." Done = a written design for the mechanism exists **before** Module 3 is built, and the built module implements it. Spec hook: 3.2 means non-reusable questions only; it does not cover candidate behaviour. |
-| GR-2 | Microservices / API gateway verified (guide feedback, Oct 2026) | "Identify the API gateway and verify the system actually follows the microservices architecture claimed in the SRS; fix it if it doesn't." Done = the gateway is named, each claimed service is checked against 0.1 / NFR-3, and gaps are fixed or recorded. Extends 0.1. Pending the architecture-audit task. |
+| GR-2 | Microservices / API gateway verified (guide feedback, Oct 2026) | "Identify the API gateway and verify the system actually follows the microservices architecture claimed in the SRS; fix it if it doesn't." Done = the gateway is named, each claimed service is checked against 0.1 / NFR-3, and gaps are fixed or recorded. Extends 0.1. Audit, target design and migration steps: `ARCHITECTURE.md` (T-0009). |
 
 ## Appendix A: team-proposed items not in the spec
 

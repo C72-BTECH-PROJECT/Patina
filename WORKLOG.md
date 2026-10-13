@@ -222,3 +222,19 @@ rollup per archived month at the top of this file.
 - Files changed: AUDIT.md, CHECKLIST.md, CLAUDE.md, ISSUES.md, tests/run-suite.ps1, tests/README.md; new tasks/T-0008, tests/docs/, Docs/archive/; two Docs/ files moved.
 - Issues logged: I-0030 (CODE_MAP), I-0031 (REVIEW_BRIEF), I-0032 (README), I-0033 (spec MongoDB wording); I-0008 resolved; note on I-0001.
 - Next: owner commits T-0008; then the architecture audit (GR-2), score-on-apply and merged dashboard (5.14, 5.15).
+
+## L-0019 · 2026-10-12 · T-0009 architecture audit (GR-2): as-is, verdict, to-be, migration
+- Prompt: GR-2 audit (API gateway? microservices as the SRS claims?): ARCHITECTURE.md + plan; owner approved D1–D4, rewrote the §0 brief, M1–M4 marked "minimum that answers GR-2".
+- Task: T-0009 (criteria 1-9, 14-18 PASS; 10-12 content PASS, owner judgement; 13 Mermaid render pending owner).
+- Done: ARCHITECTURE.md (187 cites; as-is, 7-row verdict, drift + accepted deviations, to-be, compose draft, M1–M9); `tests/arch/nlp-outage-probe.mjs`; check-trackers now checks ARCHITECTURE.md cites/verdicts.
+- Findings: no gateway; Express = monolithic core + browser's only API; 1 of 3 services; sessions in MemoryStore (NFR-3 FAIL); NLP down → analyze 500 (not 502), hung → no reply in 20 s; NLP serialises parses.
+- Verification: checker green + 3 red checks; docs suite 0; probe exit 0 twice, sweep --check 0, ports free; greps per criteria.
+- Files changed: AUDIT, CHECKLIST, CLAUDE.md, ISSUES, WORKLOG, tests/README.md, tests/docs/check-trackers.mjs (mod); ARCHITECTURE.md, tasks/T-0009, tests/arch/ (new).
+- Issues logged: I-0034..I-0039; notes on I-0012, I-0031, I-0032, I-0033 (SRS docx says "MERN stack"). AUDIT 1.1 cite is in the upload handler (in I-0034).
+- Owner decisions, recorded in ARCHITECTURE.md §4 "Decisions recorded":
+  - DEC-1: thin Node gateway, accepted.
+  - DEC-2: M3 forward-auth via `/api/auth/me`, accepted. Constraints: only the session cookie is forwarded; `/me` has no limiter and fast 401s; explicit allowlist, deny by default; fails closed; M6 replaces it.
+  - DEC-3: JWT target, accepted; timing set by the roadmap.
+  - DEC-4: GitHub evidence and assessment as Python services, accepted in principle; owners TBD.
+  - Checker: 205 cites OK.
+- Next: owner checks Mermaid render and §0; commits; roadmap task sequences M1–M4 vs score-on-apply (5.14) and M5+; team assigns owners for DEC-4.

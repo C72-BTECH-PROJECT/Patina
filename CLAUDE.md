@@ -13,6 +13,10 @@ about the project — not feature status.
   test is `CODE_REVIEWED_UNTESTED` (the row names the test that would promote it);
   a claim nobody has checked is `CLAIMED_UNVERIFIED`. `node tests/docs/check-trackers.mjs` (the `docs`
   suite of `tests/run-suite.ps1`) enforces this; run it after editing either file.
+- **How the system is wired, and the target architecture:** `ARCHITECTURE.md`
+  (root). Its as-is claims cite `file:line` at its verified-at commit, and the
+  `docs` suite checks that the cites resolve. Its §4–§5 (to-be, migration) are
+  proposals, not status; status stays in AUDIT.md.
 - `Docs/archive/project_checklist.md` and `Docs/archive/IMPLEMENTATION-TRACKER.md`
   are archived team self-reports (T-0008). Do NOT treat them as accurate:
   checked boxes there are not evidence. They are history, not a pointer.
@@ -46,7 +50,8 @@ Guide-review items, owner-reported (no written source in the repo):
   built, design a mechanism that prevents candidates from cheating on it.
 - `GR-2` (guide feedback, Oct 2026): identify the API gateway and verify the
   system actually follows the microservices architecture claimed in the SRS;
-  fix it if it doesn't. Unverified until the architecture-audit task.
+  fix it if it doesn't. Audited in T-0009; findings and the migration plan
+  are in `ARCHITECTURE.md`.
 
 ## Working agreements for this repo
 - Never mark something as done, correct, or complete without actually
