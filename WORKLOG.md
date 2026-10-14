@@ -238,3 +238,14 @@ rollup per archived month at the top of this file.
   - DEC-4: GitHub evidence and assessment as Python services, accepted in principle; owners TBD.
   - Checker: 205 cites OK.
 - Next: owner checks Mermaid render and §0; commits; roadmap task sequences M1–M4 vs score-on-apply (5.14) and M5+; team assigns owners for DEC-4.
+
+## L-0020 · 2026-10-14 · T-0010 roadmap (ROADMAP.md, DEC-5/DEC-6, Phase 1 specs T-0011..T-0015)
+- Prompt: three-phase roadmap (GitHub microservice → existing features as microservices + score-on-apply/merged dashboard → improvements), then specs for the first Phase 1 tasks; docs only.
+- Task: T-0010 (12/12 criteria PASS; 6-8 and the content half of 10 are the owner's judgement). Owner answers: stateless first; DEC-5 internal only; coverage = warning; FE runner → P1-8.
+- Done: ROADMAP.md (35 items: P1-1..9, P2-1..9, P3-1..17; contract v1, GF-4 reasons, rate limits, recorded-response tests, LinkedIn/cert feasibility, Mermaid graph); checker ROADMAP rules;
+  ARCHITECTURE DEC-3 timing (M5 = P2-7, after M4), DEC-5, DEC-6, §4.1/4.2/4.3/4.4/M8 de-routed; CLAUDE.md pointer; specs T-0011..T-0015 (unapproved).
+- Verification: red (ROADMAP missing) exit 1; reds for size XL, forward dependency, 2.99/I-9999 → exit 1; warning run exit 0 with 2 warnings; each restored, SHA-256 equal.
+  Final checker 0 warnings, ARCHITECTURE 205 cites OK; run-suite docs 0.
+- Files changed: ARCHITECTURE.md, CLAUDE.md, ISSUES.md, WORKLOG.md, tests/README.md, tests/docs/check-trackers.mjs (mod); ROADMAP.md, tasks/T-0010..T-0015 (new).
+- Issues logged: I-0040 (relative GitHub link), I-0041 (stale migration comment), I-0042 (checker skips .yml/.toml cites). Noted, not edited: ARCHITECTURE §0 pt 5 order vs the roadmap.
+- Next: owner reviews ROADMAP and commits; approves T-0011 (needs a GitHub token + octocat recording) and T-0013 (no deps); T-0012 has 2 open questions; team assigns DEC-4 owners.

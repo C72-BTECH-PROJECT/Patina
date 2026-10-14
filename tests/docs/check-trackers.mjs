@@ -17,7 +17,14 @@
 //    with an "Evidence" column cites a file:line or a probe id (P-n); "Verdict"
 //    cells are PASS/PARTIAL/FAIL; its "Verified at commit" is a real commit.
 //    This proves the cites exist, not that they still say what the doc claims.
-import { readFileSync, existsSync } from 'node:fs';
+//  - ROADMAP.md (T-0010), hard failures: every item table has the columns Id, Item,
+//    Depends on, Size, Files, Moves, Issues, Task; ids are unique; Size is S/M/L;
+//    every Pn-m in "Depends on" is an item defined in an earlier row (dependency
+//    order); every CHECKLIST id in Moves, every I-NNNN anywhere in the file and every
+//    T-NNNN in Task exists; every file:line cite resolves.
+//    Warnings only (exit 0): an OPEN issue or a CODE_REVIEWED_UNTESTED row that no
+//    item maps, because issues are logged mid-session before ROADMAP catches up.
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +40,8 @@ const REQUIRED_IDS = ['GR-1', 'GR-2', 'X-1', 'X-2'];
 const REQUIRED_GF = ['GF-1', 'GF-2', 'GF-3', 'GF-4', 'GF-5'];
 const problems = [];
 const fail = (m) => problems.push(m);
+const warnings = [];
+const warn = (m) => warnings.push(m);
 
 const cells = (line) =>
   line.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/).map((c) => c.trim());
@@ -170,6 +179,67 @@ else {
   else if (!isCommit(av[1])) fail(`ARCHITECTURE.md "Verified at commit" ${av[1]} is not a commit in this repo`);
 }
 
+// ---- ROADMAP.md (T-0010)
+const ROADMAP_COLS = ['id', 'item', 'depends on', 'size', 'files', 'moves', 'issues', 'task'];
+let roadmapItems = 0;
+if (!existsSync(resolve(root, 'ROADMAP.md'))) fail('ROADMAP.md is missing');
+else {
+  const roadmap = read('ROADMAP.md');
+  const plain = (s) => (s ?? '').replace(/[*`]/g, '').trim();
+  const issueIds = new Set([...read('ISSUES.md').matchAll(/^###\s+(I-\d{4})\b/gm)].map((m) => m[1]));
+  const taskIds = new Set(readdirSync(resolve(root, 'tasks')).map((f) => (f.match(/^(T-\d{4})-/) || [])[1]).filter(Boolean));
+  const defined = new Set();
+  const mapped = { issues: new Set(), moves: new Set() };
+  for (const t of tables(roadmap)) {
+    if (t.header[0] !== 'id' || col(t, 'size') < 0) continue;
+    const idx = Object.fromEntries(ROADMAP_COLS.map((c) => [c, t.header.indexOf(c)]));
+    const missingCols = ROADMAP_COLS.filter((c) => idx[c] < 0);
+    if (missingCols.length) { fail(`ROADMAP.md: item table "${t.header.join(' | ')}" lacks column(s): ${missingCols.join(', ')}`); continue; }
+    for (const r of t.rows) {
+      const id = plain(r[idx.id]);
+      if (!/^P[1-9]-\d+$/.test(id)) { fail(`ROADMAP.md: item id "${id}" is not of the form Pn-m`); continue; }
+      if (defined.has(id)) fail(`ROADMAP.md: duplicate item id ${id}`);
+      const size = plain(r[idx.size]);
+      if (!/^(S|M|L)$/.test(size)) fail(`ROADMAP.md: ${id} has size "${size}" (want S, M or L)`);
+      for (const [dep] of plain(r[idx['depends on']]).matchAll(/\bP[1-9]-\d+\b/g)) {
+        if (!defined.has(dep)) fail(`ROADMAP.md: ${id} depends on ${dep}, which is not defined in an earlier row`);
+      }
+      for (const c of ROADMAP_COLS) if (!plain(r[idx[c]])) fail(`ROADMAP.md: ${id} has an empty "${c}" cell`);
+      for (const [mv] of plain(r[idx.moves]).matchAll(/(?<![\w.])(\d+\.\d+[a-z]?|GR-\d+|X-\d+)(?![\w.])/g)) {
+        if (!checkIds.includes(mv)) fail(`ROADMAP.md: ${id} moves ${mv}, which is not a CHECKLIST id`);
+        mapped.moves.add(mv);
+      }
+      for (const [tk] of plain(r[idx.task]).matchAll(/\bT-\d{4}\b/g)) {
+        if (!taskIds.has(tk)) fail(`ROADMAP.md: ${id} names task ${tk}, which has no tasks/${tk}-*.md`);
+      }
+      for (const cell of r) for (const [is] of cell.matchAll(/\bI-\d{4}\b/g)) mapped.issues.add(is);
+      defined.add(id);
+      roadmapItems++;
+    }
+  }
+  if (!roadmapItems) fail('ROADMAP.md has no item tables (header starting "Id" with a "Size" column)');
+  for (const [is] of roadmap.matchAll(/\bI-\d{4}\b/g)) if (!issueIds.has(is)) fail(`ROADMAP.md names ${is}, which is not in ISSUES.md`);
+  for (const m of roadmap.matchAll(citeRe)) {
+    const p = m[1].replace(/\\/g, '/');
+    const n = lines(p);
+    const last = Number(m[3] ?? m[2]);
+    if (n < 0) fail(`ROADMAP.md: cited file does not exist: ${p}`);
+    else if (last > n || Number(m[2]) < 1) fail(`ROADMAP.md: cite ${p}:${m[2]}${m[3] ? '-' + m[3] : ''} is past end of file (${n} lines)`);
+  }
+  // coverage: warnings only
+  for (const t of tables(read('ISSUES.md'))) {
+    const iStat = col(t, 'status');
+    if (t.header[0] !== 'id' || iStat < 0) continue;
+    for (const r of t.rows) {
+      const is = plain(r[0]);
+      if (/^(OPEN|IN-PROGRESS)/.test(plain(r[iStat])) && !mapped.issues.has(is)) warn(`open issue ${is} is not in any ROADMAP.md item row`);
+    }
+  }
+  for (const r of rows) {
+    if (r.status === 'CODE_REVIEWED_UNTESTED' && !mapped.moves.has(r.id)) warn(`CODE_REVIEWED_UNTESTED row ${r.id} is not in any ROADMAP.md item's Moves`);
+  }
+}
+
 // ---- status changes vs AUDIT@32905c1
 if (process.argv.includes('--changes')) {
   let old = '';
@@ -205,9 +275,10 @@ if (process.argv.includes('--summary')) {
   console.log(`| **All** | ${tot.map((n) => `**${n}**`).join(' | ')} | **${rows.length}** |`);
 }
 
+for (const w of warnings) console.error(`warning: ${w}`);
 if (problems.length) {
   console.error(`check-trackers: ${problems.length} problem(s)`);
   for (const p of problems) console.error(`  - ${p}`);
   process.exit(1);
 }
-console.log(`check-trackers: ids ${checkIds.length}/${auditIds.length} matched, ${rows.length} rows OK, verified at ${v[1]}; ARCHITECTURE.md ${archCites} cites OK`);
+console.log(`check-trackers: ids ${checkIds.length}/${auditIds.length} matched, ${rows.length} rows OK, verified at ${v[1]}; ARCHITECTURE.md ${archCites} cites OK; ROADMAP.md ${roadmapItems} items OK, ${warnings.length} warning(s)`);

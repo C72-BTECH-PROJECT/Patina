@@ -46,6 +46,9 @@ diff you're already writing.
 | I-0037 | NLP `/parse` is `async def` but CPU-bound: parses run one at a time and block `GET /` | `nlp-engine/app/main.py` | P2 | OPEN | 2026-10-12, T-0009 |
 | I-0038 | Unpinned `requirements.txt`; three Python venvs, one without the spaCy model; Python 3.14 vs README 3.11 | `nlp-engine/requirements.txt`, `README.md` | P2 | OPEN | 2026-10-12, T-0009 |
 | I-0039 | Backend cruft: unused `bcrypt`, two empty middleware files, unused OAuth env vars, empty `backend/uploads/`, tracked `dev/null` | `backend/`, `dev/` | P3 | OPEN | 2026-10-12, T-0009 |
+| I-0040 | Recruiter "GitHub profile" link is relative when the parsed link has no scheme | `frontend/src/components/recruiter/CandidateModal.jsx` | P3 | OPEN | 2026-10-14, T-0010 |
+| I-0041 | `scores.subscores` comment in the migration says `"github_evidence": null`; code stores a full unavailable object | `supabase/migrations/20260903_create_resumes_and_scores.sql` | P3 | OPEN | 2026-10-14, T-0010 |
+| I-0042 | Docs checker silently skips cites to `.yml`/`.yaml`/`.toml`/`.ts` files and paths with spaces | `tests/docs/check-trackers.mjs` | P3 | OPEN | 2026-10-14, T-0010 |
 
 ---
 
@@ -558,6 +561,51 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 
 **Impact:** confusion only; the unused env vars suggest OAuth exists.
 **Proposed fix:** delete in a cleanup task; keep the OAuth variables only once M5/OAuth uses them.
+
+---
+
+### I-0040 — Recruiter "GitHub profile" link is relative when the parsed link has no scheme
+**Status:** OPEN
+**Severity:** P3
+**Module:** `frontend/src/components/recruiter/CandidateModal.jsx`
+**Spec ref:** FR-15 (recruiter view), loosely
+**Evidence (T-0010, HEAD `c74c5ec`):**
+- The NLP pattern makes the scheme optional: `(?:https?://)?(?:www\.)?github\.com/...` (`nlp-engine/app/ner.py:545`).
+- So the stored value is usually scheme-less. Every fixture that has a link gives one: `"github": "github.com/example-mokafor"` in `tests/nlp/snapshots/current/f1_dev_github.json`, and the same form for f2 and f5.
+- Core passes it through unchanged (`backend/Controllers/analysis.controller.js:93`).
+- The modal renders it as `href={person.github}` (`frontend/src/components/recruiter/CandidateModal.jsx:132-134`).
+- A scheme-less `href` resolves relative to the app, e.g. `http://localhost:3000/recruiter/github.com/example-mokafor`.
+
+**Impact:** a recruiter who clicks "GitHub profile" lands on a broken app route instead of the profile.
+**Proposed fix:** core already normalises the link to a login in ROADMAP P1-4. P1-9 (the GitHub evidence UI) builds the link as `https://github.com/<login>` from that login.
+
+---
+
+### I-0041 — Migration comment describes an outdated `scores.subscores` shape
+**Status:** OPEN
+**Severity:** P3
+**Module:** `supabase/migrations/20260903_create_resumes_and_scores.sql`
+**Spec ref:** n/a (documentation accuracy)
+**Evidence (T-0010):**
+- The column comment says `"github_evidence": null, -- module not built yet` and `"assessment_results": null` (`supabase/migrations/20260903_create_resumes_and_scores.sql:48-53`).
+- The code stores a full unavailable sub-score object instead: `{key, label, available:false, value:null, weight:0, reason, components:null, evidence:[]}` (`backend/Services/explainability.js:121-130`, `:447`).
+
+**Impact:** someone reading the schema expects `null` and mis-parses stored rows. Once ROADMAP P1-4 stores real GitHub sub-scores, the comment is wrong in both directions.
+**Proposed fix:** correct the comment in ROADMAP P3-15 (migrations hygiene). Schema is applied by hand (I-0010), so a comment-only change needs no re-apply.
+
+---
+
+### I-0042 — Docs checker silently skips some cites
+**Status:** OPEN
+**Severity:** P3
+**Module:** `tests/docs/check-trackers.mjs`
+**Spec ref:** n/a (tooling)
+**Evidence (T-0010):**
+- The cite pattern accepts only `js|jsx|mjs|py|sql|md|json|ps1|txt|css` files and paths without spaces (`tests/docs/check-trackers.mjs:99`).
+- A cite such as `docker-compose.yml:12` or `pyproject.toml:3` is therefore not checked at all. It passes whether or not the line exists.
+
+**Impact:** none today, because no tracker cites such a file. ROADMAP P2-6 (M4) adds compose files and Dockerfiles that ARCHITECTURE.md and AUDIT.md will cite.
+**Proposed fix:** add `yml|yaml|toml|ts|tsx|ini|cfg` and extensionless `Dockerfile` to the pattern in P2-6, with a red run.
 
 ---
 

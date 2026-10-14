@@ -320,15 +320,20 @@ Anything not listed here is still a proposal.
 |---|---|---|---|
 | DEC-1 | The API gateway is a thin Node service (Express 5 + http-proxy-middleware + jose + express-rate-limit + cors), not Nginx, Kong or Traefik | **Accepted** | §4.6 |
 | DEC-2 | Until token auth exists, the gateway checks auth by forward-auth to core's `GET /api/auth/me`, under fixed constraints and an explicit public allowlist. M6 replaces it with token verification | **Accepted** | §5 M3, M6 |
-| DEC-3 | Target auth is Supabase JWTs in httpOnly cookies, verified by the gateway and by core (D4) | **Accepted as the target**; the roadmap task decides when (M5) | §4.3 |
+| DEC-3 | Target auth is Supabase JWTs in httpOnly cookies, verified by the gateway and by core (D4) | **Accepted as the target**; timing set by the roadmap (T-0010): M5 is `ROADMAP.md` P2-7, after M4 and before M6/M7 | §4.3 |
 | DEC-4 | GitHub evidence and assessment are separate Python services, each with its own schema | **Accepted in principle**; owners to be decided with the team | §4.4, §4.5 |
+| DEC-5 | github-evidence is **internal only**: core calls it; the browser never does, and the gateway routes nothing to it. A browser-facing route is added only when a feature needs one (e.g. GitHub OAuth connect) | **Accepted** (owner, 2026-10-14, T-0010) | §4.1, §4.2, §4.4, §5 M8 |
+| DEC-6 | github-evidence starts **stateless**: core keeps the evidence snapshot inside the score row. Its `github` schema and `github_svc` role arrive with 8DFS, when per-repository results are worth caching | **Accepted** (owner, 2026-10-14, T-0010) | §4.5; `ROADMAP.md` P1-7 |
+
+Decided by the owner on 2026-10-14 in T-0010: DEC-5 and DEC-6, and DEC-3's timing.
 
 Still proposals:
 - core stays one service (AD-3);
 - the data-per-service details (§4.5);
 - the compose layout (§4.7);
-- the timeout values (§4.8);
-- the M5+ order (§5).
+- the timeout values (§4.8).
+
+The M5+ order (§5) is now sequenced in `ROADMAP.md` (T-0010).
 
 ### 4.1 Diagram (to-be)
 
@@ -353,7 +358,6 @@ flowchart LR
   LLM["LLM API"]
   FE -->|"one origin, httpOnly cookie"| GW
   GW -->|"/api/* (default)"| CORE
-  GW -->|"/api/github/*"| GHS
   GW -->|"/api/assessment/*"| ASM
   GW -.->|"JWKS, after M5"| AUTH
   CORE -->|"POST /parse, timeout, 503"| NLP
@@ -376,7 +380,7 @@ the network.
 
 | Responsibility | Mechanism (thin Node gateway: Express 5 + http-proxy-middleware v3 + jose + express-rate-limit + cors) |
 |---|---|
-| Routing | Path prefixes: `/api/github/*` → github-evidence, `/api/assessment/*` → assessment, everything else under `/api` → core; `/` serves the built frontend. Use `pathFilter`, not `app.use('/api', proxy)`, which strips the prefix. Register no body parser before the proxy, or multipart uploads and login hang. Express 5 wildcards are `/*splat`. A custom `on.error` returns `502 {"error":"upstream_unavailable","service":"core"}` instead of the library's default plain-text 504. |
+| Routing | Path prefixes: `/api/assessment/*` → assessment, everything else under `/api` → core (github-evidence gets no route: DEC-5); `/` serves the built frontend. Use `pathFilter`, not `app.use('/api', proxy)`, which strips the prefix. Register no body parser before the proxy, or multipart uploads and login hang. Express 5 wildcards are `/*splat`. A custom `on.error` returns `502 {"error":"upstream_unavailable","service":"core"}` instead of the library's default plain-text 504. |
 | Auth check | **Interim (M3, decided: DEC-2):** forward-auth. The gateway sends only the session cookie to core's `GET /api/auth/me` and rejects with `401 {"source":"gateway"}` before proxying. The constraints and the explicit public allowlist are in §5 M3. **After stateless auth (M5, M6):** the gateway verifies the Supabase JWT locally with `jose`: algorithm allowlist, `iss`, `aud=authenticated` and `exp` checked. It uses JWKS from `<SUPABASE_URL>/auth/v1/.well-known/jwks.json` if the project uses asymmetric signing keys, otherwise the HS256 secret; M5 checks which. The gateway always strips client-sent `X-User-*` headers. Core keeps authorisation (role, ownership, `is_suspended`) and re-verifies the token itself. |
 | Rate limiting | `express-rate-limit` at the gateway, keyed on the real client IP: a strict limit on `/api/auth/login`, `/api/auth/request-password-reset` and signup, and a global per-IP limit. Limits come from env vars so the test harness can raise them. Core's own limiter is removed, so limits live in one hop. `/api/auth/me` is exempt from every limiter (DEC-2). The store is in-memory, which is acceptable with **one** gateway instance, and we run only one. |
 | CORS | Only at the gateway, allowlisting `FRONTEND_URL` with credentials. Core's `cors()` and NLP's `allow_origins=["*"]` are removed. When the gateway also serves the frontend build, production is same-origin and needs no CORS at all; only the CRA dev server at :3000 does. |
@@ -390,7 +394,7 @@ the network.
 - each new service gets only its own credentials;
 - the `postgres` superuser connection string goes into no service's environment.
 
-### 4.3 Auth model: accepted as the target (DEC-3); the roadmap task sets the timing
+### 4.3 Auth model: accepted as the target (DEC-3); timing in `ROADMAP.md` P2-7
 
 The gateway can verify tokens locally only after sessions are replaced. This is
 also the change that lets core scale (NFR-3), and it opens Supabase's GitHub and
@@ -409,8 +413,10 @@ Google OAuth providers (NFR-8, FR-4/5).
 - **CSRF** posture stays as today (SameSite=Lax).
 - **Before load tests:** check Supabase Auth's per-IP limits, because every
   sign-in and refresh comes from core's single IP.
-- **Open question for M8:** how the new services authorise. Either a Supabase
-  custom access-token hook puts the role in the JWT, or they call core.
+- **Open question for M9:** how the assessment service authorises browser calls.
+  Either a Supabase custom access-token hook puts the role in the JWT, or it calls
+  core. M8 no longer needs an answer: github-evidence takes no browser calls
+  (DEC-5), and core authorises the user before calling it.
 
 ### 4.4 Service boundaries
 
@@ -418,7 +424,7 @@ Google OAuth providers (NFR-8, FR-4/5).
 |---|---|---|
 | core: auth wrapper, profiles/admin, jobs, applications, notifications, resume storage, scoring aggregation | **No, stays one service** (today's Express) | One data model (applications ↔ jobs ↔ profiles ↔ scores); light CRUD with no independent-scaling need; one team. Splitting would add network hops and cross-service consistency problems for no gain. Scoring is a pure function over sub-scores (`backend/Services/explainability.js`), so it stays with the data it aggregates. |
 | NLP: parse and match | **Yes, already separate.** Internal only | Different runtime; heavy models (torch, MiniLM, two spaCy pipelines, 15–46 s start-up, P-3); CPU-bound. It is the clearest case for independent scaling (NFR-1, NFR-3). It stays stateless and owns no data. |
-| GitHub evidence (new) | **Yes**, a new Python FastAPI service. **Accepted in principle (DEC-4); owner to be decided with the team** | Its own external dependency and rate-limit budget (GitHub API). Its outage must never block scoring (GF-4: GitHub is optional). It owns its own data (the SRS Repository entity), and its work (8DFS file analysis, FR-7) is slow and batchy. It owns the browser-facing `/api/github/*`; core reads metrics from its internal endpoint. Delete `backend/Controllers/githubAggregator.js` when it lands. |
+| GitHub evidence (new) | **Yes**, a new Python FastAPI service. **Accepted in principle (DEC-4); owner to be decided with the team** | Its own external dependency and rate-limit budget (GitHub API). Its outage must never block scoring (GF-4: GitHub is optional). It owns its own data (the SRS Repository entity), and its work (8DFS file analysis, FR-7) is slow and batchy. It is internal only (DEC-5): core calls its internal endpoint and stores the result with the score; the browser never calls it. It starts stateless; its schema comes with 8DFS (DEC-6). Delete `backend/Controllers/githubAggregator.js` when it lands. |
 | Assessment (new) | **Yes**, a new Python service, after the GR-1 anti-cheat design. **Accepted in principle (DEC-4); owner to be decided with the team** | LLM calls are slow, costly and variable. It needs parallel execution (NFR-4) and server-side anti-cheat state (GR-1), and it keeps the LLM API key in exactly one service (NFR-9). It owns the browser-facing `/api/assessment/*`; core reads results from its internal endpoint. |
 | Auth, notifications, jobs, admin, scoring as their own services | **No** | Supabase Auth is already the identity provider. The rest share core's data and have no scaling or isolation need. |
 
@@ -737,14 +743,14 @@ When M1–M4 are done, GR-2 can be re-audited:
 
 NFR-3 for core still needs M5.
 
-### After GR-2: M5 onward, sequenced by the roadmap task
+### After GR-2: M5 onward, sequenced in `ROADMAP.md` (T-0010)
 
 | Step | What | Depends on | Draft criteria |
 |---|---|---|---|
 | M5 | Stateless auth (§4.3): Supabase JWT cookies; `express-session` removed | — (the roadmap decides when) | Behaviours, not today's cookie name (`tests/backend/lib/session.mjs:17` asserts `patina_session` and is updated here): login → 200 + cookies; missing or tampered token → 401; suspended → 403; wrong role → 403; **restarting core does not log the user out**; `git grep -n "express-session" -- backend` → 0 |
 | M6 | Replaces M3's forward-auth (DEC-2) with local token verification at the gateway (§4.2) | M3, M5 | Core's log shows no `GET /api/auth/me` from the gateway for proxied requests; expired or tampered token → 401 at the gateway; a client-sent `X-User-Id` never reaches core; the public allowlist file is unchanged, and its criteria from M3 still pass |
 | M7 | Scaling and load evidence (NFR-2, NFR-3) | M4, M5 | `docker compose up -d --scale core=2 --scale nlp=2` → harness passes and both core replicas log requests; autocannon with 100 connections on `GET /api/jobs` through the gateway → 0 errors, p95 under a threshold set from the first run |
-| M8 | GitHub evidence service with its own `github` schema and `github_svc` role | M3; the authorisation decision (§4.3) | `github_svc` gets "permission denied" on `public.profiles`; core reads metrics only over HTTP (`git grep -n "from('github" -- backend` → 0); github-evidence stopped → score still 200 with the GitHub sub-score "unavailable" and a reason; `githubAggregator.js` deleted |
+| M8 | GitHub evidence service, internal only (DEC-5), stateless first and then its own `github` schema and `github_svc` role (DEC-6). Built as `ROADMAP.md` P1-1..P1-7 | — (it needs no gateway route: DEC-5) | `github_svc` gets "permission denied" on `public.profiles`; core reads metrics only over HTTP (`git grep -n "from('github" -- backend` → 0); github-evidence stopped → score still 200 with the GitHub sub-score "unavailable" and a reason; `githubAggregator.js` deleted |
 | M9 | Assessment service with its own `assessment` schema and role | GR-1 design; M3 | The LLM key appears only in this service's env (`git grep -niE "openai\|gemini" -- backend frontend/src` → 0); cross-schema access denied; NFR-4: N parallel assessments complete without serialising |
 | later | TLS (NFR-10): Caddy or the gateway with mkcert. OAuth (NFR-8): Supabase providers, after M5 | M4 / M5 | `curl -I https://localhost` → 200 with a valid local cert; GitHub sign-in yields the same session behaviour as password login |
 
