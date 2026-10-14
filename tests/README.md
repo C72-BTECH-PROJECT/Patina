@@ -50,7 +50,7 @@ logs to `tests/.out/` (git-ignored).
 
 | Suite | Files | Supabase |
 |---|---|---|
-| NLP | `nlp/test_parse.py` | None — the NLP service has no Supabase client. |
+| NLP | `nlp/test_parse.py`, `nlp/test_contact_determinism.py` | None — the NLP service has no Supabase client. The determinism test runs `extract_entities` in child processes (venv interpreter, `PYTHONHASHSEED` 0-4) and needs no running service (T-0013). |
 | Backend tier 1 | `backend/smoke.test.mjs` | No writes; one `profiles` read (unknown-username login). |
 | Backend tier 2 | `backend/live-analyze.test.mjs` | **Live.** Dedicated `t0001_cand` / `t0001_recr` accounts (`tests/.env`), a job tagged `[T-0001 TEST]`, sweep before and after. |
 | Frontend | `CI=true npm run build` | None. |

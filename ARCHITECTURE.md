@@ -22,7 +22,7 @@ Verified at commit: `8e8e498` (branch `Anthony_V3`; application code identical t
 2. Of the three Python services we designed, one runs today: a stateless FastAPI NLP service (port 8000) that Express calls over HTTP to parse and match resumes. The GitHub evidence service and the assessment engine are not built yet.
 3. So today we are a monolith with one extracted NLP microservice, not yet a microservices architecture. Express cannot run as two copies because it keeps login sessions in process memory (NFR-3 not met), and the NLP service processes one parse at a time.
 4. Failure isolation is partial (NFR-12). When we stopped the NLP service, login, jobs and upload kept working, but scoring failed with a raw 500 error. When NLP hung, scoring gave no response for 20 seconds, because the call has no timeout.
-5. Our plan, with each step a tested task: a timeout and a clean 503 on the NLP call, one API base URL in the frontend, a Node API gateway in front of Express (routing, auth check, rate limits, CORS, request IDs, health), and docker-compose to start everything with one command. After that come stateless JWT auth and the GitHub and assessment services, each with its own database schema.
+5. Our plan, in the order of `ROADMAP.md`: the GitHub evidence service first, then NLP isolation (timeout and a clean 503), score-on-apply, the Node API gateway, containers (docker-compose), and stateless JWT auth.
 
 ---
 
@@ -321,11 +321,12 @@ Anything not listed here is still a proposal.
 | DEC-1 | The API gateway is a thin Node service (Express 5 + http-proxy-middleware + jose + express-rate-limit + cors), not Nginx, Kong or Traefik | **Accepted** | §4.6 |
 | DEC-2 | Until token auth exists, the gateway checks auth by forward-auth to core's `GET /api/auth/me`, under fixed constraints and an explicit public allowlist. M6 replaces it with token verification | **Accepted** | §5 M3, M6 |
 | DEC-3 | Target auth is Supabase JWTs in httpOnly cookies, verified by the gateway and by core (D4) | **Accepted as the target**; timing set by the roadmap (T-0010): M5 is `ROADMAP.md` P2-7, after M4 and before M6/M7 | §4.3 |
-| DEC-4 | GitHub evidence and assessment are separate Python services, each with its own schema | **Accepted in principle**; owners to be decided with the team | §4.4, §4.5 |
+| DEC-4 | GitHub evidence and assessment are separate Python services, each with its own schema | **Accepted in principle**; github-evidence is built by the project owner (2026-10-15); the assessment service's owner is still to be decided with the team | §4.4, §4.5 |
 | DEC-5 | github-evidence is **internal only**: core calls it; the browser never does, and the gateway routes nothing to it. A browser-facing route is added only when a feature needs one (e.g. GitHub OAuth connect) | **Accepted** (owner, 2026-10-14, T-0010) | §4.1, §4.2, §4.4, §5 M8 |
 | DEC-6 | github-evidence starts **stateless**: core keeps the evidence snapshot inside the score row. Its `github` schema and `github_svc` role arrive with 8DFS, when per-repository results are worth caching | **Accepted** (owner, 2026-10-14, T-0010) | §4.5; `ROADMAP.md` P1-7 |
 
 Decided by the owner on 2026-10-14 in T-0010: DEC-5 and DEC-6, and DEC-3's timing.
+Decided by the owner on 2026-10-15: DEC-4's github-evidence owner (the owner builds it); `/api/analyze` removal stays decided in P2-3.
 
 Still proposals:
 - core stays one service (AD-3);
@@ -424,7 +425,7 @@ Google OAuth providers (NFR-8, FR-4/5).
 |---|---|---|
 | core: auth wrapper, profiles/admin, jobs, applications, notifications, resume storage, scoring aggregation | **No, stays one service** (today's Express) | One data model (applications ↔ jobs ↔ profiles ↔ scores); light CRUD with no independent-scaling need; one team. Splitting would add network hops and cross-service consistency problems for no gain. Scoring is a pure function over sub-scores (`backend/Services/explainability.js`), so it stays with the data it aggregates. |
 | NLP: parse and match | **Yes, already separate.** Internal only | Different runtime; heavy models (torch, MiniLM, two spaCy pipelines, 15–46 s start-up, P-3); CPU-bound. It is the clearest case for independent scaling (NFR-1, NFR-3). It stays stateless and owns no data. |
-| GitHub evidence (new) | **Yes**, a new Python FastAPI service. **Accepted in principle (DEC-4); owner to be decided with the team** | Its own external dependency and rate-limit budget (GitHub API). Its outage must never block scoring (GF-4: GitHub is optional). It owns its own data (the SRS Repository entity), and its work (8DFS file analysis, FR-7) is slow and batchy. It is internal only (DEC-5): core calls its internal endpoint and stores the result with the score; the browser never calls it. It starts stateless; its schema comes with 8DFS (DEC-6). Delete `backend/Controllers/githubAggregator.js` when it lands. |
+| GitHub evidence (new) | **Yes**, a new Python FastAPI service. **Accepted in principle (DEC-4); built by the project owner (2026-10-15)** | Its own external dependency and rate-limit budget (GitHub API). Its outage must never block scoring (GF-4: GitHub is optional). It owns its own data (the SRS Repository entity), and its work (8DFS file analysis, FR-7) is slow and batchy. It is internal only (DEC-5): core calls its internal endpoint and stores the result with the score; the browser never calls it. It starts stateless; its schema comes with 8DFS (DEC-6). Delete `backend/Controllers/githubAggregator.js` when it lands. |
 | Assessment (new) | **Yes**, a new Python service, after the GR-1 anti-cheat design. **Accepted in principle (DEC-4); owner to be decided with the team** | LLM calls are slow, costly and variable. It needs parallel execution (NFR-4) and server-side anti-cheat state (GR-1), and it keeps the LLM API key in exactly one service (NFR-9). It owns the browser-facing `/api/assessment/*`; core reads results from its internal endpoint. |
 | Auth, notifications, jobs, admin, scoring as their own services | **No** | Supabase Auth is already the identity provider. The rest share core's data and have no scaling or isolation need. |
 

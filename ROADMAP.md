@@ -129,7 +129,8 @@ It makes no GitHub call.
                  "authored_commits_window": 12, "languages": { "Python": 12345 } } ] },
   "languages": [ { "name": "Python", "bytes": 12345, "share": 0.62 } ],
   "commit_activity": { "window_days": 365, "authored_commits": 120, "active_weeks": 30, "weeks": 52, "weekly": [0, 3, 1] },
-  "claims": [ { "skill": "python", "language": "Python", "status": "evidenced", "share": 0.62, "repos": ["hello-world"] },
+  "claims": [ { "skill": "python", "language": "Python", "status": "evidenced", "share": 0.62, "repos": ["hello-world"],
+                "last_activity": "2026-09-30T08:00:00Z" },
               { "skill": "react", "language": null, "status": "not_checkable" } ],
   "sub_score": { "available": true, "value": 0.64, "reason_code": null, "weights_source": "default",
     "components": [ { "key": "activity", "value": 0.7, "weight": 0.25, "available": true } ] },
@@ -142,9 +143,10 @@ It makes no GitHub call.
   after the profile and repository list arrived. The sub-score is computed from what
   arrived, and `limitations` names what is missing (CHECKLIST 2.13).
 - **Claim statuses:**
-  - `evidenced`: the claimed language appears in an owned, non-fork repo where the
-    user has authored commits;
-  - `not_found`: a checkable language with no such repo;
+  - `evidenced`: any owned, non-fork repo uses the claimed language, at any age.
+    `last_activity` (latest `pushed_at` among those repos) is reported per claim and
+    does not change the status;
+  - `not_found`: a checkable language that no owned, non-fork repo uses (never "too old");
   - `not_checkable`: frameworks and tools that language statistics cannot show.
     These are never counted against the candidate.
 - **Errors** are always `{"error": "<code>", "message": "<fixed safe text>"}`. They
@@ -284,7 +286,7 @@ never silently counted as missing (CHECKLIST 2.10).
 |---|---|---|---|---|---|---|---|
 | P1-1 | Service skeleton: contract v1 (§1.2), GitHub client (token, pagination, rate limits §1.5, retry, deadline), username validation, request ID, recorded-response harness, `github` suite | — | M | `github-evidence/app/{main,config,contract,github_client}.py`, `github-evidence/{requirements.txt,requirements-dev.txt,README.md,.env.example}`, `github-evidence/tools/record_github.py`, `tests/github/{conftest.py,test_service.py,test_client.py,recordings/}`, `tests/run-suite.ps1`, `tests/README.md` | 2.3 PART (service half; DONE once P1-4 feeds the score); 2.13 BROKEN (service half) | — | T-0011 |
 | P1-2 | Metrics and sub-score: 52-week authored-commit activity, language breakdown, owned vs forked, consistency, claim cross-reference against the parsed skills, documented formula and weights, partial labelling, call budget | P1-1 | M | `github-evidence/app/{metrics,claims,scoring,skill_languages}.py`, `github-evidence/README.md`, `tests/github/{test_metrics.py,test_scoring.py,snapshots/}`, `tests/github/recordings/` | 2.4 MIS (all but quality); 2.5 MIS; 2.7 MIS (all DONE once P1-4 feeds the score) | — | T-0012 |
-| P1-3 | Deterministic contact fields in the parser: document order instead of `set()`; GitHub link prefers a bare profile URL; full path captured; trailing punctuation stripped. The `entities.github` output shape is unchanged | — | S | `nlp-engine/app/ner.py`, `tests/nlp/test_contact_determinism.py`, `tests/nlp/snapshots/current/` | 2.1 PART (resume path deterministic); 4.11 CRU (deterministic input) | I-0015 | T-0013 |
+| P1-3 | Deterministic contact fields in the parser: document order instead of `set()`; GitHub link prefers a bare profile URL; full path captured; trailing punctuation stripped. The `entities.github` output shape is unchanged | — | S | `nlp-engine/app/ner.py`, `tests/nlp/test_contact_determinism.py`, `tests/nlp/snapshots/current/` | 2.1 PART (resume path deterministic); 4.11 CRU (deterministic input) | I-0015, I-0043 | T-0013 |
 | P1-4 | Core integration: `backend/Services/internalHttp.js` (timeout, one retry on connect errors, request ID, safe errors) and `githubEvidence.js` (login normalisation, reason codes §1.3); `buildScoreRecord(nlpJson, { github })` and `buildGithubSubScore`; per-skill `sources.github`; flags stay "not available" (no false "no contradictions"); "public repositories only" in the explanation; `githubAggregator.js` deleted | P1-2, P1-3 | L | `backend/Services/{internalHttp,githubEvidence,explainability}.js`, `backend/Controllers/analysis.controller.js`, `backend/.env.example`, `backend/Controllers/githubAggregator.js` (deleted), `tests/backend/{explainability.test.mjs,github-evidence-client.test.mjs,live-analyze-github.test.mjs,lib/stub-server.mjs}`, `tests/run-suite.ps1`, `AUDIT.md` | 2.3 PART→DONE; 2.4 MIS→PART; 2.5 MIS→DONE; 2.7 MIS→DONE; 2.8 PART (now exercised with two sources; assessment-only needs Module 3); 2.10 MIS→DONE; 2.11 MIS→PART; 2.12 MIS→DONE; 2.13 BROKEN→DONE; 4.1 BROKEN (2 of 3 sources); 4.2 PART→DONE; 4.5 PART; 4.7 CRU→DONE; 0.3 PART; 0.5 CRU (GitHub key server-side); 0.7 MIS→PART (GitHub path) | I-0039 (githubAggregator part) | T-0014 |
 | P1-5 | Outage probe P-4 service down, P-5 service hung, P-6 GitHub rate-limited, as asserting rows; timings feed the §1.2 timeout values | P1-4 | S | `tests/arch/nlp-outage-probe.mjs`, `tests/README.md` | 0.7 PART (evidence); 2.8 PART (evidence); 2.13 DONE (evidence); GR-2 PART (evidence) | — | T-0015 |
 | P1-6 | 8DFS (FR-7): up to 8 core logic files per analysed repo (top repos by authored commits); skips vendor, config, lock, generated, minified and test files; `lizard` for cyclomatic complexity, function length and parameter counts; smell flags; a quality component in the sub-score | P1-2 | L | `github-evidence/app/{dfs8,quality}.py`, `github-evidence/app/scoring.py`, `github-evidence/requirements.txt`, `tests/github/test_dfs8.py`, recordings of git trees and blobs | 2.6 MIS→DONE; 2.4 PART→DONE; 2.12 DONE | — | later |
@@ -416,8 +418,8 @@ These are not in the three phases. Each is listed with what it waits for.
 
 ## Open questions for the owner and the team
 
-1. **DEC-4 owners.** Who builds github-evidence (Phase 1) and, later, the assessment
-   service.
+1. **DEC-4 owners.** github-evidence (Phase 1): the owner builds it (2026-10-15). Still open:
+   who builds the assessment service later.
 2. **GitHub token.** The owner creates a fine-grained token (public read only) for
    recording and local runs. It goes into `github-evidence/.env` and is never committed.
 3. **Recorded account.** `octocat` by default. A teammate's real account would need

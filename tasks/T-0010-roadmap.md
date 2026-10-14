@@ -224,6 +224,21 @@ Green (`tests/.out/t0010-green.log`): `… ARCHITECTURE.md 205 cites OK; ROADMAP
 - **T-0012 carries two open questions for its approval:** the claim definition, and
   the starting weights and saturation points.
 
+### Follow-up answers (owner, 2026-10-15; ad-hoc docs task, no new spec)
+- **ARCHITECTURE.md §0 point 5** now follows the roadmap order in one line: GitHub
+  evidence service, NLP isolation, score-on-apply, gateway, containers, stateless
+  auth. This closes the "noted, not edited" item below.
+- **T-0012 Q1 (claims):** a claimed language is `evidenced` if any owned, non-fork
+  repository uses it, at any age; `not_found` means no repository uses it. Recency is
+  reported per language and feeds the activity component, not the claim status.
+- **T-0012 Q2 (weights):** accepted as provisional starting values, env-configurable,
+  documented; P3-12 calibrates them. T-0012 is still awaiting approval of its criteria.
+- **DEC-4:** the owner builds github-evidence; the assessment service's owner is open.
+- **`/api/analyze`:** removal stays decided in P2-3.
+- Files touched: tasks/T-0012, tasks/T-0010 (this note), ARCHITECTURE.md (§0, DEC-4
+  rows, a decision line), ROADMAP.md (claim-status contract text, `last_activity` in
+  the example, open question 1). No code.
+
 ### Found, not fixed
 - I-0040 (relative GitHub link in CandidateModal), I-0041 (stale `scores.subscores`
   comment in a migration) and I-0042 (the checker skips `.yml/.toml/.ts` cites).
@@ -231,6 +246,6 @@ Green (`tests/.out/t0010-green.log`): `… ARCHITECTURE.md 205 cites OK; ROADMAP
 - **ARCHITECTURE.md §0, point 5 (the owner's guide answer)** still lists the gateway
   and compose before "the GitHub and assessment services". The owner's brief puts the
   GitHub service first. I did not edit the owner's §0 text; the owner decides whether
-  §0 should mention the new order.
+  §0 should mention the new order. (Resolved 2026-10-15: §0 point 5 now follows the roadmap.)
 
 Suggested commit boundary: one commit for T-0010 (all files above). The owner commits.

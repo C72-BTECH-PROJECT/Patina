@@ -28,7 +28,6 @@ diff you're already writing.
 | I-0006 | Upload.jsx: neither Choose-File nor drag-drop validates file type on selection, only at submit | `frontend/src/pages/candidate/Upload.jsx` | P2 | OPEN | 2026-10-12, L-0001 |
 | I-0010 | Supabase Preview check fails on `main`; fixing it naively turns on auto-apply of migrations to production — **decision needed** | `supabase/migrations/`, Supabase GitHub integration | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0012 | HEAD frontend reads `import.meta.env.VITE_*` under CRA; 5 pages hardcode `localhost:5000` | `frontend/src/**` | P1 | OPEN | 2026-10-12, T-0001 |
-| I-0015 | `ner.py` contact fields picked via `list(set(...))[0]` — nondeterministic across processes | `nlp-engine/app/ner.py` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0016 | Signup rejects one-word "Full Name" with a misleading "all fields required" message | `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0017 | Signup's explicit `profiles` insert duplicates the `on_auth_user_created` trigger and logs a pkey error on every signup | `backend/Controllers/auth.controller.js` | P3 | OPEN | 2026-10-12, T-0001 |
 | I-0025 | `multer.memoryStorage()` without `limits`: upload size is unbounded and buffered in memory | `backend/Controllers/analysis.controller.js` | P2 | OPEN | 2026-10-12, T-0002 |
@@ -49,6 +48,7 @@ diff you're already writing.
 | I-0040 | Recruiter "GitHub profile" link is relative when the parsed link has no scheme | `frontend/src/components/recruiter/CandidateModal.jsx` | P3 | OPEN | 2026-10-14, T-0010 |
 | I-0041 | `scores.subscores` comment in the migration says `"github_evidence": null`; code stores a full unavailable object | `supabase/migrations/20260903_create_resumes_and_scores.sql` | P3 | OPEN | 2026-10-14, T-0010 |
 | I-0042 | Docs checker silently skips cites to `.yml`/`.yaml`/`.toml`/`.ts` files and paths with spaces | `tests/docs/check-trackers.mjs` | P3 | OPEN | 2026-10-14, T-0010 |
+| I-0043 | ROADMAP P1-3 says the GitHub "full path" is captured; T-0013 returns the profile (repo owner) only | `ROADMAP.md` | P3 | OPEN | 2026-10-15, T-0013 |
 
 ---
 
@@ -258,24 +258,6 @@ against a backend on `localhost:5000`.
 - **Calls env cannot redirect:** 5 (ResetPassword ×2, `CreateJob.jsx:211`, `Assessment.jsx:61,104`).
 - **Full call table:** all 29 calls by origin are listed in ARCHITECTURE.md §1.6. None goes to :8000 or to Supabase directly.
 - **Proposed shape (M2):** one `src/config/api.js` with a relative base, the CRA `proxy` in dev, and the `window.fetch` patch (`AuthContext.jsx:23-36`) removed.
-
----
-
-### I-0015 — `ner.py` contact fields nondeterministic (`list(set(...))[0]`)
-**Status:** OPEN
-**Severity:** P1
-**Module:** `nlp-engine/app/ner.py`
-**Spec ref:** FR-2 (PROJECT_SOURCE_DOCS.md @ 32905c1)
-**Evidence:** `email`, `phone`, `github`, `linkedin` are each chosen as
-`list(set(matches))[0]` (HEAD `ner.py:247-261`, baseline `:548-562`). Python
-randomises string hashing per process, so when a resume contains two or more
-matches the chosen value can change between server restarts.
-**Impact:** Same resume can yield different contact details (and different
-GitHub handle for validation) on different runs. The T-0001 harness pins
-`PYTHONHASHSEED=0` on the test server so snapshots are stable — **that hides
-the bug in tests; production remains nondeterministic.**
-**Proposed fix:** Pick the first match in document order
-(`dict.fromkeys(matches)` / first `re` hit) instead of via a `set`.
 
 ---
 
@@ -608,6 +590,13 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Proposed fix:** add `yml|yaml|toml|ts|tsx|ini|cfg` and extensionless `Dockerfile` to the pattern in P2-6, with a red run.
 
 ---
+
+### I-0043 — ROADMAP P1-3 wording disagrees with T-0013 on the GitHub path
+**Status:** OPEN
+**Severity:** P3
+**Module:** `ROADMAP.md`
+**Evidence:** `ROADMAP.md:289` says "full path captured"; `tasks/T-0013-parser-contact-determinism.md` criterion 2 returns `github.com/<owner>` for a repo link. T-0013 was implemented as specced.
+**Proposed fix:** Reword P1-3 to "owner of the first repo link when no bare profile link exists".
 
 ## Resolved
 
@@ -947,3 +936,26 @@ T-0001).
 **Evidence of resolution** (verified at HEAD `5446ebe`, 2026-10-12):
 - `backend/Config/supabase.js:40` logs only `service client key role: … (project …)`. There is no `slice(` in the file.
 - The file is byte-identical to `32905c1`. That also brings back the role warning and the Authorization/apikey pin.
+
+### I-0015 — `ner.py` contact fields nondeterministic (`list(set(...))[0]`) (RESOLVED)
+**Status:** RESOLVED T-0013: contact fields are the first match in document order; no `set()` in the contact block.
+**Severity:** P1
+**Module:** `nlp-engine/app/ner.py`
+**Spec ref:** FR-2 (PROJECT_SOURCE_DOCS.md @ 32905c1)
+**Evidence:** `email`, `phone`, `github`, `linkedin` are each chosen as
+`list(set(matches))[0]` (HEAD `ner.py:247-261`, baseline `:548-562`). Python
+randomises string hashing per process, so when a resume contains two or more
+matches the chosen value can change between server restarts.
+**Impact:** Same resume can yield different contact details (and different
+GitHub handle for validation) on different runs. The T-0001 harness pins
+`PYTHONHASHSEED=0` on the test server so snapshots are stable — **that hides
+the bug in tests; production remains nondeterministic.**
+**Proposed fix:** Pick the first match in document order
+(`dict.fromkeys(matches)` / first `re` hit) instead of via a `set`.
+**Evidence of resolution** (T-0013, 2026-10-15):
+- `nlp-engine/app/ner.py:543-577`: `re.findall` results are used in document order; GitHub prefers a bare profile link, else the owner of the first repo link, with a trailing `.` stripped.
+- `tests/nlp/test_contact_determinism.py::test_contact_fields_same_under_every_hash_seed`: red at HEAD (seeds 0-4 all differed), green after. `::test_github_link_rules` covers the five link rows.
+- `tests/run-suite.ps1` still pins `PYTHONHASHSEED=0`; that is now harmless for these fields.
+
+---
+

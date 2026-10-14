@@ -1,8 +1,9 @@
 # T-0012 — github-evidence-metrics
 
-> Status: **spec only, awaiting owner approval** (written in T-0010, 2026-10-14).
-> ROADMAP item P1-2. Depends on T-0011. No code until the criteria and the open
-> questions below are approved.
+> Status: **spec only, awaiting owner approval of the acceptance criteria**
+> (written in T-0010, 2026-10-14). ROADMAP item P1-2. Depends on T-0011. The two open
+> questions were answered by the owner on 2026-10-15 (see "Decisions"); no code until
+> the criteria are approved.
 
 ## Context
 After T-0011 the service returns a profile and a repository list. FR-6 asks for:
@@ -63,24 +64,39 @@ Weights:
   `CREDIBILITY_WEIGHTS`: unknown keys and negative or non-finite values are ignored,
   and a total ≤ 0 or invalid JSON falls back to the defaults with a warning.
 
-These are starting values. P3-12 calibrates them against human ratings (6.4).
+These are **provisional starting values** (owner, 2026-10-15). They stay
+env-configurable, the README documents them as provisional, and P3-12 calibrates them
+against human ratings (6.4).
 
 Other definitions:
+- **Claim evidence (decision Q1):** a claimed language is `evidenced` if any owned,
+  non-fork repository uses it, at any age. The sources are the `/languages` bytes of
+  the detail repos plus the `language` field (primary language) that the repository
+  list already carries for every owned, non-fork repo, archived or not. The second
+  source costs no extra calls and keeps repos beyond the detail cap from being
+  ignored. `not_found` means no such repo uses the language, never "too old".
+- **Recency (decision Q1):** each claim carries `last_activity`, the most recent
+  `pushed_at` among the owned, non-fork repos that use the language. It is reported
+  only. It does not change the claim status or the corroboration component. Recency
+  enters the sub-score through the **activity** component (authored commits in the
+  window), which is unchanged.
 - **Detail repos:** owned, non-fork, non-archived repos, the `GITHUB_DETAIL_REPOS`
   (default 10) most recently pushed. They get `/languages` and
   `/commits?author=<login>&since=<now − window_days>` calls, the commit list paginated.
 - **No evidence:** if the user owns no non-fork repo, `sub_score.available` is false
   with `reason_code: "no_public_repositories"`. Never value 0.
 
-## Open questions for approval
-1. **Claim definition.** Draft: `evidenced` = the claimed language has bytes in a
-   detail repo where the user has at least one authored commit **in the window**.
-   Work older than `window_days` (365) then counts as `not_found`.
-   - Alternative: any owned non-fork repo counts, and a `recent` flag shows whether
-     it has authored commits in the window.
-   - Which do you want?
-2. **Starting weights and saturation points** (200 commits, 26 weeks, 5 repos): keep
-   the draft, or change before implementation?
+## Decisions (owner, 2026-10-15; were open questions)
+1. **Claim definition (Q1).** A claimed language counts as `evidenced` if any owned,
+   non-fork repository uses it, at any age. Recency is reported separately (last
+   activity per language) and feeds the activity component, not the claim status.
+   `not_found` means no repository uses it at all, never "too old". This replaces
+   the draft rule ("authored commits in the window"), which would have turned old
+   but real work into `not_found`.
+2. **Starting weights and saturation points (Q2).** Accepted as provisional starting
+   values (weights 0.25 / 0.25 / 0.20 / 0.30; saturation at 200 commits, 26 weeks,
+   5 repos). They stay env-configurable, are documented in the README as
+   provisional, and P3-12 calibrates them against human ratings.
 
 ## Acceptance criteria
 1. **Languages.** Bytes are summed per language over the detail repos; `share` sums
@@ -95,6 +111,14 @@ Other definitions:
 4. **Claims.** Checked by `test_claims`:
    - Each claimed skill maps through `skill_languages.py`.
    - Statuses are `evidenced`, `not_found` or `not_checkable`.
+   - A language used only by an owned, non-fork repo last pushed 3 years ago (outside
+     the window, no commits in it) is `evidenced`, with an old `last_activity`; a
+     language used by no owned, non-fork repo is `not_found`; a language used only by
+     a fork is `not_found`. A language that only the repository list's primary
+     `language` shows (repo beyond the detail cap) is `evidenced`.
+   - `last_activity` is the max `pushed_at` of the owned, non-fork repos using the
+     language, and `null` for `not_found` and `not_checkable`.
+   - Changing a repo's `pushed_at` leaves status and `corroboration` unchanged.
    - `react`, `docker` and `aws` are `not_checkable`, never `not_found`.
    - Matching ignores case and separators (`C++`, `c#`, `Golang` → `Go`).
 5. **Formula.** Given fixed metrics, each component and the value match the
@@ -140,7 +164,11 @@ Other definitions:
 
 ## Risks and rollback
 - **Weights look arbitrary.** Mitigation: documented, env-overridable, labelled
-  "starting values", calibrated in P3-12; the explanation shows each component.
+  "provisional starting values", calibrated in P3-12; the explanation shows each
+  component.
+- **Old work corroborates the claim.** A stale repo makes a language `evidenced`.
+  Accepted (owner, Q1): recency is shown in `last_activity` and scored through the
+  activity component, not the claim.
 - **The commits endpoint sees the default branch only, and `author=` matches the
   login or an email.** Mitigation: both are listed in `limitations` and the README.
 - **Rollback:** revert the files inside `github-evidence/` and `tests/github/`; no

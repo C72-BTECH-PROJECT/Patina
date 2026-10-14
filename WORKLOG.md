@@ -249,3 +249,24 @@ rollup per archived month at the top of this file.
 - Files changed: ARCHITECTURE.md, CLAUDE.md, ISSUES.md, WORKLOG.md, tests/README.md, tests/docs/check-trackers.mjs (mod); ROADMAP.md, tasks/T-0010..T-0015 (new).
 - Issues logged: I-0040 (relative GitHub link), I-0041 (stale migration comment), I-0042 (checker skips .yml/.toml cites). Noted, not edited: ARCHITECTURE §0 pt 5 order vs the roadmap.
 - Next: owner reviews ROADMAP and commits; approves T-0011 (needs a GitHub token + octocat recording) and T-0013 (no deps); T-0012 has 2 open questions; team assigns DEC-4 owners.
+
+## L-0021 · 2026-10-15 · T-0010 open questions answered (T-0012 Q1/Q2, §0 point 5, DEC-4)
+- Prompt: record the owner's answers to T-0010's open questions; docs only, ad-hoc, no new spec.
+- Task: none (follow-up to T-0010 and T-0012; T-0012 still awaits criteria approval).
+- Done: T-0012 Q1 = any owned non-fork repo at any age is `evidenced`; recency reported as `last_activity`, scored via activity only; Q2 weights provisional, env-configurable, P3-12 calibrates.
+  ARCHITECTURE §0 pt 5 = roadmap order, one line. DEC-4: owner builds github-evidence. `/api/analyze` stays with P2-3.
+- Also: ROADMAP claim-status text and open question 1 aligned (they contradicted Q1); T-0010 Result follow-up note.
+- My choice, for the owner to check: "any owned non-fork repo" is covered beyond the 10 detail repos by the repo list's primary `language` field (no extra calls); added to T-0012.
+- Files changed: tasks/T-0012, tasks/T-0010, ARCHITECTURE.md, ROADMAP.md, WORKLOG.md.
+- Issues logged: none.
+- Next: owner approves T-0012 criteria (and T-0011, T-0013); commits.
+
+## L-0022 · 2026-10-15 · T-0013 parser contact determinism (I-0015)
+- Prompt: execute the approved T-0013 spec: tests first, red log, implement, full harness, Result, AUDIT, WORKLOG; no commits.
+- Task: T-0013 (5/5 criteria PASS).
+- Done: `ner.py` contact block uses document order (no `set()`); GitHub prefers a bare profile link, else the first repo link's owner, trailing `.` stripped; new `tests/nlp/test_contact_determinism.py`.
+- Verification: red `tests/.out/t0013-red.log` (all seeds 0-4 differed, trailing-dot row failed); green `t0013-green.log`; full harness nlp 0, backend 0 (27/27), docs 0, snapshots diff empty; frontend 1 = the existing CreateJob/Jobs CI lint warnings.
+- Findings: the spec's repo-link rows passed at HEAD under seed 0 by luck (only the trailing-dot row was red); noted in Result.
+- Files changed: nlp-engine/app/ner.py, tests/nlp/test_contact_determinism.py (new), tests/README.md, ISSUES.md, AUDIT.md (2.1, 1.9, 4.11 evidence; 1.16 cite), tasks/T-0013, WORKLOG.md.
+- Issues logged: I-0043 (ROADMAP wording); I-0015 resolved.
+- Next: owner commits T-0013; T-0014 (core GitHub integration) consumes `entities.github`.

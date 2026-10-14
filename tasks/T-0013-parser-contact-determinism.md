@@ -1,7 +1,7 @@
 # T-0013 — parser-contact-determinism
 
-> Status: **spec only, awaiting owner approval** (written in T-0010, 2026-10-14).
-> ROADMAP item P1-3. No code until the criteria are approved.
+> Status: **implemented 2026-10-15, awaiting owner commit** (spec written in T-0010, 2026-10-14; approved by owner).
+> ROADMAP item P1-3.
 
 ## Context
 ISSUES I-0015 (P1): `extract_entities` builds each of `email`, `phone`, `github` and
@@ -97,4 +97,11 @@ The parser returns the same contact fields for the same text in every process.
 ---
 
 ## Result
-<Filled at the end. One line per acceptance criterion.>
+1. **PASS** - `test_contact_fields_same_under_every_hash_seed` green (`tests/.out/t0013-green.log`, 2 passed). Red at HEAD (`tests/.out/t0013-red.log`): every seed 0-4 differed - 0: email, phone, linkedin; 1: email, github, linkedin; 2: github, linkedin; 3: phone; 4: email, phone, github.
+2. **PASS** - `test_github_link_rules` green (5 rows). Red at HEAD: the trailing-dot row (`https://github.com/alice.`). The two repo-link rows passed at HEAD under seed 0 by luck (set order happened to give `alice`; the old code never read the repo segment), so the spec's "repo-link row fails at HEAD" was not reproduced for that seed.
+3. **PASS** - `nlp/test_parse.py` passes in the full run (12 passed with the 2 new tests = 10 + 2); `entities` keys untouched, `github` still `str | None`.
+4. **PASS** - `git diff --stat tests/nlp/snapshots` is empty after the `current` nlp run.
+5. **PASS** - `run-suite.ps1 -Target current -Suites nlp,backend,frontend,docs -Live` (`tests/.out/t0013-full-harness.log`): nlp 0, backend 0 (27 pass, 0 fail), docs 0. frontend 1 = the existing CI-mode ESLint warnings in `CreateJob.jsx` / `Jobs.jsx` (not touched by this task, same as T-0004..T-0007 Results).
+
+Changes: `nlp-engine/app/ner.py:543-577` (contact block), `tests/nlp/test_contact_determinism.py` (new), `tests/README.md` (suite row), ISSUES I-0015 -> RESOLVED, AUDIT rows 2.1, 1.9, 4.11 (evidence only, statuses unchanged: 2.1 STUBBED_OR_PARTIAL, 4.11 CODE_REVIEWED_UNTESTED) and 1.16 (cite lines moved).
+Notes: ROADMAP P1-3 says "full path captured" while this spec returns the repo owner; I followed the spec (see ISSUES I-0043).
