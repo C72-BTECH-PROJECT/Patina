@@ -1,0 +1,16 @@
+# Install into a dedicated venv for this service, e.g.:
+#   python -m venv assessment-service/.venv
+#   assessment-service/.venv/Scripts/python -m pip install -r assessment-service/requirements.txt
+
+# ── Web Framework ──────────────────────────────
+fastapi
+uvicorn
+
+# ── Data Validation ────────────────────────────
+pydantic
+
+# ── LLM Provider (OpenRouter via OpenAI-compatible SDK) ──
+openai
+
+# ── Config ─────────────────────────────────────
+python-dotenv
