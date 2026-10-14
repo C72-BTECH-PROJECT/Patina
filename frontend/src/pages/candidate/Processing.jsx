@@ -1,27 +1,59 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FileText, Brain, Database, GitBranch, Sparkles, CheckCircle, AlertCircle, Zap, Cpu } from 'lucide-react';
+import { FileText, ScanText, CheckCircle, AlertCircle, Cpu } from 'lucide-react';
 
-const steps = [
-  { id: 1, text: 'Parsing resume...', subtext: 'Extracting text and metadata', icon: FileText },
-  { id: 2, text: 'Extracting skills...', subtext: 'Identifying technical competencies', icon: Database },
-  { id: 3, text: 'Analyzing GitHub profile...', subtext: 'Verifying real-world activity', icon: GitBranch },
-  { id: 4, text: 'Generating credibility score...', subtext: 'Computing semantic similarity', icon: Brain },
-  { id: 5, text: 'Complete!', subtext: 'Analysis finished successfully', icon: Sparkles },
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+
+// The two phases the analyze request genuinely goes through, from the browser's
+// point of view. "Uploading" is measured from real XHR upload progress.
+// "Analyzing" covers everything the server does inside the single /api/analyze
+// response — text extraction, skill NER, semantic matching, then normalising the
+// evidence and writing the score explanation — none of which is streamed, so it
+// shows as an indeterminate working state rather than a fabricated percentage.
+//
+// There is deliberately no "Analyzing GitHub profile" or assessment step here:
+// those services are not part of the pipeline, so claiming they run would be a
+// lie on the progress screen.
+const PHASES = [
+  {
+    key: 'uploading',
+    text: 'Uploading résumé',
+    subtext: 'Sending your file to the analysis service',
+    icon: FileText,
+  },
+  {
+    key: 'analyzing',
+    text: 'Analyzing résumé',
+    subtext: 'Extracting skills, matching them against the job description, and scoring',
+    icon: ScanText,
+  },
 ];
 
-const CircularProgress = ({ progress, children }) => {
-  const circumference = 2 * Math.PI * 140;
-  const strokeDashoffset = circumference - (progress / 100) * circumference;
+const PHASE_INDEX = { uploading: 0, analyzing: 1, done: 2 };
+
+function CircularProgress({ percent, indeterminate, centerLabel, centerSub }) {
+  const radius = 140;
+  const circumference = 2 * Math.PI * radius;
+  const offset = indeterminate
+    ? circumference * 0.72
+    : circumference - (Math.min(100, Math.max(0, percent)) / 100) * circumference;
 
   return (
-    <div className="relative w-80 h-80">
+    <motion.div
+      className="relative w-72 h-72"
+      animate={indeterminate ? { rotate: 360 } : { rotate: 0 }}
+      transition={
+        indeterminate
+          ? { duration: 1.1, repeat: Infinity, ease: 'linear' }
+          : { duration: 0.3 }
+      }
+    >
       <svg className="w-full h-full -rotate-90" viewBox="0 0 300 300">
         <circle
           cx="150"
           cy="150"
-          r="140"
+          r={radius}
           fill="none"
           stroke="hsl(var(--border))"
           strokeWidth="6"
@@ -29,195 +61,174 @@ const CircularProgress = ({ progress, children }) => {
         <motion.circle
           cx="150"
           cy="150"
-          r="140"
+          r={radius}
           fill="none"
           stroke="hsl(var(--primary))"
           strokeWidth="6"
           strokeLinecap="round"
           strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
           initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
         />
       </svg>
 
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        {children}
-      </div>
-    </div>
+      <motion.div
+        className="absolute inset-0 flex flex-col items-center justify-center text-center"
+        animate={indeterminate ? { rotate: -360 } : { rotate: 0 }}
+        transition={
+          indeterminate
+            ? { duration: 1.1, repeat: Infinity, ease: 'linear' }
+            : { duration: 0.3 }
+        }
+      >
+        <span className="text-5xl font-bold text-foreground tabular-nums">{centerLabel}</span>
+        <span className="text-sm text-muted-foreground mt-2 uppercase tracking-widest">
+          {centerSub}
+        </span>
+      </motion.div>
+    </motion.div>
   );
-};
+}
 
-const StepItem = ({ step, index, currentStep, progress }) => {
-  const isCompleted = index < currentStep;
-  const isActive = index === currentStep;
-  const stepProgress = isCompleted ? 100 : isActive ? (progress % 20) * 5 : 0;
+function StepItem({ step, index, activeIndex }) {
+  const isCompleted = index < activeIndex;
+  const isActive = index === activeIndex;
 
   return (
-    <motion.div
-      className={`relative flex items-start gap-4 p-4 rounded-xl transition-all duration-500 ${
+    <div
+      className={`flex items-start gap-4 p-4 rounded-xl transition-colors duration-300 ${
         isActive ? 'bg-muted' : isCompleted ? 'bg-success/5' : 'bg-transparent'
       }`}
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.1 }}
     >
-      {index < steps.length - 1 && (
-        <div className="absolute left-[1.625rem] top-14 w-0.5 h-12">
-          <div className="w-full h-full bg-border rounded-full overflow-hidden">
-            <motion.div
-              className="w-full bg-foreground rounded-full"
-              initial={{ height: 0 }}
-              animate={{ height: isCompleted ? '100%' : isActive ? `${stepProgress}%` : '0%' }}
-              transition={{ duration: 0.3 }}
-            />
-          </div>
-        </div>
-      )}
-
-      <motion.div
-        className={`relative w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          isCompleted
-            ? 'bg-success/10'
-            : isActive
-            ? 'bg-muted'
-            : 'bg-muted'
+      <div
+        className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+          isCompleted ? 'bg-success/10' : 'bg-muted'
         }`}
-        animate={isActive ? { scale: [1, 1.05, 1] } : {}}
-        transition={{ duration: 1, repeat: isActive ? Infinity : 0 }}
       >
         {isCompleted ? (
           <CheckCircle className="w-5 h-5 text-success" />
-        ) : isActive ? (
-          <step.icon className="w-5 h-5 text-foreground" />
         ) : (
-          <div className="w-3 h-3 rounded-full bg-border" />
-        )}
-      </motion.div>
-
-      <div className="flex-1 min-w-0">
-        <div className={`font-medium transition-colors ${
-          isCompleted ? 'text-success' : isActive ? 'text-foreground' : 'text-muted-foreground'
-        }`}>
-          {step.text}
-        </div>
-        <div className={`text-sm mt-0.5 transition-colors ${
-          isCompleted ? 'text-success/60' : isActive ? 'text-muted-foreground' : 'text-muted-foreground/60'
-        }`}>
-          {step.subtext}
-        </div>
-
-        {isActive && (
-          <motion.div
-            className="mt-2 h-1 w-full bg-border rounded-full overflow-hidden"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+          <motion.span
+            animate={isActive ? { scale: [1, 1.08, 1] } : {}}
+            transition={{ duration: 1.2, repeat: isActive ? Infinity : 0 }}
           >
-            <motion.div
-              className="h-full bg-foreground rounded-full"
-              animate={{ width: [`${stepProgress}%`, `${(progress % 20) * 5}%`] }}
-              transition={{ duration: 0.5 }}
+            <step.icon
+              className={`w-5 h-5 ${isActive ? 'text-foreground' : 'text-muted-foreground/50'}`}
             />
-          </motion.div>
+          </motion.span>
         )}
       </div>
 
-      {isActive && (
-        <motion.div
-          className="px-3 py-1 rounded-full bg-muted border border-border"
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
+      <div className="flex-1 min-w-0">
+        <div
+          className={`font-medium ${
+            isCompleted ? 'text-success' : isActive ? 'text-foreground' : 'text-muted-foreground'
+          }`}
         >
-          <span className="text-xs text-foreground font-medium flex items-center gap-1">
-            <motion.span
-              animate={{ opacity: [1, 0.3, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            >
-              ●
-            </motion.span>
-            Processing
-          </span>
-        </motion.div>
+          {step.text}
+        </div>
+        <div
+          className={`text-sm mt-0.5 ${
+            isActive ? 'text-muted-foreground' : 'text-muted-foreground/60'
+          }`}
+        >
+          {step.subtext}
+        </div>
+      </div>
+
+      {isActive && (
+        <span className="px-3 py-1 rounded-full bg-muted border border-border text-xs text-foreground font-medium flex items-center gap-1.5 flex-shrink-0">
+          <motion.span
+            animate={{ opacity: [1, 0.3, 1] }}
+            transition={{ duration: 1, repeat: Infinity }}
+          >
+            ●
+          </motion.span>
+          Working
+        </span>
       )}
-    </motion.div>
+    </div>
   );
-};
+}
 
 function Processing() {
   const location = useLocation();
   const navigate = useNavigate();
   const { file, jobId } = location.state || {};
   const hasContext = Boolean(file && jobId);
-  const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState(0);
+
+  const [phase, setPhase] = useState('uploading'); // uploading | analyzing | done
+  const [uploadPercent, setUploadPercent] = useState(0);
   const [error, setError] = useState('');
-  const doneRef = useRef(false);
+  const xhrRef = useRef(null);
 
   useEffect(() => {
-    const stepIndex = Math.min(Math.floor(progress / 20), steps.length - 1);
-    setCurrentStep(stepIndex);
-  }, [progress]);
+    if (!hasContext) return undefined;
 
-  useEffect(() => {
-    if (!hasContext) return;
-    doneRef.current = false;
-    let isCancelled = false;
-    let animId = null;
+    setError('');
+    setPhase('uploading');
+    setUploadPercent(0);
 
-    const run = async () => {
-      try {
-        setError('');
-        setProgress(0);
-        setProgress(5);
-        animId = setInterval(() => {
-          setProgress((prev) => {
-            if (doneRef.current) return 100;
-            const next = Math.min(99, prev + Math.random() * 8);
-            return next;
-          });
-        }, 250);
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
+    xhr.open('POST', `${API_BASE_URL}/api/analyze`);
+    // The analyze endpoint is session-guarded (requireRole CANDIDATE); XHR
+    // bypasses the app-wide fetch wrapper, so opt into cookies explicitly.
+    xhr.withCredentials = true;
 
-        const form = new FormData();
-        form.append('resume', file);
-        form.append('jobId', String(jobId));
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        setUploadPercent(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+    xhr.upload.onload = () => {
+      setUploadPercent(100);
+      setPhase('analyzing');
+    };
 
-        const resp = await fetch('http://localhost:5000/api/analyze', {
-          method: 'POST',
-          body: form,
-        });
-
-        if (!resp.ok) {
-          const txt = await resp.text().catch(() => '');
-          throw new Error(`NLP parsing failed (${resp.status}) ${txt}`);
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        let analysis = null;
+        try {
+          analysis = JSON.parse(xhr.responseText);
+        } catch {
+          setError('The analysis service returned a response we could not read.');
+          return;
         }
-
-        await resp.json();
-        if (isCancelled) return;
-        doneRef.current = true;
-        if (animId) clearInterval(animId);
-        setProgress(100);
-        setTimeout(() => navigate('/candidate/dashboard'), 2000);
-      } catch (e) {
-        if (isCancelled) return;
-        if (animId) clearInterval(animId);
-        doneRef.current = true;
-        setError(e?.message || 'Failed to process resume');
+        setPhase('done');
+        setTimeout(() => {
+          navigate('/candidate/results', { state: { analysis }, replace: true });
+        }, 900);
+      } else {
+        let message = `Analysis failed (${xhr.status}).`;
+        try {
+          const body = JSON.parse(xhr.responseText);
+          message = body.message || body.error || message;
+        } catch {
+          /* keep the status-code message */
+        }
+        setError(message);
       }
     };
 
-    run();
+    xhr.onerror = () => {
+      setError('Could not reach the analysis service. Check your connection and try again.');
+    };
+
+    const form = new FormData();
+    form.append('resume', file);
+    form.append('jobId', String(jobId));
+    xhr.send(form);
+
     return () => {
-      isCancelled = true;
-      doneRef.current = true;
-      if (animId) clearInterval(animId);
+      xhr.upload.onprogress = null;
+      xhr.upload.onload = null;
+      xhr.onload = null;
+      xhr.onerror = null;
+      xhr.abort();
     };
   }, [hasContext, file, jobId, navigate]);
-
-  useEffect(() => {
-    if (!error) return;
-    setProgress(0);
-  }, [error]);
 
   if (!hasContext) {
     return (
@@ -230,28 +241,27 @@ function Processing() {
           <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-6">
             <AlertCircle className="w-8 h-8 text-destructive" />
           </div>
-
-          <h1 className="text-2xl font-bold text-foreground mb-3">Processing Context Missing</h1>
-          <p className="text-muted-foreground mb-8">Please go back and upload your resume again.</p>
-
-          <motion.button
+          <h1 className="text-2xl font-bold text-foreground mb-3">Processing context missing</h1>
+          <p className="text-muted-foreground mb-8">
+            Please go back and upload your résumé again.
+          </p>
+          <button
+            type="button"
             onClick={() => navigate('/candidate/upload')}
             className="w-full h-10 rounded-md bg-primary text-primary-foreground font-medium text-body-sm hover:bg-primary/90 transition-colors"
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
           >
-            Upload Resume
-          </motion.button>
-
-          {error && (
-            <div className="mt-4 p-4 rounded-md bg-destructive/10 border border-border text-destructive text-sm text-left">
-              {error}
-            </div>
-          )}
+            Upload résumé
+          </button>
         </motion.div>
       </div>
     );
   }
+
+  const activeIndex = PHASE_INDEX[phase];
+  const indeterminate = phase === 'analyzing';
+  const centerLabel = phase === 'done' ? '100%' : phase === 'analyzing' ? '···' : `${uploadPercent}%`;
+  const centerSub =
+    phase === 'done' ? 'Done' : phase === 'analyzing' ? 'Analyzing' : 'Uploading';
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -261,11 +271,11 @@ function Processing() {
             className="card p-8"
             initial={{ opacity: 0, x: -40 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            transition={{ duration: 0.5 }}
           >
             <h2 className="text-2xl font-bold text-foreground mb-8 flex items-center gap-3">
               <Cpu className="w-6 h-6" />
-              AI Analysis Pipeline
+              Analyzing your résumé
             </h2>
 
             {error ? (
@@ -276,54 +286,50 @@ function Processing() {
               >
                 <div className="flex items-center gap-3 mb-4">
                   <AlertCircle className="w-6 h-6 text-destructive" />
-                  <span className="font-semibold text-destructive">Processing Failed</span>
+                  <span className="font-semibold text-destructive">Processing failed</span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-4">{error}</p>
-                <motion.button
+                <button
+                  type="button"
                   onClick={() => navigate('/candidate/upload')}
                   className="px-6 py-2 rounded-md bg-muted border border-border text-foreground font-medium text-body-sm hover:bg-muted/80 transition-colors"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
                 >
-                  Upload Again
-                </motion.button>
+                  Upload again
+                </button>
               </motion.div>
             ) : (
               <div className="space-y-2">
-                {steps.map((step, index) => (
-                  <StepItem
-                    key={step.id}
-                    step={step}
-                    index={index}
-                    currentStep={currentStep}
-                    progress={progress}
-                  />
+                {PHASES.map((step, index) => (
+                  <StepItem key={step.key} step={step} index={index} activeIndex={activeIndex} />
                 ))}
+                {phase === 'done' && (
+                  <div className="flex items-center gap-3 p-4 text-success font-medium">
+                    <CheckCircle className="w-5 h-5" />
+                    Analysis complete — opening your results
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
 
           <motion.div
             className="flex justify-center"
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.5 }}
           >
-            <div className="relative">
-              <CircularProgress progress={progress}>
-                <div className="text-center">
-                  <motion.span
-                    className="text-6xl font-bold text-foreground"
-                    key={Math.floor(progress)}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    {Math.round(progress)}%
-                  </motion.span>
-                  <div className="text-sm text-muted-foreground mt-2 uppercase tracking-widest">Processing</div>
-                </div>
-              </CircularProgress>
-            </div>
+            {error ? (
+              <div className="w-72 h-72 rounded-full border-4 border-destructive/20 flex items-center justify-center">
+                <AlertCircle className="w-16 h-16 text-destructive/60" />
+              </div>
+            ) : (
+              <CircularProgress
+                percent={phase === 'done' ? 100 : uploadPercent}
+                indeterminate={indeterminate}
+                centerLabel={centerLabel}
+                centerSub={centerSub}
+              />
+            )}
           </motion.div>
         </div>
       </main>

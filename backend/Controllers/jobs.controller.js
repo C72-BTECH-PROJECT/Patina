@@ -1,4 +1,5 @@
 import supabase from '../Config/supabase.js';
+import { sendNotification } from '../Controllers/notification.controller.js';
 
 const formatJob = (job) => ({
   id: job.id,
@@ -83,15 +84,33 @@ export const getJobById = async (req, res) => {
     return res.status(404).json({ message: 'Job not found.' });
   }
 
-  return res.json(formatJob(job));
+  // Candidates also learn whether they already applied, so the UI can render
+  // the job as applied instead of leaving the Apply button clickable.
+  let applied = false;
+  if (req.session?.role === 'CANDIDATE') {
+    const { data: existing } = await supabase
+      .from('applications')
+      .select('id, status, submitted_at')
+      .eq('candidate_id', req.session.userId)
+      .eq('job_id', job.id)
+      .maybeSingle();
+    applied = Boolean(existing);
+  }
+
+  return res.json({ ...formatJob(job), applied });
 };
 export const applyToJob = async (req, res) => {
   const jobId = req.params.id;
 
   // Only allow applying if the candidate has a resume in Supabase Storage.
-  const { data: resumeFiles } = await supabase.storage
+  const { data: resumeFiles, error: resumeListError } = await supabase.storage
     .from('resumes')
     .list(`candidates/${req.session.userId}`, { limit: 100 });
+  // A storage outage must not be reported as "upload your resume first".
+  if (resumeListError) {
+    console.error('Apply resume check failed:', resumeListError.message);
+    return res.status(500).json({ message: 'Could not check your resume. Please try again.' });
+  }
   const hasResume =
     Array.isArray(resumeFiles) && resumeFiles.some((f) => f.name.startsWith('resume'));
 
@@ -134,4 +153,55 @@ export const applyToJob = async (req, res) => {
   }
 
   return res.status(201).json(data);
+};
+
+export const shortlistCandidate = async (req, res) => {
+  const { applicationId, status } = req.body || {};
+
+  if (!applicationId || !status) {
+    return res.status(400).json({ message: 'applicationId and status are required.' });
+  }
+
+  const allowed = ['shortlisted', 'rejected'];
+  if (!allowed.includes(status)) {
+    return res.status(400).json({ message: 'Invalid status.' });
+  }
+
+  // The application must belong to a job this recruiter owns. A missing row and
+  // someone else's row look the same (404) so ids can't be probed.
+  const { data: owned, error: lookupError } = await supabase
+    .from('applications')
+    .select('id, job:jobs!inner(recruiter_id)')
+    .eq('id', applicationId)
+    .maybeSingle();
+
+  if (lookupError) {
+    console.error('Shortlist lookup failed:', lookupError.message);
+    return res.status(500).json({ message: 'Could not update application status.' });
+  }
+  if (!owned || owned.job?.recruiter_id !== req.session.userId) {
+    return res.status(404).json({ message: 'Application not found.' });
+  }
+
+  const { data, error } = await supabase
+    .from('applications')
+    .update({ status })
+    .eq('id', applicationId)
+    .select('id, candidate_id, job_id, status')
+    .single();
+
+  if (error) {
+    return res.status(500).json({ message: 'Could not update application status.' });
+  }
+
+  if (status === 'shortlisted') {
+    await sendNotification(
+      data.candidate_id,
+      'shortlisted',
+      'You have been shortlisted for a job!',
+      { applicationId: data.id, jobId: data.job_id }
+    );
+  }
+
+  return res.status(200).json(data);
 };

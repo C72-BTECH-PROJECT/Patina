@@ -1,0 +1,150 @@
+{
+  "entities": {
+    "candidate_name": null,
+    "education": [
+      "B.Tech in Computer Science - Example Institute of Technology (2018 - 2022)"
+    ],
+    "email": "maya.okafor@example.com",
+    "experience": [
+      {
+        "dates": "Jun 2022 – Present",
+        "highlights": [
+          "Built REST APIs in Django and FastAPI serving 40k daily users.",
+          "Cut p95 latency by 35% by adding Redis caching and query indexes.",
+          "Containerised services with Docker and deployed to AWS ECS."
+        ],
+        "organisation": "Northwind Labs ()",
+        "title": "Software Engineer"
+      },
+      {
+        "dates": "Jan 2022 – May 2022",
+        "highlights": [
+          "Wrote ETL jobs in Python and SQL for the reporting warehouse."
+        ],
+        "organisation": "Software Engineering Intern",
+        "title": "Bluebird Analytics ()"
+      }
+    ],
+    "github": "github.com/example-mokafor",
+    "linkedin": "linkedin.com/in/example-maya-okafor",
+    "phone": "+15550104477",
+    "projects": [],
+    "skill_count": 15,
+    "skills": [
+      "python",
+      "javascript",
+      "react",
+      "django",
+      "fastapi",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "git",
+      "github",
+      "sql",
+      "pytest",
+      "rest",
+      "api"
+    ]
+  },
+  "filename": "f1_dev_github.pdf",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "maya okafor",
+      "tx\ngithub.com/example-mokafor",
+      "| linkedin.com/in/example-maya-okafor",
+      "3 years",
+      "experience building\npython web services",
+      "skills\npython",
+      "django",
+      "fastapi",
+      "react",
+      "javascript"
+    ],
+    "sentence_count": 4,
+    "token_count": 95,
+    "tokens_preview": [
+      "maya",
+      "okafor",
+      "austin",
+      "tx",
+      "summary",
+      "backend",
+      "lean",
+      "software",
+      "engineer",
+      "year",
+      "experience",
+      "build",
+      "python",
+      "web",
+      "service",
+      "react",
+      "end",
+      "skills",
+      "python",
+      "django"
+    ]
+  },
+  "raw_text_preview": "Maya Okafor\nmaya.okafor@example.com | +1 555 010 4477 | Austin, TX\ngithub.com/example-mokafor | linkedin.com/in/example-maya-okafor\nSUMMARY\nBackend-leaning software engineer with 3 years of experience building\nPython web services and React front ends.\nSKILLS\nPython, Django, FastAPI, React, JavaScrip",
+  "semantic_analysis": {
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
+    "focused_score": 0.7765,
+    "full_text_score": 0.7605,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react",
+      "redis",
+      "aws",
+      "kubernetes"
+    ],
+    "jd_source": "structured_skills",
+    "match_level": "Strong Match",
+    "match_reason": "Matched 9 of 10 job skills (from the role's listed required/preferred skills); missing: kubernetes.",
+    "matched_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react",
+      "redis",
+      "aws"
+    ],
+    "missing_skills": [
+      "kubernetes"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "python",
+      "javascript",
+      "react",
+      "django",
+      "fastapi",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "git",
+      "github",
+      "sql",
+      "pytest",
+      "rest api"
+    ],
+    "semantic_score": 0.7709,
+    "similarity_score": 0.8484,
+    "skill_coverage": 0.9
+  },
+  "status": "success"
+}

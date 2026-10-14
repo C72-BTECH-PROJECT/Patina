@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Briefcase, MapPin, Layers, Sparkles, CheckCircle, Loader2, FileUp } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
 function CandidateJobDetail() {
   const { id } = useParams();
@@ -18,6 +18,8 @@ function CandidateJobDetail() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'Could not load this job.');
         setJob(data);
+        // If the candidate already applied, reflect it immediately on load.
+        if (data.applied) setApplied(true);
       } catch (loadError) {
         setError(loadError.message || 'Could not load this job.');
       } finally {
@@ -238,7 +240,7 @@ function CandidateJobDetail() {
                 disabled={applying || applied || (resumeCheckDone && hasResume === false)}
                 className={`inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-all ${
                   applied
-                    ? 'cursor-default border border-success/30 bg-success/10 text-success'
+                    ? 'cursor-not-allowed border border-border bg-muted text-muted-foreground'
                     : 'cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90'
                 } disabled:cursor-not-allowed disabled:opacity-60`}
               >

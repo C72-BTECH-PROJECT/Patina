@@ -1,0 +1,19 @@
+Application Support Engineer (L2)
+
+Keep our production platform healthy. You will own L2 incident response for
+our customer billing and logistics applications, run root-cause analysis on
+recurring problems, and maintain the scripts and runbooks the on-call rota
+depends on. This is a support and maintenance role, not feature development.
+
+Requirements:
+- 2+ years in application or production support
+- Strong SQL for investigating data issues
+- Linux administration and Bash or shell scripting
+- Incident management with a ticketing tool such as ServiceNow or Jira
+- Familiarity with ITIL processes
+
+Nice to have:
+- Monitoring and logging tools (Splunk, Nagios, CloudWatch)
+- Oracle or PL/SQL
+- Python scripting for automation
+- Windows Server and Active Directory

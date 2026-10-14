@@ -1,0 +1,7 @@
+# Test-only dependencies for the T-0001 harness. Install into the NLP venv:
+#   nlp-engine/venv/Scripts/python -m pip install -r tests/requirements.txt
+# (python-docx and Pillow, used by fixtures/make_fixtures.py, already come with
+# nlp-engine/requirements.txt.)
+pytest>=9.0
+requests>=2.31
+fpdf2>=2.8

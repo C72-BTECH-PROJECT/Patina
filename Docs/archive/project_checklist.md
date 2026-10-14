@@ -1,3 +1,9 @@
+> **ARCHIVED 2026-10-12 (T-0008). Do not use as evidence.** Self-reported team
+> checklist: checked boxes here are not verified and several contradict the
+> code. Superseded by `AUDIT.md` (code-verified status, file:line evidence) and
+> `CHECKLIST.md` (spec-derived item list). Content below is unchanged from the
+> restored `32905c1` version.
+
 # Project Developer Checklist: AI-Automated Skill Validation Framework
 
 ## 1. Project Initialization & Architecture
