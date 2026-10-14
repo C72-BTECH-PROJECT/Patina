@@ -17,6 +17,8 @@ about the project — not feature status.
   (root). Its as-is claims cite `file:line` at its verified-at commit, and the
   `docs` suite checks that the cites resolve. Its §4–§5 (to-be, migration) are
   proposals, not status; status stays in AUDIT.md.
+- **What gets built next, and in what order:** `ROADMAP.md` (root). A plan,
+  never status; the `docs` suite checks its dependency order and ids.
 - `Docs/archive/project_checklist.md` and `Docs/archive/IMPLEMENTATION-TRACKER.md`
   are archived team self-reports (T-0008). Do NOT treat them as accurate:
   checked boxes there are not evidence. They are history, not a pointer.

@@ -542,23 +542,38 @@ def extract_entities(text: str) -> dict:
     # ── 5. REGEX EXTRACTIONS (Email, Phone, Links) ───────
     email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
     phone_pattern = r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}'
-    github_pattern = r'(?:https?://)?(?:www\.)?github\.com/[A-Za-z0-9_.-]+'
+    # Group 1 = scheme/host prefix, 2 = owner, 3 = optional "/repo" segment (T-0013, I-0015).
+    github_pattern = r'((?:https?://)?(?:www\.)?github\.com/)([A-Za-z0-9_.-]+)(/[A-Za-z0-9_.-]*)?'
     linkedin_pattern = r'(?:https?://)?(?:www\.)?linkedin\.com/in/[A-Za-z0-9_.-]+'
 
-    emails = list(set(re.findall(email_pattern, text)))
-    
+    # First match in document order; never via set(), whose order varies per process.
+    emails = re.findall(email_pattern, text)
+
     # Phone numbers might have duplicates due to formatting, keep distinct digits
     phones_raw = re.findall(phone_pattern, text)
-    phones = list(set([re.sub(r'[^0-9+]', '', p) for p in phones_raw if len(re.sub(r'[^0-9]', '', p)) >= 10]))
+    phones = [re.sub(r'[^0-9+]', '', p) for p in phones_raw if len(re.sub(r'[^0-9]', '', p)) >= 10]
 
-    github_links = list(set(re.findall(github_pattern, text)))
-    linkedin_links = list(set(re.findall(linkedin_pattern, text)))
+    # A bare profile link beats a repository link; otherwise the owner of the first repo link.
+    github_profile = github_repo_owner = None
+    for m in re.finditer(github_pattern, text):
+        owner = m.group(2).rstrip('.')
+        if not owner:
+            continue
+        link = m.group(1) + owner
+        if (m.group(3) or '').strip('/').rstrip('.'):
+            github_repo_owner = github_repo_owner or link
+        else:
+            github_profile = link
+            break
+    github_link = github_profile or github_repo_owner
+
+    linkedin_links = re.findall(linkedin_pattern, text)
 
     return {
         "candidate_name": candidate_name,
         "email": emails[0] if emails else None,
         "phone": phones[0] if phones else None,
-        "github": github_links[0] if github_links else None,
+        "github": github_link,
         "linkedin": linkedin_links[0] if linkedin_links else None,
         "skills": found_skills,
         "experience": experience,
