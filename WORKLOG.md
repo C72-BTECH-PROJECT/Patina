@@ -270,3 +270,98 @@ rollup per archived month at the top of this file.
 - Files changed: nlp-engine/app/ner.py, tests/nlp/test_contact_determinism.py (new), tests/README.md, ISSUES.md, AUDIT.md (2.1, 1.9, 4.11 evidence; 1.16 cite), tasks/T-0013, WORKLOG.md.
 - Issues logged: I-0043 (ROADMAP wording); I-0015 resolved.
 - Next: owner commits T-0013; T-0014 (core GitHub integration) consumes `entities.github`.
+
+## L-0023 · 2026-10-14 · T-0016 assessment generate-only (partial, key-independent work)
+- Prompt: plan then build assessment wiring, generate-only scope approved.
+- Task: T-0016 (spec written + approved; Result partial: criteria 1, 3 PASS; 2, 4, 5, 6 PENDING).
+- Done: `backend/Controllers/assessment.controller.js` + `Routes/assessment.routes.js`
+  (new, `POST /api/assessment/generate`, CANDIDATE-only, answer_key stripped);
+  `backend/index.js` registers `/api/assessment`; `Assessment.jsx` rewritten
+  (job picker → real questions, zero mocks) + `/candidate/assessment` route;
+  `tests/backend/assessment-generate.smoke.mjs` (new); service venv + boot verified.
+- Verification: backend suite 8/8 (7 existing + 1 new, fresh server :5100);
+  service `GET /` healthy; keyless generate → clean 502 JSON (designed path).
+  Stale dev server on :5000 left untouched; test servers stopped after runs.
+- Files changed: backend/ (2 new, index.js mod), frontend Assessment.jsx + App.jsx
+  (mod), tests/backend/assessment-generate.smoke.mjs (new), tasks/T-0016, WORKLOG.md.
+  Uncommitted per protocol. assessment-service/.venv/ is gitignored.
+- Issues logged: none new.
+- Next: owner supplies OPENROUTER_API_KEY → live criteria 2, 4, 5, 6; then commit.
+
+## L-0024 · 2026-10-14 · Session rollup: pull, password reset, T-0016 build
+- Prompt: pull teammates' changes into aditya-ui-work; one-off authorized password
+  reset; history + assessment reviews; plan + build T-0016 (generate-only, approved).
+- Pull: `origin/main` had all but 2 Anthony_V3 commits; stashed tree (`stash@{0}`
+  kept); merged main (`323c3cc`, 2 conflicts resolved with main) + Anthony_V3
+  (`4dc0097`); stash restored (backend kept both sides, Dashboard kept main's,
+  old variant stays in stash); reset to dirty tree. 8 ahead / 0 behind main.
+- Password: verified user `17856516…` then set `pass123` via Auth Admin API;
+  read-only resumed, no keys printed.
+- T-0016: new assessment controller + routes + `index.js` wiring; `Assessment.jsx`
+  rewritten (no mocks) + `/candidate/assessment` route; new smoke test; Supabase
+  skills + MCP config added (owner runs `opencode mcp auth supabase`).
+- Verification: backend 8/8 on fresh :5100 (stale :5000 server untouched);
+  service healthy, keyless call → clean 502 JSON; `node --check` clean.
+  Live criteria 2, 4, 5, 6 pending owner's key. All uncommitted; `.venv` gitignored.
+- Next: key → live checks → commit; decide `stash@{0}`; review
+  `frontend/package-lock.json` (modified before this session).
+
+## L-0025 · 2026-10-14 · T-0016 live verification (key supplied, all green)
+- Prompt: verify criteria 2, 4, 6 live after owner added the key.
+- Key rescue: owner put the real key in tracked `.env.example`; moved it to
+  ignored `assessment-service/.env` (copied, values never printed) and restored
+  the template via `git checkout` — repo has zero tracked `.env` files again.
+- Done: direct live generation → 20 questions (`openrouter/free`, answer key
+  server-side); authed backend generate as Myuser → `{questions}` only, NO
+  `answer_key`; service-down retry → clean JSON 502. T-0016 Result updated
+  (1–4, 6 PASS; 5 manual UI with owner).
+- Findings: (a) free-tier generation needs 2–4 min — backend's 120 s abort may
+  cut slow calls (watch item for T-0017); (b) first attempt failed only because
+  NLP was still cold-booting (HF weights) and the assessment service had died
+  unnoticed — rerun with health-gated boots passed; (c) Upload page stores a
+  file while analyze/proxy need the parsed `resumes` row — one approved
+  `/api/analyze` run as Myuser (score 64.68, fixture f1) bridged it.
+- Writes (all explicitly approved): one analyze run (resumes+scores rows as
+  Myuser). Everything else read-only; test servers stopped after runs.
+- Next: owner does manual UI check (criterion 5) → commit; then T-0017 evaluate.
+
+## L-0026 · 2026-10-14 · Assessment nav item (T-0016 follow-up)
+- Prompt: assessment page had no entry point in the UI; add it.
+- Done: "Assessment" item (`/candidate/assessment`, ListChecks icon) added to
+  the candidate navbar in `CandidateLayout.jsx` (import + navItems entry).
+- Verification: code-only change following the existing nav pattern; visual
+  check rides on the owner's manual UI pass (T-0016 criterion 5).
+- Files changed: frontend/src/components/layouts/CandidateLayout.jsx (mod),
+  uncommitted.
+- Next: owner UI check → commit.
+
+## L-0027 · 2026-10-14 · Assessment options clickable (practice mode)
+- Prompt: MCQ options were dead divs; make them clickable.
+- Done: options are now toggle buttons with selected styling; short-answer
+  got a draft textarea + word count; nav dots mark answered questions.
+  All state is local-only — still zero submission/persistence (T-0016 scope).
+- Verification: code follows existing patterns; visual check rides on the
+  owner's UI pass. Bottom note reworded to "Practice mode".
+- Files changed: frontend/src/pages/candidate/Assessment.jsx (mod), uncommitted.
+- Next: owner UI check → commit; then T-0017 evaluate.
+
+## L-0028 · 2026-10-15 · T-0017 evaluate loop complete
+- Prompt: finish the evaluate loop (submit → server-side score → persisted → credibility fold-in).
+- Done: service POST /evaluate-assessment (MCQ deterministic incl. `_mcq_result` string-index fix; short answers LLM rubric); backend generate/evaluate controllers (nested payload, 409/open-attempt resume); Assessment.jsx submit→score UI; migration 20261015_create_assessments applied; rebuildScoreRecord folds latest attempt.
+- Verification: smoke 2/2; assessment-evaluate-live.test.mjs added (skips w/o tests/.env); owner UI-tested submit→score; scores row fd263c50 (job a103c197) composite 51.34 with assessment_results 30 available:true ("3 of 10 correct").
+- Files changed: assessment-service/app/*, backend/Controllers/assessment.controller.js + Routes/assessment.routes.js (new), explainability.js, Assessment.jsx, assessments migration, tasks/T-0017, smoke/live tests.
+- Next: T-0018 (quiz demanded a resume right after upload).
+
+## L-0029 · 2026-10-15 · T-0018 resume parse fallback (quiz from stored NLP + JD)
+- Prompt: quiz "asks to add resume every time" though uploaded; quiz must use the stored NLP parse + JD, never re-upload.
+- Done: generateAssessment resolves the resume from Supabase (resolveResumeForAssessment); file-but-no-row (or file newer than row) → download Storage file → NLP /parse (same contract as /analyze) → persist a resumes row → use it; 502/500/400 mapping; stored-result fallback when NLP is down.
+- Verification: pre-fix repro (fresh t0001_cand18: upload 200, rows 0, generate → 400 "Upload a resume first" — tests/.out/t0018-prefix.log); post-fix rows 0→1 (preview 300, file_ref set), unchanged file → stays 1, re-upload → 2; smoke 2/2; owner UI run 04:01 parsed resume.pdf → row ba4a2c79.
+- Ops: a 401-squatter on :8000 found and cleared (nlp-engine has no auth — 401s are never ours); all four ports killed/restarted (3000/5000/8000/8002).
+- Next: T-0019 five-attempt limit.
+
+## L-0030 · 2026-10-15 · T-0019 five attempts + quiz outage fixes + run/test doc
+- Prompt: 5 attempts per user per job (latest score counts); then a doc for running/testing everything.
+- Done: dropped assessments_candidate_job_completed_idx (migration allow_five_assessment_attempts applied; file added); generate resumes an open attempt, regenerates while <5 completed, else 409 {attempts_used, max_attempts, latest score}; Assessment.jsx Retake button + "up to 5 attempts" copy; backend generate abort 120s→300s; assessment-service .env timeout 60→240, retries 2→3 (untracked); docs/HOW_TO_RUN_AND_TEST.md.
+- Root causes (quiz 502s): OpenRouter free slugs rotated (gpt-oss-20b:free → 404 "unavailable for free"); openrouter/free router itself returns 200; 60 s service timeout too short for long generations.
+- Verification: node --check clean; smoke 2/2; t0019 flow (2 LLM rounds + 409-limit) relaunched after the timeout fix — result pending, T-0019 Result to be updated.
+- Next: flow result → T-0019 Result → AUDIT/CHECKLIST/ISSUES updates.

@@ -1,9 +1,15 @@
 import spacy
+import os
 
 # load the english model once at module level
 # loading it here means it loads only once when the app starts
 # not every time the function is called — much faster
-nlp = spacy.load("en_core_web_sm")
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "venv", "Lib", "site-packages", "en_core_web_sm", "en_core_web_sm-3.8.0")
+
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    nlp = spacy.load(MODEL_PATH)
 
 def preprocess(text: str) -> dict:
     # pass raw text through spacy pipeline

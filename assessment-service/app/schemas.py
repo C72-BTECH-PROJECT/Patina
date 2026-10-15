@@ -80,3 +80,34 @@ class AssessmentAnswerKey(BaseModel):
     answers: list[MCQAnswerKey | ShortAnswerKey] = Field(
         min_length=20, max_length=20
     )
+
+class CandidateAnswer(BaseModel):
+    question_id: str = Field(min_length=1, max_length=128)
+    # For MCQs: "A"/"B"/"C"/"D". For short answers: free text.
+    response: str = Field(min_length=1, max_length=10000)
+
+
+class EvaluateInput(BaseModel):
+    assessment_id: str = Field(min_length=1, max_length=128)
+    questions: list[dict[str, Any]] = Field(min_length=1, max_length=50)
+    answer_key: list[dict[str, Any]] = Field(min_length=1, max_length=50)
+    answers: list[CandidateAnswer] = Field(min_length=1, max_length=50)
+
+
+class QuestionResult(BaseModel):
+    question_id: str
+    question_type: str
+    skill: str
+    correct: bool
+    points: float
+    max_points: float
+    feedback: str | None = None
+
+
+class EvaluationResult(BaseModel):
+    assessment_id: str
+    points_earned: float
+    points_possible: float
+    score: float
+    results: list[QuestionResult]
+    short_answer_graded: bool

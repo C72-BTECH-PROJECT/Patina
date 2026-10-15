@@ -118,4 +118,3 @@ def generate_assessment(
         f"{MAX_RETRIES_PER_MODEL} validation attempt(s). "
         f"Validation errors: {details}"
     )
-

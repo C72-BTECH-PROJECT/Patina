@@ -19,6 +19,7 @@ import CandidateProfile from './pages/candidate/CandidateProfile';
 import CandidateJobs from './pages/candidate/CandidateJobs';
 import CandidateNotifications from './pages/candidate/Notifications';
 import CandidateJobDetail from './pages/candidate/JobDetail';
+import Assessment from './pages/candidate/Assessment';
 
 // recruiter flow
 import RecruiterLayout from './components/layouts/RecruiterLayout';
@@ -27,6 +28,7 @@ import RecruiterDashboard from './pages/recruiter/Dashboard';
 import Jobs from './pages/recruiter/Jobs';
 import JobDetails from './pages/recruiter/JobDetails';
 import CreateJob from './pages/recruiter/CreateJob';
+import AllCandidates from './pages/recruiter/AllCandidates';
 import { AuthProvider } from './context/AuthContext';
 import RequireRole from './components/auth/RequireRole';
 
@@ -60,6 +62,7 @@ function App() {
               <Route path="jobs/:id" element={<CandidateJobDetail />} />
               <Route path="profile" element={<CandidateProfile />} />
               <Route path="notifications" element={<CandidateNotifications />} />
+              <Route path="assessment" element={<Assessment />} />
             </Route>
 
             {/* 🧑‍💼 RECRUITER FLOW (WITH LAYOUT) */}
@@ -67,6 +70,7 @@ function App() {
 
               <Route path="profile" element={<Profile />} />
               <Route path="dashboard" element={<RecruiterDashboard />} />
+              <Route path="candidates" element={<AllCandidates />} />
               <Route path="jobs" element={<Jobs />} />
               <Route path="jobs/:id" element={<JobDetails />} />
               <Route path="create-job" element={<CreateJob />} />

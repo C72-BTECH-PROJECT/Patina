@@ -73,7 +73,7 @@ const UNAVAILABLE_REASONS = {
   [SUBSCORE_KEYS.GITHUB]:
     'No GitHub evidence was collected for this candidate. The GitHub Aggregator service is not part of this deployment yet, so repository activity has not been checked.',
   [SUBSCORE_KEYS.ASSESSMENT]:
-    'No assessment has been completed by this candidate. The generated technical assessment is not part of this deployment yet.',
+    'No assessment has been completed by this candidate for this job yet. Candidates complete a generated technical assessment from their dashboard.',
 };
 
 // Intended weighting once all three evidence sources exist. Stated here rather
@@ -262,6 +262,89 @@ export const buildParsingSubScore = (semanticAnalysis) => {
   };
 };
 
+/**
+ * Assessment Results (CHECKLIST 3.7 / 4.1, GF-5).
+ *
+ * Built from a completed assessment's evaluation: the server-side score
+ * against the answer key, plus enough per-type detail for the recruiter to
+ * see what the number is made of. MCQs are deterministic; short answers are
+ * rubric-graded, so `short_answer_graded` records whether that path worked.
+ */
+export const buildAssessmentSubScore = (evaluation) => {
+  const score = Number(evaluation?.score);
+  if (!Number.isFinite(score)) {
+    return unavailableSubScore(SUBSCORE_KEYS.ASSESSMENT);
+  }
+
+  const results = asArray(evaluation.results);
+  const mcqResults = results.filter((r) => r?.question_type === 'mcq');
+  const shortResults = results.filter((r) => r?.question_type === 'short_answer');
+  const mcqCorrect = mcqResults.filter(
+    (r) => Number(r.points) >= Number(r.max_points || 1) - 0.001
+  ).length;
+
+  const gradedNote =
+    evaluation.short_answer_graded === false
+      ? ' Short-answer grading was unavailable, so the score reflects the multiple-choice questions and any short answers that could not be graded counted as unanswered.'
+      : '';
+
+  const evidence = [
+    {
+      type: 'metric',
+      key: 'assessment_score',
+      label: 'Assessment score',
+      value: clamp01(score / 100),
+      display: asPercent(score / 100),
+      direction: score >= 50 ? 'positive' : 'negative',
+      note: `Scored server-side against the answer key generated with the questions: ${evaluation.points_earned} of ${evaluation.points_possible} points.${gradedNote}`,
+    },
+    {
+      type: 'metric',
+      key: 'assessment_mcq',
+      label: 'Multiple-choice results',
+      value: mcqResults.length ? mcqCorrect / mcqResults.length : 0,
+      display: `${mcqCorrect} of ${mcqResults.length} correct`,
+      direction: null,
+      note: 'Deterministic match against the answer key.',
+    },
+  ];
+  if (shortResults.length) {
+    evidence.push({
+      type: 'metric',
+      key: 'assessment_short_answer',
+      label: 'Short-answer questions',
+      value: null,
+      display: `${shortResults.length} question${shortResults.length === 1 ? '' : 's'}, rubric-graded`,
+      direction: null,
+      note:
+        evaluation.short_answer_graded === false
+          ? 'Rubric grading was unavailable for this attempt.'
+          : 'Each answer was graded against its ideal answer and key points (0, 0.5 or 1).',
+    });
+  }
+
+  return {
+    key: SUBSCORE_KEYS.ASSESSMENT,
+    label: SUBSCORE_LABELS[SUBSCORE_KEYS.ASSESSMENT],
+    available: true,
+    value: toPoints(score / 100),
+    weight: 0, // set by aggregate()
+    reason: null,
+    components: {
+      score,
+      points_earned: Number(evaluation.points_earned) || 0,
+      points_possible: Number(evaluation.points_possible) || 0,
+      questions_total: results.length,
+      mcq_correct: mcqCorrect,
+      mcq_total: mcqResults.length,
+      short_answer_total: shortResults.length,
+      short_answer_graded: evaluation.short_answer_graded ?? null,
+      match_reason: `Scored ${Math.round(score)}% across ${results.length} generated question${results.length === 1 ? '' : 's'}.`,
+    },
+    evidence,
+  };
+};
+
 // --- Aggregation ------------------------------------------------------------
 
 /**
@@ -439,13 +522,48 @@ export const buildExplanation = (subScores, composite) => {
 
 /**
  * Build everything a `scores` row persists, from one NLP parse result.
- * GitHub and assessment enter here as soon as their builders exist.
+ * GitHub enters as soon as its builder exists; the assessment subscore is
+ * built when a completed assessment evaluation is supplied (CHECKLIST 3.7).
  */
-export const buildScoreRecord = (nlpJson) => {
+export const buildScoreRecord = (nlpJson, assessmentEvaluation = null) => {
   const subscores = {
     [SUBSCORE_KEYS.PARSING]: buildParsingSubScore(nlpJson?.semantic_analysis),
     [SUBSCORE_KEYS.GITHUB]: unavailableSubScore(SUBSCORE_KEYS.GITHUB),
-    [SUBSCORE_KEYS.ASSESSMENT]: unavailableSubScore(SUBSCORE_KEYS.ASSESSMENT),
+    [SUBSCORE_KEYS.ASSESSMENT]: buildAssessmentSubScore(assessmentEvaluation),
+  };
+
+  const composite = aggregate(subscores);
+  const explanation = buildExplanation(subscores, composite);
+
+  const weights = Object.fromEntries(
+    Object.values(SUBSCORE_KEYS).map((key) => [key, subscores[key].weight])
+  );
+
+  return {
+    composite,
+    subscores,
+    weights,
+    explanation,
+    evidence_limited: explanation.evidence_limited,
+  };
+};
+
+/**
+ * Rebuild a stored score once new evidence arrives (T-0017: a candidate
+ * completes their assessment after the résumé was already analysed).
+ *
+ * `storedSubscores` is the `scores.subscores` object as persisted — every
+ * source keeps its value/components/evidence, only the weights and the
+ * composite are recomputed against the new evidence set.
+ */
+export const rebuildScoreRecord = (storedSubscores, assessmentEvaluation) => {
+  const stored = storedSubscores || {};
+  const subscores = {
+    [SUBSCORE_KEYS.PARSING]:
+      stored[SUBSCORE_KEYS.PARSING] ?? unavailableSubScore(SUBSCORE_KEYS.PARSING),
+    [SUBSCORE_KEYS.GITHUB]:
+      stored[SUBSCORE_KEYS.GITHUB] ?? unavailableSubScore(SUBSCORE_KEYS.GITHUB),
+    [SUBSCORE_KEYS.ASSESSMENT]: buildAssessmentSubScore(assessmentEvaluation),
   };
 
   const composite = aggregate(subscores);

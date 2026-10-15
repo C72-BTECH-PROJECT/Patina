@@ -3,8 +3,9 @@ from fastapi import FastAPI, HTTPException
 
 from app.config import SERVICE_NAME
 from app.generator import generate_assessment
+from app.evaluator import evaluate_assessment
 from app.llm_client import AssessmentLLMError
-from app.schemas import AssessmentInput
+from app.schemas import AssessmentInput, EvaluateInput
 
 app = FastAPI(
     title=SERVICE_NAME,
@@ -46,4 +47,22 @@ def create_assessment(data: AssessmentInput):
         raise HTTPException(
             status_code=500,
             detail="Assessment generation failed. Check service logs.",
+        ) from exc
+
+
+@app.post("/evaluate-assessment")
+def score_assessment(data: EvaluateInput):
+    try:
+        return evaluate_assessment(data.model_dump())
+
+    except AssessmentLLMError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=str(exc),
+        ) from exc
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Assessment evaluation failed. Check service logs.",
         ) from exc

@@ -84,3 +84,35 @@ Do not include Markdown fences or text outside the JSON object.
 CANDIDATE AND JOB DATA:
 {context_json}
 """.strip()
+
+
+def build_short_answer_evaluation_prompt(items: list[dict]) -> str:
+    """
+    Rubric grading for the short-answer questions only.
+
+    Each item carries the question, the candidate's answer, the ideal answer
+    and the key points. The model returns partial credit (0, 0.5 or 1) plus
+    one sentence of feedback.
+    """
+    payload = json.dumps(items, ensure_ascii=False)
+    return f"""
+You are a fair technical interviewer grading short-answer responses.
+
+TASK:
+Grade each answer against its ideal answer and key points.
+- 1.0 = covers all key points with correct reasoning.
+- 0.5 = covers some key points, or is partly correct/incomplete.
+- 0.0 = misses the key points or is incorrect.
+
+OUTPUT:
+Return only one valid JSON object with exactly one top-level key, "grades",
+which is an array with one entry per item:
+- question_id
+- points (0, 0.5 or 1)
+- feedback (one sentence, specific, encouraging but honest)
+
+Do not include Markdown fences or text outside the JSON object.
+
+ANSWERS TO GRADE:
+{payload}
+""".strip()
