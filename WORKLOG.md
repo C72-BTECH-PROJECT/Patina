@@ -290,3 +290,39 @@ rollup per archived month at the top of this file.
 - Files changed: github-evidence/app (4 new, 5 mod), tools/record_github.py, .env.example, README; tests/github (2 new test files, snapshot, 5 synthetic accounts, 12 octocat files, conftest, 2 tests, manifest); AUDIT (2.3, 2.4, 2.5, 2.7, 2.13), ISSUES, ROADMAP, tests/README.md, tasks/T-0012, WORKLOG.
 - Issues logged: I-0047 (ROADMAP §1.3 lacks `insufficient_evidence`), I-0048 (calibration notes for P3-12).
 - Next: owner reviews the snapshot and formula and commits (suggested split: service code + tests + recordings, then trackers); T-0014 maps `sub_score` and `insufficient_evidence`; P1-6 adds code quality.
+
+## L-0025 · 2026-10-15 · T-0014 core GitHub integration (P1-4)
+- Prompt: execute the approved T-0014 spec: tests first, red log, implement, full harness, Result, AUDIT, WORKLOG; no commits. Owner decisions in planning: D1 10th reason `insufficient_evidence` (I-0047); D2 fixture = synthetic/active replayed through the real service, login renamed, marked synthetic; D3 404 only by error code; D4 4 ARCHITECTURE cites rewritten as history. Approval added: frontend = exactly the 5 known warnings; a pending manual real-token check.
+- Task: T-0014 (12/12 criteria PASS; manual end-to-end check with the owner's token pending).
+- Done: `backend/Services/internalHttp.js` (timeout over the whole call, one retry on connect errors, typed errors without body/URL), `githubEvidence.js` (login normalisation, 10 reason codes); `explainability.js` (`buildGithubSubScore` with snapshot and public-repos note, per-skill `sources.github`, flags stay unavailable, `buildScoreRecord(nlp, { github })`); analyze forwards/generates `X-Request-ID`; `githubAggregator.js` deleted; `.env.example` names.
+- Tests: `explainability.test.mjs`, `github-evidence-client.test.mjs`, `live-analyze-github.test.mjs`, `lib/stub-server.mjs`, fixture + `make-github-evidence-fixture.py` (byte-stable); `run-suite.ps1` (current only).
+- Verification: red `tests/.out/t0014-red.log` (29/39; C9 already passed at HEAD); green `t0014-green.log` 66/66; full harness `t0014-full-harness.log`: nlp 0, backend 0, docs 0, github 0 (80), frontend = exactly the 5 known lint warnings; sweep --check 0; both greps 0 lines.
+- Files changed: backend/Services/{internalHttp,githubEvidence}.js (new), explainability.js, Controllers/analysis.controller.js, .env.example, githubAggregator.js (deleted); tests/backend (5 new), tests/run-suite.ps1, tests/README.md; AUDIT.md (17 rows, 38 cites re-pointed, summary 3→11 DONE), ARCHITECTURE.md (4 cites), ROADMAP.md (§1.3 row), ISSUES.md, tasks/T-0014, WORKLOG.md.
+- Issues logged: I-0049 (ARCHITECTURE as-is refresh for the GitHub path; unmapped in ROADMAP → 1 checker warning). I-0047 resolved; I-0039 githubAggregator part done; I-0045 T-0014 cite fixed.
+- Next: owner reviews the reason texts, commits (suggested split: backend + tests, then trackers), runs the manual real-token check, decides where I-0049 goes (P1-5?); then T-0015 (outage probe).
+
+## L-0026 · 2026-10-15 · T-0015 outage probe P-4..P-6 (P1-5) + I-0049
+- Prompt: execute the approved T-0015 spec: tests first, red log, implement, full harness, Result, AUDIT, WORKLOG; no commits. Owner additions: map I-0049 to P1-5 and resolve it (ARCHITECTURE as-is GitHub path with cites, P-4..P-6 in the appendix); docs suite at 0 warnings.
+- Task: T-0015 (7/7 criteria PASS).
+- Done: `tests/arch/nlp-outage-probe.mjs` gains asserting phases P-4 (service down), P-5 (service hung, TCP stub), P-6 (real github-evidence, dummy token, local 403 GitHub stub); `hangStub` helper (P-2 now uses it); `check` rows print expected/observed/PASS|FAIL; exit 1 on any FAIL; default phases 1-6; table to `t0015-probe.md`. The probe starts NLP for P-4..P-6 so the score is produced. ROADMAP §1.2: core → service 8 s confirmed.
+- Verification: red (`GITHUB_EVIDENCE_TIMEOUT_MS=60000`) `tests/.out/t0015-red.log`: P-5 analyze FAIL, exit 1; green `t0015-green.log` (phases 1-6, exit 0) and `t0015-green-456.log` (9/9 PASS); full harness `t0015-full-harness.log`: nlp 0, backend 0 (66/66), github 0 (80), docs 0, frontend 1 = the 5 known lint warnings; final docs run 0 warnings (`t0015-docs.log`); sweep --check 0, ports 5000/8000/8001 free.
+- Measured: down 0.7-1.2 s, hung 8.6-8.7 s, rate-limited 0.9 s then 0.6 s with 0 more GitHub requests.
+- Files changed: tests/arch/nlp-outage-probe.mjs, tests/README.md, ROADMAP.md (§1.2, P1-5 row, P2-1/P2-9 issue cells), ARCHITECTURE.md (GitHub path, shifted cites, Appendix A.2), AUDIT.md (0.7, 2.8, 2.13, GR-2 evidence), ISSUES.md, tasks/T-0015, WORKLOG.md. No production code.
+- Issues logged: I-0050 (probe login row label), I-0051 (AUDIT 0.1/GR-2 "1 of 3 services"). I-0049 resolved.
+- Next: owner commits (suggested split: probe + README, then ARCHITECTURE/AUDIT/ROADMAP/ISSUES/task/WORKLOG); ARCHITECTURE's verified-at hash is still `8e8e498` because the work is uncommitted, so re-stamp it after the commit; then P1-6 (8DFS).
+
+## L-0027 · 2026-10-15 · T-0014 manual real-token check
+- Prompt: run the pending manual check with the real services and GitHub API on `tests/private/Anthony_Jennis_Resume`; show only the sub-score facts; sweep, stop services, record. No commits.
+- Task: T-0014 manual check - NOT EXERCISED (not a pass or a fail of the code).
+- Done: confirmed env presence (URL set, token set, not printed); started NLP, github-evidence, backend; seeded, logged in as `t0001_cand`, analyzed; swept (recount 0); stopped all three, ports free.
+- Result: HTTP 200, GitHub sub-score unavailable with `no_github_link`; github-evidence never called. The PDF's GitHub link is a hyperlink annotation behind the word "GitHub", which text extraction does not read. Weights fell back to parsing 1.0 (GF-4 behaviour confirmed). Rate limit 4997/5000 (untouched).
+- Files changed: tasks/T-0014 (Result), ISSUES.md, WORKLOG.md. No production code, no tests.
+- Issues logged: I-0052 (P1, link annotations not extracted).
+- Next: owner decides - re-run with a résumé that prints the URL as text, or fix I-0052 first (needs a roadmap slot; unmapped, so the docs checker may warn).
+
+## L-0028 · 2026-10-15 · T-0014 manual check, second run
+- Prompt: re-run the manual check with `tests/private/resume.pdf` against the test job. No commits.
+- Task: T-0014 manual check - PASS (L-0027's run was not exercised, I-0052).
+- Result: `github=ok`, GitHub sub-score available 26.23/100 for `Arya-A-Nair` (35 owned repos, 10 languages, claims 3 evidenced / 2 not_found / 18 not_checkable), weights GitHub 0.4667 / parsing 0.5333, composite 36.74, same request id in the service log. Rate limit 4975/5000 (22 calls, as budgeted). Swept (0 remaining), services stopped, ports free.
+- Files changed: tasks/T-0014 (Result), WORKLOG.md. No code.
+- Next: owner commits T-0014; I-0052 still needs a roadmap slot.

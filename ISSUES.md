@@ -52,8 +52,10 @@ diff you're already writing.
 | I-0044 | ROADMAP §1.6 names `pytest-socket --disable-socket`; T-0011 uses `--allow-hosts=127.0.0.1,::1` | `ROADMAP.md` | P3 | OPEN | 2026-10-15, T-0011 |
 | I-0045 | T-0012, T-0014 and T-0015 cite "ROADMAP §1.2" for the contract, env vars and timeouts; the service contract moved to `github-evidence/README.md` | `tasks/T-0012-github-evidence-metrics.md`, `tasks/T-0014-core-github-integration.md`, `tasks/T-0015-github-outage-probe.md` | P3 | OPEN | 2026-10-15, T-0011 |
 | I-0046 | Starlette's `TestClient` warns that using it with `httpx` is deprecated ("install `httpx2` instead") | `github-evidence/requirements-dev.txt` | P3 | OPEN | 2026-10-15, T-0011 |
-| I-0047 | ROADMAP §1.3 has no row for the sub-score reason `insufficient_evidence` | `ROADMAP.md`, core mapping (T-0014) | P2 | OPEN | 2026-10-15, T-0012 |
 | I-0048 | An inactive account with corroborated claims scores 0.30 from corroboration alone; commit counts trust author-set dates | `github-evidence/app/scoring.py` | P2 | OPEN | 2026-10-15, T-0012 |
+| I-0050 | Probe labels its login row "P-1 NLP down" even when phase 1 is not selected | `tests/arch/nlp-outage-probe.mjs` | P3 | OPEN | 2026-10-15, T-0015 |
+| I-0051 | AUDIT rows 0.1 and GR-2 still say "1 of the 3 services exists" and that `githubAggregator.js` is the only other code | `AUDIT.md` | P3 | OPEN | 2026-10-15, T-0015 |
+| I-0052 | A résumé whose GitHub link is only a hyperlink annotation behind the text "GitHub" gets `no_github_link`: the NLP text extraction does not read PDF link annotations | `nlp-engine/app` (extraction), `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-10-15, T-0014 manual check |
 
 ---
 
@@ -544,7 +546,7 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 - `backend/.env` defines `GOOGLE_CLIENT_ID/SECRET` and `GITHUB_CLIENT_ID/SECRET`, but no code reads them (grep: 0). They hint at OAuth that was never built (AUDIT 0.4).
 - `backend/uploads/` is an empty local directory that no code references.
 - `dev/null` is a tracked empty file (added in `f2a135c`), probably a shell redirect committed by accident on Windows.
-- `backend/Controllers/githubAggregator.js` is already recorded as dead code (AUDIT 2.3).
+- `backend/Controllers/githubAggregator.js` is already recorded as dead code (AUDIT 2.3). **Done in T-0014:** deleted; the rest of this entry stays open.
 
 **Impact:** confusion only; the unused env vars suggest OAuth exists.
 **Proposed fix:** delete in a cleanup task; keep the OAuth variables only once M5/OAuth uses them.
@@ -616,6 +618,7 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Module:** `tasks/`
 **Evidence:** T-0011 moved the service contract, error table, service timeouts and service env vars from ROADMAP §1.2 to `github-evidence/README.md`. `tasks/T-0012-github-evidence-metrics.md:23` ("as in ROADMAP §1.2"), `tasks/T-0014-core-github-integration.md:34,189` and `tasks/T-0015-github-outage-probe.md:26,36,78` still cite §1.2. §1.2 keeps only the core-side timeouts and variables (`GITHUB_EVIDENCE_URL`, `GITHUB_EVIDENCE_TIMEOUT_MS`), so the timeout cites (`T-0014:189`, `T-0015`) still resolve; the contract cites (`T-0012:23`, `T-0014:34`) do not.
 **Proposed fix:** When each spec is approved, point the contract cites at `github-evidence/README.md`.
+**Progress:** T-0014's contract cite (Spec ref) now names `github-evidence/README.md` (done in T-0014). T-0012 (done) and T-0015 remain.
 
 ### I-0046 — `TestClient` deprecation warning for httpx
 **Status:** OPEN
@@ -623,13 +626,6 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Module:** `github-evidence/requirements-dev.txt`, `tests/github/`
 **Evidence:** Every `tests/github` run prints `StarletteDeprecationWarning: Using httpx with starlette.testclient is deprecated; install httpx2 instead` (starlette 1.3.1, httpx 0.28.1; `tests/.out/t0011-green.log`). The suite is green; a later Starlette may drop httpx support in `TestClient`.
 **Proposed fix:** When bumping pins, try `httpx2` for the test client only (the service itself keeps httpx, and respx mocks httpx), or pin Starlette below the removal.
-
-### I-0047 — ROADMAP §1.3 has no row for `insufficient_evidence`
-**Status:** OPEN
-**Severity:** P2
-**Module:** `ROADMAP.md`, core mapping (T-0014)
-**Evidence:** The service can answer `sub_score.available: false` with `reason_code: "insufficient_evidence"` (owned repos exist but no component could be computed, e.g. `GITHUB_DETAIL_REPOS=0` and no claims; `github-evidence/app/scoring.py`, `tests/github/test_metrics.py::test_no_detail_repos`). ROADMAP §1.3 lists only `no_public_repositories` as a service-side unavailable reason, so T-0014 has no reason text for it.
-**Proposed fix:** Add a §1.3 row (cause, draft text such as "The GitHub account's repositories gave too little data to score.") and map it in T-0014.
 
 ### I-0048 — Sub-score calibration notes for P3-12
 **Status:** OPEN
@@ -641,7 +637,39 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Impact:** The score can be nudged by cheap commits, and a stale account is not near 0. Relevant to GR-1 (cheating) in spirit, though that item is about the assessment.
 **Proposed fix:** Decide in P3-12 whether corroboration needs a floor on activity, and whether P1-6 quality signals should discount trivial commits.
 
+### I-0050 — Probe login row is labelled "P-1 NLP down" whatever phases run
+**Status:** OPEN
+**Severity:** P3
+**Module:** `tests/arch/nlp-outage-probe.mjs`
+**Evidence (T-0015):** the login row is recorded with the phase label `P-1 NLP down` (`tests/arch/nlp-outage-probe.mjs`, main block). In a run of `--phase 4` only, the table opens with a "P-1" row though phase 1 did not run (`tests/.out/t0015-red.log`).
+**Impact:** cosmetic; the T-0015 spec keeps P-1..P-3 unchanged, so it was not touched.
+**Proposed fix:** label it `setup` when P-1 is not selected (with P2-1, which rewrites P-1..P-3).
+
+### I-0051 — AUDIT rows 0.1 and GR-2 predate github-evidence
+**Status:** OPEN
+**Severity:** P3
+**Module:** `AUDIT.md`
+**Evidence (T-0015):** row 0.1 says "1 of the 3 Python services exists" and "`backend/Controllers/githubAggregator.js` is unused"; the GR-2 row says "1 of the 3 SRS services exists". Since T-0011..T-0014 github-evidence runs on :8001 and `githubAggregator.js` is deleted. ARCHITECTURE.md now says 2 of 3. T-0015 added probe evidence to GR-2 but kept its scope to evidence and did not rewrite these sentences.
+**Impact:** AUDIT and ARCHITECTURE disagree on the service count.
+**Proposed fix:** re-verify rows 0.1 and GR-2 in the next AUDIT pass (the statuses should stay `STUBBED_OR_PARTIAL`).
+### I-0052 — GitHub link hidden in a PDF hyperlink annotation is not extracted
+**Status:** OPEN
+**Severity:** P1
+**Module:** `nlp-engine/app` (résumé text extraction); consumer `backend/Controllers/analysis.controller.js:343`
+**Evidence (T-0014 manual check, 2026-10-15):** analyzing `tests/private/Anthony_Jennis_Resume.pdf` returned `github_evidence.available: false`, `reason_code: no_github_link`, and the backend logged `github=no_github_link`. The PDF's text mentions "GitHub" but contains no `github.com/` string; the PDF has 9 link annotations, 3 of them to github.com (checked with pdfplumber, counts only). The visible text is a label and the URL lives in the annotation, which the text extraction does not read. No call reached github-evidence.
+**Impact:** Many real résumés (Word/LaTeX exports) link icons or labels this way, so a candidate with a real GitHub account is scored as having no GitHub link. That is unfair under GF-4 only in the sense that the evidence is lost silently; the reason text ("No GitHub profile link was found on the resume") is also wrong for the candidate.
+**Proposed fix:** read link annotations (PDF) and hyperlink targets (DOCX) in the NLP extraction and append their URLs to the text/entities before contact parsing; add a test with a label-only link fixture.
+
 ## Resolved
+
+### I-0049 — ARCHITECTURE.md as-is sections still describe the pre-T-0014 GitHub path (RESOLVED)
+**Status:** RESOLVED T-0015 (mapped to ROADMAP P1-5 by the owner): the as-is GitHub path is refreshed with cites.
+**Severity:** P3
+**Module:** `ARCHITECTURE.md`
+**Evidence of resolution** (T-0015, 2026-10-15):
+- Component table, edge table, diagram, §0, §1.7, §1.8 and §2 describe github-evidence on :8001 and core's client (`backend/Services/githubEvidence.js:100`, `backend/Services/internalHttp.js:61`) with the reason codes; Appendix A.2 holds the P-4..P-6 output.
+- Every cite into `backend/Controllers/analysis.controller.js`, `tests/run-suite.ps1` and `nlp-engine/app/ner.py` was re-pointed by diffing `8e8e498` against the working tree (for example the NLP `fetch` moved from 262 to 273).
+- `node tests/docs/check-trackers.mjs` → 228 cites OK, 0 warnings. The verified-at hash was not changed: the work is uncommitted, so the new text says it was checked against the working tree on top of `f65d5b2`.
 
 ### I-0008 — `Docs/IMPLEMENTATION-TRACKER.md` Firestore/MongoDB sections are stale doc drift (RESOLVED)
 **Status:** RESOLVED T-0008: tracker archived, Firestore/MongoDB content replaced by the verified Supabase data model in `AUDIT.md`.
@@ -1002,3 +1030,14 @@ the bug in tests; production remains nondeterministic.**
 
 ---
 
+### I-0047 — ROADMAP §1.3 has no row for `insufficient_evidence` (RESOLVED)
+**Status:** RESOLVED T-0014: a 10th reason code, mapped in core and listed in ROADMAP §1.3 (owner decision D1).
+**Severity:** P2
+**Module:** `ROADMAP.md`, core mapping (T-0014)
+**Evidence:** The service can answer `sub_score.available: false` with `reason_code: "insufficient_evidence"` (owned repos exist but no component could be computed, e.g. `GITHUB_DETAIL_REPOS=0` and no claims; `github-evidence/app/scoring.py`, `tests/github/test_metrics.py::test_no_detail_repos`). ROADMAP §1.3 lists only `no_public_repositories` as a service-side unavailable reason, so T-0014 has no reason text for it.
+**Proposed fix:** Add a §1.3 row (cause, draft text such as "The GitHub account's repositories gave too little data to score.") and map it in T-0014.
+**Evidence of resolution** (T-0014, 2026-10-15):
+- `backend/Services/githubEvidence.js:84-94` (`reasonForBody`) passes the service's `reason_code` through for `no_public_repositories` and `insufficient_evidence`; any other unavailable body is `service_error`.
+- `backend/Services/explainability.js:75` (`GITHUB_REASONS.insufficient_evidence`, the draft text above).
+- `ROADMAP.md` §1.3 has the row.
+- `tests/backend/github-evidence-client.test.mjs` "maps every service outcome" › "200 sub_score unavailable: insufficient_evidence (D1)", and `tests/backend/explainability.test.mjs` "every GitHub reason is unavailable, never zero" (10 codes), both pass (`tests/.out/t0014-green.log`).

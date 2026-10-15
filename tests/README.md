@@ -40,7 +40,7 @@ powershell -File tests\run-suite.ps1 -Target baseline -Suites nlp
 powershell -File tests\run-suite.ps1 -Target baseline -Suites backend -Live   # + tier 2 (writes to Supabase)
 powershell -File tests\run-suite.ps1 -Target current -Suites github         # github-evidence service vs recorded/synthetic GitHub responses (T-0011), no services, network blocked
 powershell -File tests\run-suite.ps1 -Target current -Suites docs           # CHECKLIST/AUDIT/CLAUDE.md/ARCHITECTURE.md/ROADMAP.md drift check (T-0008..T-0010), no services
-node tests\arch\nlp-outage-probe.mjs                                          # NLP down/hung/busy probe (T-0009); starts its own backend and NLP, ports 5000/8000 must be free
+node tests\arch\nlp-outage-probe.mjs                                          # outage probe: P-1..P-3 NLP down/hung/busy (T-0009, descriptive), P-4..P-6 github-evidence down/hung/rate-limited (T-0015, asserting; exit 1 on a FAIL); starts its own backend, NLP and github-evidence, ports 5000/8000/8001 must be free; `--phase N` is repeatable
 ```
 
 The script starts NLP (`PYTHONHASHSEED=0`, HF offline) and the backend from
@@ -53,11 +53,12 @@ logs to `tests/.out/` (git-ignored).
 |---|---|---|
 | NLP | `nlp/test_parse.py`, `nlp/test_contact_determinism.py` | None — the NLP service has no Supabase client. The determinism test runs `extract_entities` in child processes (venv interpreter, `PYTHONHASHSEED` 0-4) and needs no running service (T-0013). |
 | Backend tier 1 | `backend/smoke.test.mjs` | No writes; one `profiles` read (unknown-username login). |
-| Backend tier 2 | `backend/live-analyze.test.mjs` | **Live.** Dedicated `t0001_cand` / `t0001_recr` accounts (`tests/.env`), a job tagged `[T-0001 TEST]`, sweep before and after. |
+| Backend unit (T-0014) | `backend/explainability.test.mjs`, `backend/github-evidence-client.test.mjs`, `backend/lib/stub-server.mjs`, `backend/fixtures/github-evidence-example-mokafor.json` | None, and no network beyond loopback. Import this repo's `backend/Services/*.js` directly. The client test runs against `lib/stub-server.mjs`, an HTTP stub bound on 127.0.0.1 and ::1, never the real service. Run in the default backend suite for `-Target current` only. |
+| Backend tier 2 | `backend/live-analyze.test.mjs`, `backend/live-analyze-github.test.mjs` (T-0014) | **Live.** Dedicated `t0001_cand` / `t0001_recr` accounts (`tests/.env`), a job tagged `[T-0001 TEST]`, sweep before and after. `live-analyze-github` binds a github-evidence stub on **:8001** (core's default `GITHUB_EVIDENCE_URL`) that replays the fixture, so stop any real github-evidence service first; GitHub is never called. `-Target current` only. |
 | Frontend | `CI=true npm run build` | None. |
 | GitHub evidence | `github/test_service.py`, `github/test_client.py`, `github/test_metrics.py`, `github/test_scoring.py`, `github/recordings/`, `github/snapshots/` | None, and no network: `github-evidence/venv`, its own pytest call, FastAPI `TestClient`, every test inside `respx.mock(assert_all_mocked=True)`, and `--allow-hosts=127.0.0.1,::1` (pytest-socket) so any other connect raises. Recordings are listed in `recordings/manifest.json` (`recorded` or `synthetic`, dated) and scrubbed to allow-listed headers. The `octocat` tests in `test_metrics.py` use the owner's real recording (`github-evidence/tools/record_github.py octocat`; T-0012 also records `/languages` and `/commits`) and skip if it is absent. Tests never read the real clock: the service clock is pinned to the account's `fetched_at` in the manifest. `synthetic/<name>/` folders are whole fake accounts (active, forks, empty, partial, archived). After re-recording octocat, regenerate `snapshots/octocat.json`. Skipped for `-Target baseline`. |
 | Docs | `docs/check-trackers.mjs` | None. Also checks that every `file:line` in `ARCHITECTURE.md` resolves (T-0009), and that `ROADMAP.md` items list Depends on/Size/Files/Moves/Issues/Task, depend only on earlier items, use S/M/L, and name only existing CHECKLIST, issue and task ids (T-0010). An open issue or a CODE_REVIEWED_UNTESTED row that no item maps prints a `warning:` line but does not fail. |
-| Architecture probe (not in the default suites) | `arch/nlp-outage-probe.mjs` | **Live.** One `[T-0001 TEST]` job and one upload under `resumes/candidates/<C>/`, swept before and after. With NLP down or hung, analyze stops before any write; P-1/P-2 refuse to run if :8000 answers. Prints a table only, asserts nothing (T-0009). |
+| Architecture probe (not in the default suites) | `arch/nlp-outage-probe.mjs` | **Live.** One `[T-0001 TEST]` job and one upload under `resumes/candidates/<C>/`, swept before and after. With NLP down or hung, analyze stops before any write; P-1/P-2 refuse to run if :8000 answers. P-1..P-3 print a table only (T-0009). **P-4..P-6 (T-0015) assert**: each row prints expected, observed and PASS/FAIL, and the probe exits 1 if any fails. They run real analyzes (NLP started by the probe, so scores and resumes rows are written and swept) with github-evidence down (nothing on :8001), hung (a TCP stub) or rate-limited (the real service, dummy `GITHUB_TOKEN`, `GITHUB_API_URL` on a local 403 stub: no request leaves the machine). They refuse to run if :8001 answers. `GITHUB_EVIDENCE_TIMEOUT_MS=60000` in the probe's environment makes P-5 FAIL (the red run). Table: `.out/t0015-probe.md` when P-4..P-6 run, else `.out/t0009-probe.md`. |
 | Manual | `MANUAL_SMOKE.md` | Live, via the UI — finish with `node tests/backend/sweep.mjs`. |
 
 The sweep (`backend/lib/testdb.mjs`) deletes only: `scores`, `resumes`,
@@ -77,6 +78,16 @@ Every run snapshots the t0001_ `profiles` rows to
 `profile-missing:<username>: 1` if a t0001_ profile row is gone, and
 `sweep.mjs --restore-profiles` upserts the rows back from the snapshot
 (idempotent).
+
+**`backend/fixtures/github-evidence-example-mokafor.json` is synthetic.**
+`example-mokafor` is the fixture login on `fixtures/f1_dev_github.pdf`, not a
+real GitHub account. The file is the real github-evidence service's answer when
+it replays `github/recordings/synthetic/active` in process, with `synth-active`
+rewritten to `example-mokafor` in memory. The clock is pinned to that set's
+manifest `fetched_at`, and the claimed skills are f1's parsed skills from the NLP
+snapshot. Its `_source` field says the same. Regenerate it (deterministic) with:
+
+    github-evidence\venv\Scripts\python tests\backend\fixtures\make-github-evidence-fixture.py
 
 Known schema gaps this depends on (not fixed here): `resumes` bucket (I-0001),
 `scores` table (I-0007), `resumes` table (I-0013) exist only in the live

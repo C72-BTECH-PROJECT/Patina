@@ -15,7 +15,9 @@
   current  = this repo, ports NLP 8000 / backend 5000 (HEAD hardcodes both).
   -Live adds tests\backend\live-analyze.test.mjs, which writes to the shared
   Supabase project (scoped to the t0001_ test accounts; see tests\README.md).
-  docs     = tests\docs\check-trackers.mjs (T-0008): CHECKLIST/AUDIT/CLAUDE.md drift check.
+  backend (current only, T-0014): explainability + github-evidence-client unit tests always;
+             -Live adds live-analyze-github.test.mjs, which binds a github-evidence stub on :8001.
+  docs    = tests\docs\check-trackers.mjs (T-0008): CHECKLIST/AUDIT/CLAUDE.md drift check.
              Read-only, starts no services, always checks the current repo's files.
   github   = tests\github (T-0011): the github-evidence service against recorded and synthetic
              GitHub responses only. Own venv (github-evidence\venv), own pytest call, no services
@@ -102,8 +104,17 @@ try {
     Write-Host "== backend suite"
     $env:BACKEND_BASE_URL = $beUrl
     $files = @((Join-Path $tests 'backend\smoke.test.mjs'))
+    # Offline unit tests (T-0014): explainability layer and the github-evidence client against a
+    # local stub. They import this repo's backend modules, so they mean nothing for baseline.
+    if ($Target -eq 'current') {
+      foreach ($f in 'explainability', 'github-evidence-client') {
+        $files += (Join-Path $tests "backend\$f.test.mjs")
+      }
+    }
     if ($Live) {
       $files += (Join-Path $tests 'backend\live-analyze.test.mjs')
+      # T-0014: analyze with a github-evidence stub on :8001 (needs :8001 free). Not in baseline.
+      if ($Target -eq 'current') { $files += (Join-Path $tests 'backend\live-analyze-github.test.mjs') }
       # Cross-user authorization tests (T-0004..T-0007); they skip if the second accounts are not in tests\.env.
       foreach ($f in 'live-shortlist-authz', 'live-notifications-authz', 'live-auth-failclosed', 'live-analysis-isolation') {
         $files += (Join-Path $tests "backend\$f.test.mjs")

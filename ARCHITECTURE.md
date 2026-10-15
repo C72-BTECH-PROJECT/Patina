@@ -6,6 +6,12 @@ doesn't"). Task: T-0009.
 
 Verified at commit: `8e8e498` (branch `Anthony_V3`; application code identical to `2e87d44`).
 
+**Refreshed 2026-10-15 (T-0015, I-0049).** The GitHub path (§0, §1.1–§1.3, §1.7, §1.8, §2, Appendix A.2) and
+every cite into `backend/Controllers/analysis.controller.js`, `tests/run-suite.ps1` and
+`nlp-engine/app/ner.py` were re-verified against the working tree on top of `f65d5b2`, which
+holds the uncommitted T-0014 and T-0015 changes. Those cites are working-tree lines; the hash
+above is the last full verification. Other sections are unchanged from `8e8e498`.
+
 **How to read it:**
 - Every as-is claim cites `file:line` at that commit, or a probe result `P-n`
   (Appendix A; re-run with `node tests/arch/nlp-outage-probe.mjs`).
@@ -19,10 +25,10 @@ Verified at commit: `8e8e498` (branch `Anthony_V3`; application code identical t
 ## 0. Answer for the guide
 
 1. We don't have an API gateway yet; our Express server is currently the entry point and the application itself. The browser calls only Express (port 5000). Express holds the login sessions, jobs, applications, resume storage and scoring, and does all access to our Supabase Postgres database.
-2. Of the three Python services we designed, one runs today: a stateless FastAPI NLP service (port 8000) that Express calls over HTTP to parse and match resumes. The GitHub evidence service and the assessment engine are not built yet.
-3. So today we are a monolith with one extracted NLP microservice, not yet a microservices architecture. Express cannot run as two copies because it keeps login sessions in process memory (NFR-3 not met), and the NLP service processes one parse at a time.
-4. Failure isolation is partial (NFR-12). When we stopped the NLP service, login, jobs and upload kept working, but scoring failed with a raw 500 error. When NLP hung, scoring gave no response for 20 seconds, because the call has no timeout.
-5. Our plan, in the order of `ROADMAP.md`: the GitHub evidence service first, then NLP isolation (timeout and a clean 503), score-on-apply, the Node API gateway, containers (docker-compose), and stateless JWT auth.
+2. Of the three Python services we designed, two run today: a stateless FastAPI NLP service (port 8000) that Express calls over HTTP to parse and match resumes, and a stateless FastAPI github-evidence service (port 8001) that Express calls to score a candidate's public GitHub activity. The assessment engine is not built yet.
+3. So today we are a monolith with two extracted internal services, not yet a microservices architecture. Express cannot run as two copies because it keeps login sessions in process memory (NFR-3 not met), and the NLP service processes one parse at a time.
+4. Failure isolation is partial (NFR-12). When we stopped the NLP service, login, jobs and upload kept working, but scoring failed with a raw 500 error. When NLP hung, scoring gave no response for 20 seconds, because the call has no timeout. The github-evidence call is isolated properly: with that service down, hung or rate-limited by GitHub, scoring still returns 200 with a stated reason (probe P-4..P-6).
+5. Our plan, in the order of `ROADMAP.md`: the GitHub evidence service first (built; the outage probe is P1-5), then NLP isolation (timeout and a clean 503), score-on-apply, the Node API gateway, containers (docker-compose), and stateless JWT auth.
 
 ---
 
@@ -44,15 +50,18 @@ flowchart LR
     DB[("Postgres, schema public<br/>profiles, jobs, applications,<br/>notifications, resumes, scores")]
     ST[("Storage bucket resumes")]
   end
-  GH["GitHub Aggregator<br/>not built"]
+  GHE["FastAPI github-evidence :8001<br/>POST /v1/evidence, GET /health<br/>stateless, internal only,<br/>holds GITHUB_TOKEN"]
+  GHAPI["GitHub REST API"]
   AS["Assessment Engine<br/>not built"]
   FE -->|"29 calls, HTTP + cookie patina_session"| BE
   BE -->|"POST /parse multipart<br/>only from /api/analyze<br/>no timeout, no retry, no auth"| NLP
+  BE -->|"POST /v1/evidence JSON<br/>8 s timeout, one retry on connect errors<br/>X-Request-ID, no auth"| GHE
+  GHE -->|"REST with token<br/>4 s per call, 6 s deadline"| GHAPI
   BE -->|"supabase-js, service-role key"| DB
   BE -->|"supabase-js, service-role key"| ST
   BE -->|"anon key: sign-in, sign-up, reset"| AUTH
   classDef missing stroke-dasharray: 5 5
-  class GH,AS missing
+  class AS missing
 ```
 
 ### 1.2 Runnable units
@@ -66,11 +75,12 @@ config of any kind. A search for `Dockerfile*`, `docker-compose*`, `Procfile`,
 |---|---|---|---|---|---|
 | Frontend | React 19, Create React App (`react-scripts` 5.0.1) | 3000 (CRA default; no `PORT` override, no `proxy` field) | `npm start` = `react-scripts start` | Candidate, recruiter and admin UI | `frontend/package.json:13`, `frontend/package.json:21` |
 | Backend | Node.js (24.12 locally; no `engines` pin), Express 5, ESM | 5000 (`process.env.PORT \|\| 5000`; `PORT` is not in `backend/.env`) | `npm start` = `node index.js` (`dev`: nodemon) | Everything except parsing: sessions and auth, jobs, applications, shortlist, notifications, admin, resume storage, scoring and explanation, all DB access, the call to NLP | `backend/index.js:20`, `backend/index.js:74`, `backend/package.json:7-8` |
-| NLP service | Python 3.14 venv (README says 3.11), FastAPI, uvicorn | 8000 (command-line flag; default host 127.0.0.1) | `uvicorn app.main:app --port 8000`, from `nlp-engine/` | Resume text extraction, NER, S-BERT similarity against a job | `README.md:118-123`, `tests/run-suite.ps1:72-76`, `nlp-engine/app/main.py:48-57` |
-| GitHub Aggregator | not built | none | none | (designed) GitHub evidence | `backend/Controllers/githubAggregator.js:10` is a 43-line helper that nothing imports |
+| NLP service | Python 3.14 venv (README says 3.11), FastAPI, uvicorn | 8000 (command-line flag; default host 127.0.0.1) | `uvicorn app.main:app --port 8000`, from `nlp-engine/` | Resume text extraction, NER, S-BERT similarity against a job | `README.md:118-123`, `tests/run-suite.ps1:77-81`, `nlp-engine/app/main.py:48-57` |
+| github-evidence service | Python venv (`github-evidence/venv`), FastAPI, uvicorn, httpx | 8001 (command-line flag; host 127.0.0.1) | `python -m uvicorn app.main:app --host 127.0.0.1 --port 8001`, from `github-evidence/` | GitHub profile, repository, language and commit evidence for one login, and its sub-score; holds the GitHub token; refuses to start without `GITHUB_TOKEN` | `github-evidence/README.md:18`, `github-evidence/app/main.py:172` (`GET /health`), `github-evidence/app/main.py:176` (`POST /v1/evidence`), `github-evidence/app/config.py:61` (`Settings.from_env`) |
 | Assessment Engine | not built | none | none | (designed) LLM assessment | `frontend/src/pages/candidate/Assessment.jsx:61` calls `/api/assessment/generate`, which no backend route serves; the page is unrouted |
 
 Notes:
+- **github-evidence is optional for scoring.** Core reads `GITHUB_EVIDENCE_URL` (default `http://localhost:8001`, empty = disabled) and `GITHUB_EVIDENCE_TIMEOUT_MS` (default 8000) on every call (`backend/Services/githubEvidence.js:59-65`). Nothing pings it at start-up, and the backend boots without it (P-4).
 - **NLP start-up.** NLP loads its models at import: MiniLM at
   `nlp-engine/app/embedder.py:11`, and spaCy twice, at
   `nlp-engine/app/preprocessor.py:6` and `nlp-engine/app/ner.py:4`. Start-up to
@@ -87,17 +97,20 @@ Notes:
 
 | Caller → callee | Protocol | URL source | Timeout / retry | On failure | Evidence |
 |---|---|---|---|---|---|
-| Backend `POST /api/analyze` → NLP `POST /parse` | HTTP multipart via `node-fetch` 3 | `NLP_PARSE_URL`, default `http://localhost:8000/parse` (not set in `backend/.env`) | none / none; no auth header | non-2xx → **502**, echoing the upstream body (`:263-268`); unreachable → caught → **500** `{"message":"Analyze failed","error":"request to http://localhost:8000/parse failed, reason: "}` (P-1); hung → no response within 20 s (P-2) | `backend/Controllers/analysis.controller.js:5`, `backend/Controllers/analysis.controller.js:12`, `backend/Controllers/analysis.controller.js:262`, `backend/Controllers/analysis.controller.js:357-359` |
+| Backend `POST /api/analyze` → NLP `POST /parse` | HTTP multipart via `node-fetch` 3 | `NLP_PARSE_URL`, default `http://localhost:8000/parse` (not set in `backend/.env`) | none / none; no auth header | non-2xx → **502**, echoing the upstream body (`:274-279`); unreachable → caught → **500** `{"message":"Analyze failed","error":"request to http://localhost:8000/parse failed, reason: "}` (P-1); hung → no response within 20 s (P-2) | `backend/Controllers/analysis.controller.js:5`, `backend/Controllers/analysis.controller.js:21`, `backend/Controllers/analysis.controller.js:273`, `backend/Controllers/analysis.controller.js:373-375` |
 | Backend → Supabase Postgres + Storage | HTTPS via `supabase-js` (PostgREST, Storage API) | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`; one client created at import, with the service-role key pinned as the bearer | none / none | Per handler, mostly 500; job lookup → 404; the auth middleware's profile lookup → 401 (fails closed) | `backend/Config/supabase.js:54-62`, `backend/Middlewares/auth.Middleware.js:26-27` |
 | Backend → Supabase Auth (sign-in, sign-up, resend, reset) | HTTPS via `supabase-js`, anon key | `SUPABASE_URL` + `SUPABASE_ANON_KEY`; lazy singleton | none / none | 400/401/403 from auth errors; 500 if the key is missing | `backend/Config/supabaseAuth.js:22-30`, `backend/Controllers/auth.controller.js:333` |
-| Backend → Supabase Auth admin (`getUserById`) | HTTPS via `supabase-js`, service-role key | as above | none / none | Login → 401; elsewhere the error is swallowed | `backend/Controllers/auth.controller.js:310`, `backend/Controllers/auth.controller.js:132`, `backend/Controllers/analysis.controller.js:488` |
-| Backend → GitHub REST | HTTPS `fetch`, unauthenticated | hardcoded `https://api.github.com/users/<name>/repos` | none / none | returns `[]` | `backend/Controllers/githubAggregator.js:21` is **dead code**: nothing imports it |
-| NLP → anything | none | none | none | none | `nlp-engine/app/main.py:1-11` imports no HTTP client. `git grep -nE "import requests\|httpx\|urllib" -- nlp-engine/app` → 0. Its only network use is the one-time Hugging Face model download (`nlp-engine/app/embedder.py:11`), which the harness blocks with `HF_HUB_OFFLINE=1` (`tests/run-suite.ps1:71`) |
+| Backend → Supabase Auth admin (`getUserById`) | HTTPS via `supabase-js`, service-role key | as above | none / none | Login → 401; elsewhere the error is swallowed | `backend/Controllers/auth.controller.js:310`, `backend/Controllers/auth.controller.js:132`, `backend/Controllers/analysis.controller.js:504` |
+| Backend `POST /api/analyze` → github-evidence `POST /v1/evidence` | HTTP JSON via `node-fetch` 3 in `postJson`; `X-Request-ID` forwarded | `GITHUB_EVIDENCE_URL`, default `http://localhost:8001` (`backend/Services/githubEvidence.js:60`) | 8 s over the whole call (`GITHUB_EVIDENCE_TIMEOUT_MS`, `backend/Services/githubEvidence.js:17,64`; abort at `backend/Services/internalHttp.js:62-63`) / one retry on connection errors only, never after a timeout or an HTTP answer (`backend/Services/internalHttp.js:79-80`); no auth header | never throws: every failure becomes a reason code and an unavailable sub-score, and the score is still produced (`backend/Services/githubEvidence.js:21-32`, `backend/Services/githubEvidence.js:72-80`, `backend/Services/githubEvidence.js:100`). Down → `service_unavailable`, analyze 1.2 s in total (P-4). Hung → `timeout`, 8.7 s in total, one connection (P-5). GitHub rate-limited → `github_rate_limited` (P-6) | `backend/Controllers/analysis.controller.js:9`, `backend/Controllers/analysis.controller.js:343`, `backend/Services/githubEvidence.js:114`, `backend/Services/internalHttp.js:61` |
+| github-evidence → GitHub REST | HTTPS via httpx with a bearer token | `GITHUB_API_URL`, default `https://api.github.com` (`github-evidence/app/config.py:65`) | 4 s per call, 6 s deadline (`github-evidence/app/config.py:50-51`) / one retry on 5xx, connection errors and short secondary limits (`github-evidence/app/github_client.py:277`); the primary limit and the low-water mark stop further calls (`github-evidence/app/github_client.py:237-238`, `github-evidence/app/github_client.py:305-306`) | `github_rate_limited` to core, and no further GitHub request until the reset (P-6: 1 request, then 0) | `github-evidence/app/github_client.py:129`, `github-evidence/app/github_client.py:277` |
+| NLP → anything | none | none | none | none | `nlp-engine/app/main.py:1-11` imports no HTTP client. `git grep -nE "import requests\|httpx\|urllib" -- nlp-engine/app` → 0. Its only network use is the one-time Hugging Face model download (`nlp-engine/app/embedder.py:11`), which the harness blocks with `HF_HUB_OFFLINE=1` (`tests/run-suite.ps1:76`) |
 
-Coverage of this table at `8e8e498`:
-- `git grep -nE "\bfetch\(" -- backend ':!backend/node_modules'` → 2 hits,
-  `backend/Controllers/analysis.controller.js:262` and
-  `backend/Controllers/githubAggregator.js:21`, both above.
+Coverage of this table (working tree, T-0015):
+- `grep -rnE "\bfetch\(" backend --include=*.js --exclude-dir=node_modules` → 2 hits,
+  `backend/Controllers/analysis.controller.js:273` (NLP) and
+  `backend/Services/internalHttp.js:71` (github-evidence), both above.
+  `backend/Controllers/githubAggregator.js`, a third hit at `8e8e498`, was dead code
+  and was deleted in T-0014.
 - The 39 `.from('<table>')` sites and 11 `.auth.*(` sites are the Supabase rows
   above, broken down by resource in §1.5.
 
@@ -151,13 +164,13 @@ Auth calls. The NLP service and the browser hold no database credentials.
 | Resource | Read by | Written by | Client / key | Evidence |
 |---|---|---|---|---|
 | `profiles` | auth middleware on every request; login, `me`, admin, recruiter applicants | signup insert; admin suspension update | service role | `supabase/migrations/20260823_create_profiles.sql:8`, `backend/Middlewares/auth.Middleware.js:16`, `backend/Controllers/auth.controller.js:257`, `backend/Controllers/admin.controller.js:93-95` |
-| `jobs` | jobs list/detail/mine, analyze, applicants, admin count | recruiter create | service role | `supabase/migrations/20260830_create_jobs_and_applications.sql:12`, `backend/Controllers/jobs.controller.js:21`, `backend/Controllers/jobs.controller.js:56-57`, `backend/Controllers/analysis.controller.js:243` |
-| `applications` | job detail (applied?), shortlist, applicants | apply insert; shortlist update | service role | `supabase/migrations/20260830_create_jobs_and_applications.sql:35`, `backend/Controllers/jobs.controller.js:137-138`, `backend/Controllers/jobs.controller.js:187-188`, `backend/Controllers/analysis.controller.js:460` |
+| `jobs` | jobs list/detail/mine, analyze, applicants, admin count | recruiter create | service role | `supabase/migrations/20260830_create_jobs_and_applications.sql:12`, `backend/Controllers/jobs.controller.js:21`, `backend/Controllers/jobs.controller.js:56-57`, `backend/Controllers/analysis.controller.js:254` |
+| `applications` | job detail (applied?), shortlist, applicants | apply insert; shortlist update | service role | `supabase/migrations/20260830_create_jobs_and_applications.sql:35`, `backend/Controllers/jobs.controller.js:137-138`, `backend/Controllers/jobs.controller.js:187-188`, `backend/Controllers/analysis.controller.js:476` |
 | `notifications` | candidate notifications | shortlist side effect; mark read | service role | `supabase/migrations/20260903_create_notifications.sql:6`, `backend/Controllers/notification.controller.js:4`, `backend/Controllers/notification.controller.js:21`, `backend/Controllers/notification.controller.js:45-46` |
-| `resumes` | embedded in score reads | analyze only | service role | `supabase/migrations/20260903_create_resumes_and_scores.sql:18`, `backend/Controllers/analysis.controller.js:304-305` |
-| `scores` | candidate analysis, recruiter candidates, applicants | analyze only | service role | `supabase/migrations/20260903_create_resumes_and_scores.sql:41`, `backend/Controllers/analysis.controller.js:332-333`, `backend/Controllers/analysis.controller.js:368`, `backend/Controllers/analysis.controller.js:505` |
-| `auth.users` (Supabase Auth) | login, reset, applicants (`getUserById`) | sign-up, password update | anon (sign-in/sign-up), service role (admin API) | `backend/Controllers/auth.controller.js:238`, `backend/Controllers/auth.controller.js:310`, `backend/Controllers/analysis.controller.js:488` |
-| Storage bucket `resumes` | resume status, apply (has a resume?) | upload route (`candidates/<id>/resume.<ext>`, upsert, prune); analyze (`<id>/<uuid>.<ext>`) | service role | `supabase/migrations/20260903_create_resumes_and_scores.sql:14`, `backend/Controllers/analysis.controller.js:151-153`, `backend/Controllers/analysis.controller.js:277-279`, `backend/Controllers/analysis.controller.js:137-139`, `backend/Controllers/jobs.controller.js:106-108` |
+| `resumes` | embedded in score reads | analyze only | service role | `supabase/migrations/20260903_create_resumes_and_scores.sql:18`, `backend/Controllers/analysis.controller.js:315-316` |
+| `scores` | candidate analysis, recruiter candidates, applicants | analyze only | service role | `supabase/migrations/20260903_create_resumes_and_scores.sql:41`, `backend/Controllers/analysis.controller.js:348-349`, `backend/Controllers/analysis.controller.js:384`, `backend/Controllers/analysis.controller.js:521` |
+| `auth.users` (Supabase Auth) | login, reset, applicants (`getUserById`) | sign-up, password update | anon (sign-in/sign-up), service role (admin API) | `backend/Controllers/auth.controller.js:238`, `backend/Controllers/auth.controller.js:310`, `backend/Controllers/analysis.controller.js:504` |
+| Storage bucket `resumes` | resume status, apply (has a resume?) | upload route (`candidates/<id>/resume.<ext>`, upsert, prune); analyze (`<id>/<uuid>.<ext>`) | service role | `supabase/migrations/20260903_create_resumes_and_scores.sql:14`, `backend/Controllers/analysis.controller.js:160-162`, `backend/Controllers/analysis.controller.js:288-290`, `backend/Controllers/analysis.controller.js:146-148`, `backend/Controllers/jobs.controller.js:106-108` |
 | NLP | nothing | a temporary file per request, deleted in `finally` | none | `nlp-engine/app/main.py:59-63`, `nlp-engine/app/main.py:106-108` |
 
 There is no table for the SRS's Repository entity, for audit logs, or for
@@ -227,9 +240,10 @@ entry point that routes to several back-end services and owns cross-cutting edge
 concerns. Express does not proxy anything:
 - there is no proxy library in `backend/package.json:15-25`;
 - there are no `.pipe(` pass-throughs;
-- it knows exactly one downstream URL (`backend/Controllers/analysis.controller.js:12`);
-- it calls that URL from inside a domain handler, then transforms and stores the
-  result (`backend/Controllers/analysis.controller.js:262-352`).
+- it knows exactly two downstream URLs, NLP (`backend/Controllers/analysis.controller.js:21`) and
+  github-evidence (`backend/Services/githubEvidence.js:60`);
+- it calls them from inside one domain handler, then transforms and stores the
+  result (`backend/Controllers/analysis.controller.js:273-368`).
 
 It is not a backend-for-frontend (BFF) either. A BFF is a thin, client-specific
 layer over other services; Express *is* the domain:
@@ -250,23 +264,29 @@ separately deployed service behind it.
 | P-2 NLP hung | The stub on :8000 accepted the backend's connection and received 2916 bytes, then sent nothing. `POST /api/analyze` gave **no response within the 20 s client limit**. Meanwhile `GET /api/jobs` (200, 76 ms) and `/api/health` (`ok`) kept working. The backend logged the failure only when the stub closed the socket. | P-2 |
 | P-3 NLP busy | Start-up took 15.2 s (45.6 s on the first, cold run). One `/parse` of fixture f1 takes about 0.26 s, and `GET /` takes 2 ms when idle. A `GET /` sent 150 ms into a parse took 92 ms, so it waited for the parse to finish. Two concurrent parses finished at 253 and 558 ms, so they ran **one after the other**. Cause: `async def parse_resume` (`nlp-engine/app/main.py:49`) runs CPU-bound code on the event loop (`nlp-engine/app/main.py:66-77`). Real resumes take 0.88–1.16 s each (`tests/BASELINE_RESULTS.md:64-65`), so the tenth simultaneous analyze would wait about 10 s. | P-3 |
 
+| P-4 github-evidence down | Nothing on :8001. `POST /api/analyze` returned **200** in 1168 ms with the GitHub sub-score unavailable (`service_unavailable`) and parsing weight 1. `/api/jobs` stayed 200. | P-4 |
+| P-5 github-evidence hung | A stub on :8001 accepted the connection and never answered. `GET /api/jobs` sent 1 s in returned 200 while analyze was pending. `POST /api/analyze` returned **200** after 8710 ms (the 8 s core timeout plus NLP and writes) with reason `timeout`. The stub saw exactly one connection, so a timeout is not retried. | P-5 |
+| P-6 GitHub rate-limited | The real service on :8001, its GitHub URL pointed at a local stub answering 403 with `x-ratelimit-remaining: 0`. The first analyze returned **200** in 929 ms with `github_rate_limited`, and the stub saw 1 request. The second analyze also returned 200 with the same reason, and the stub saw **0** more (the low-water mark). | P-6 |
+
+P-4..P-6 assert (the probe exits 1 if any row fails); P-1..P-3 only describe. Together: an NLP outage hard-fails scoring, a github-evidence outage never does.
+
 ---
 
 ## 2. Verdict
 
 | Criterion | Verdict | Evidence |
 |---|---|---|
-| Independently deployable | PARTIAL | Three units with separate manifests and start commands, and no shared code (`frontend/package.json:21`, `backend/package.json:7`, `README.md:123`). But: no deploy artefact of any kind (§1.2); `nlp-engine/requirements.txt:2` and the rest are unpinned; five frontend calls hardcode `http://localhost:5000` (`frontend/src/pages/recruiter/CreateJob.jsx:211`, `frontend/src/pages/public/ResetPassword.jsx:6`); the NLP URL defaults to localhost (`backend/Controllers/analysis.controller.js:12`). Deploying anywhere but a laptop needs code changes. |
+| Independently deployable | PARTIAL | Three units with separate manifests and start commands, and no shared code (`frontend/package.json:21`, `backend/package.json:7`, `README.md:123`). But: no deploy artefact of any kind (§1.2); `nlp-engine/requirements.txt:2` and the rest are unpinned; five frontend calls hardcode `http://localhost:5000` (`frontend/src/pages/recruiter/CreateJob.jsx:211`, `frontend/src/pages/public/ResetPassword.jsx:6`); the NLP URL defaults to localhost (`backend/Controllers/analysis.controller.js:21`). Deploying anywhere but a laptop needs code changes. |
 | Single responsibility | PARTIAL | NLP does one cohesive job: parse and match (`nlp-engine/app/main.py:48-57`). The backend is one process with 24 routes across auth, jobs, applications, notifications, admin, storage and scoring (`backend/index.js:50-60`), plus all data access (§1.5). |
-| Network-only communication | PASS | The only hop between services is HTTP (`backend/Controllers/analysis.controller.js:262`). NLP shares no database, files or code with the backend: it has no DB client (`nlp-engine/app/main.py:1-11`) and only a per-request temp file (`nlp-engine/app/main.py:59-63`). |
+| Network-only communication | PASS | The only hop between services is HTTP (`backend/Controllers/analysis.controller.js:273`). NLP shares no database, files or code with the backend: it has no DB client (`nlp-engine/app/main.py:1-11`) and only a per-request temp file (`nlp-engine/app/main.py:59-63`). |
 | Independent scaling (NFR-3) | FAIL | The backend cannot run as two copies: sessions live in the in-process MemoryStore (`backend/index.js:30-41`), and the rate limiter is an in-memory Map (`backend/Routes/auth.routes.js:17-21`). NLP is stateless, but one process parses one resume at a time (P-3; `nlp-engine/app/main.py:49`), and nothing (no container, no load balancer, a single `NLP_PARSE_URL`) runs more than one copy. |
-| Failure isolation (NFR-12) | PARTIAL | Only `POST /api/analyze` depends on NLP (`backend/Controllers/analysis.controller.js:262`; upload and apply do not call it, `backend/Controllers/jobs.controller.js:102`). Login, jobs and upload survive an NLP outage (P-1, P-2). But an outage returns a raw 500 that leaks the internal URL (P-1, `backend/Controllers/analysis.controller.js:357-359`); a hang never times out (P-2); there is no retry; and `/api/health` reports `ok` without checking NLP or the database (`backend/index.js:62-64`). |
+| Failure isolation (NFR-12) | PARTIAL | Only `POST /api/analyze` depends on NLP and github-evidence. github-evidence isolates correctly: down, hung (8 s core timeout, no retry) and rate-limited each still give a 200 score with a stated reason, and the other routes keep working (P-4..P-6; `backend/Services/githubEvidence.js:100`, `backend/Services/internalHttp.js:61`). NLP is not isolated like that. Only analyze calls NLP (`backend/Controllers/analysis.controller.js:273`; upload and apply do not call it, `backend/Controllers/jobs.controller.js:102`). Login, jobs and upload survive an NLP outage (P-1, P-2). But an outage returns a raw 500 that leaks the internal URL (P-1, `backend/Controllers/analysis.controller.js:373-375`); a hang never times out (P-2); there is no retry; and `/api/health` reports `ok` without checking NLP or the database (`backend/index.js:62-64`). |
 | Data ownership | PARTIAL | No service reaches into another's data today, but only because one service holds all of it: six tables in `public`, one service-role client that bypasses RLS (`backend/Config/supabase.js:54-62`), and no schemas, roles or grants in `supabase/migrations/20260823_create_profiles.sql:6` or any other migration. Nothing would stop a second service from sharing everything. |
-| Single client entry point | PARTIAL | In practice the browser talks only to Express (§1.6; `frontend/src/context/AuthContext.jsx:4`). But that entry point is the monolith, not a gateway (§1.7). The address is copied into 14 files, and five calls ignore configuration. NLP is open to any origin with no auth (`nlp-engine/app/main.py:19-24`), protected only by binding to 127.0.0.1 (`tests/run-suite.ps1:74`). |
+| Single client entry point | PARTIAL | In practice the browser talks only to Express (§1.6; `frontend/src/context/AuthContext.jsx:4`). But that entry point is the monolith, not a gateway (§1.7). The address is copied into 14 files, and five calls ignore configuration. NLP is open to any origin with no auth (`nlp-engine/app/main.py:19-24`), protected only by binding to 127.0.0.1 (`tests/run-suite.ps1:79`). |
 
 **Overall:** not a microservices architecture. It is a Node/Express monolith
-plus one extracted, stateless NLP service. 1 of the 3 designed services exists,
-and no API gateway exists.
+plus two extracted, stateless internal services (NLP, and github-evidence since T-0011..T-0014). 2 of the 3 designed
+services exist, and no API gateway exists.
 
 ---
 
@@ -276,21 +296,21 @@ and no API gateway exists.
 
 | Source | What it says | Evidence (what the code does) | Tracked in |
 |---|---|---|---|
-| SRS docx §2.1 = `PROJECT_SOURCE_DOCS.md:76-79` | "microservices architecture… backend microservices (NLP, validation, assessment)" | One service exists beside the monolith: `nlp-engine/app/main.py:48`. Validation (GitHub) and assessment are not built: `backend/Controllers/githubAggregator.js:10` is dead code | AUDIT 0.1, GR-2 |
+| SRS docx §2.1 = `PROJECT_SOURCE_DOCS.md:76-79` | "microservices architecture… backend microservices (NLP, validation, assessment)" | One service exists beside the monolith: `nlp-engine/app/main.py:48`. Validation (GitHub) and assessment are not built: `backend/Controllers/githubAggregator.js` (line 10 at `8e8e498`, deleted in T-0014) was dead code | AUDIT 0.1, GR-2 |
 | SRS docx §3 System Architecture = `PROJECT_SOURCE_DOCS.md:104-107` | "MERN stack… Application Layer (Node/Express backend routing)… Data Layer (MongoDB)". The `PROJECT_SOURCE_DOCS.md` excerpt drops the word "MERN" | Supabase Postgres, no MongoDB (`backend/Config/supabase.js:54`; no `mongo` dependency in `backend/package.json:15-25`). Express owns all domain logic, not just routing (§1.7) | ISSUES I-0033, §3.2 below |
 | SRS docx §6.1 NFR-3 = `PROJECT_SOURCE_DOCS.md:162` | "Microservices must scale independently" | Not met: `backend/index.js:30-41` (MemoryStore sessions) | §2 |
 | SRS docx §6.3 NFR-8 = `PROJECT_SOURCE_DOCS.md:167` | "OAuth 2.0 for authentication" | Password and session only (`backend/Controllers/auth.controller.js:333`). `GOOGLE_*`/`GITHUB_*` client variables sit unused in `backend/.env` | AUDIT 0.4 |
-| SRS docx §6.3 NFR-10 = `PROJECT_SOURCE_DOCS.md:169` | "HTTPS for data transmission" | Plain HTTP everywhere locally; the NLP URL is `http://` (`backend/Controllers/analysis.controller.js:12`) | AUDIT 0.6 |
+| SRS docx §6.3 NFR-10 = `PROJECT_SOURCE_DOCS.md:169` | "HTTPS for data transmission" | Plain HTTP everywhere locally; the NLP URL is `http://` (`backend/Controllers/analysis.controller.js:21`) | AUDIT 0.6 |
 | SRS docx §6.3 NFR-12 = `PROJECT_SOURCE_DOCS.md:171` | "graceful failure on API errors" | Partial (P-1, P-2) | AUDIT 0.7, ISSUES I-0036 |
 | `Docs/archive/IMPLEMENTATION-TRACKER.md:29` | "Express \| API gateway, routing, auth" | Express is not a gateway (§1.7; `backend/package.json:15-25` has no proxy) | archived (T-0008); history only |
 | `Docs/archive/IMPLEMENTATION-TRACKER.md:32` | "Database (Document) \| Firebase Firestore \| job_descriptions, parsed_profiles, …" | No Firestore anywhere; these are Postgres tables or columns (`supabase/migrations/20260903_create_resumes_and_scores.sql:18`) | ISSUES I-0008 (resolved), archived |
-| `Docs/archive/project_checklist.md:13` and `Docs/archive/project_checklist.md:18` | "[x] … FastAPI microservice", "[x] … microservice communication" | True as far as it goes: one service, one HTTP hop (`backend/Controllers/analysis.controller.js:262`) | archived |
+| `Docs/archive/project_checklist.md:13` and `Docs/archive/project_checklist.md:18` | "[x] … FastAPI microservice", "[x] … microservice communication" | True as far as it goes: one service, one HTTP hop (`backend/Controllers/analysis.controller.js:273`) | archived |
 | `Docs/Architecture.md` (deleted in `a7c74e4`; last present in `314e494`, lines 9-13 and 43) | "microservices architecture", three Python microservices, "Data layer: MongoDB", "independently scaling microservices" | Same gap as the SRS rows above (`nlp-engine/app/main.py:48`) | history only; this file replaces it |
-| `REVIEW_BRIEF.md:21-23` and `REVIEW_BRIEF.md:309-313` | "three-tier microservice split… independently deployable Python FastAPI service"; "The spec also mandates independently deployable services" | Separate process yes, deployable no: no deploy artefact (§1.2), and the NLP address is a localhost default (`backend/Controllers/analysis.controller.js:12`) | ISSUES I-0031 |
+| `REVIEW_BRIEF.md:21-23` and `REVIEW_BRIEF.md:309-313` | "three-tier microservice split… independently deployable Python FastAPI service"; "The spec also mandates independently deployable services" | Separate process yes, deployable no: no deploy artefact (§1.2), and the NLP address is a localhost default (`backend/Controllers/analysis.controller.js:21`) | ISSUES I-0031 |
 | `README.md:46-52` | "React frontend (port 3000) → Express API (port 5000) → FastAPI NLP (port 8000)"; "Supabase (… tables pending)" | Ports correct (`backend/index.js:20`); tables are not pending (`supabase/migrations/20260830_create_jobs_and_applications.sql:12`) | ISSUES I-0032 |
 | `README.md:61` | "Node.js, Express, Passport, Express Session" | No Passport (`backend/package.json:15-25`); `CODE_MAP.md:500` already says so | ISSUES I-0032 |
 | `CODE_MAP.md:19` | "The only fully-working microservice" (NLP) | Accurate (`nlp-engine/app/main.py:48`) | none needed |
-| AUDIT.md "Services that actually run" (before T-0009) | "Express backend … Gateway to Supabase and to the NLP service" | Not a gateway: no proxy dependency (`backend/package.json:15-25`), one downstream URL (`backend/Controllers/analysis.controller.js:12`); see §1.7. Corrected in AUDIT.md by T-0009 | AUDIT GR-2 |
+| AUDIT.md "Services that actually run" (before T-0009) | "Express backend … Gateway to Supabase and to the NLP service" | Not a gateway: no proxy dependency (`backend/package.json:15-25`), one downstream URL (`backend/Controllers/analysis.controller.js:21`); see §1.7. Corrected in AUDIT.md by T-0009 | AUDIT GR-2 |
 
 Firestore appears only in the archived tracker. MongoDB appears only in the SRS,
 its excerpt, the deleted `Docs/Architecture.md` and explanatory notes
@@ -592,7 +612,7 @@ Draft criteria:
   - NLP hung → 503 within timeout + 1 s.
 - **NLP stopped → analyze returns a clean 503, while login, `GET /api/jobs` and
   `POST /api/resume/upload` still return 200.** Upload does not call NLP at
-  HEAD (`backend/Controllers/analysis.controller.js:197-227`), so the 503
+  HEAD (`backend/Controllers/analysis.controller.js:206-236`), so the 503
   belongs to analyze; apply joins it only if score-on-apply stays asynchronous (§4.4).
 - `GET /` on NLP answers in under 500 ms while a parse is running.
 - Restarting NLP gives 200 on analyze again, without restarting core.
@@ -757,9 +777,11 @@ NFR-3 for core still needs M5.
 
 ---
 
-## Appendix A: probe output (P-1, P-2, P-3)
+## Appendix A: probe output (P-1 .. P-6)
 
-Command: `node tests/arch/nlp-outage-probe.mjs`
+### A.1 P-1, P-2, P-3 (T-0009)
+
+Command: `node tests/arch/nlp-outage-probe.mjs --phase 1 --phase 2 --phase 3`
 
 Run on 2026-10-12 at `8e8e498` on a Windows 11 dev laptop with Node 24.12 and
 the `nlp-engine/venv` Python. NLP was stopped for P-1 and P-2. Pre-run and
@@ -789,3 +811,28 @@ matched within a few tens of milliseconds, except NLP start-up, which took
 | P-3 NLP busy | POST /parse alone | 200 | 261 |  |
 | P-3 NLP busy | GET / sent 150 ms into a /parse | 200 | 92 | that /parse took 249 ms |
 | P-3 NLP busy | two concurrent /parse | 200, 200 | 559 | finished at 253 and 558 ms; one alone took 261 ms |
+
+### A.2 P-4, P-5, P-6 (T-0015)
+
+Command: `node tests/arch/nlp-outage-probe.mjs --phase 4 --phase 5 --phase 6`; the table is from the
+full run (phases 1-6, `tests/.out/t0015-green.log`), exit 0. P-1..P-3 in that run matched A.1 within timing noise.
+
+Run on 2026-10-15 on the working tree on top of `f65d5b2` (uncommitted T-0014 and T-0015 changes), same laptop as A.1.
+The probe started its own backend, NLP service and, for P-6, github-evidence (dummy `GITHUB_TOKEN`, `GITHUB_API_URL`
+on a local stub). Afterwards `node tests/backend/sweep.mjs --check` exited 0 and ports 5000, 8000 and 8001 were free.
+Unlike A.1 these rows assert: the Result column is PASS or FAIL, and the note holds expected and observed.
+With `GITHUB_EVIDENCE_TIMEOUT_MS=60000` the P-5 analyze row FAILed (no response within the probe's 20 s limit) and the
+probe exited 1 (`tests/.out/t0015-red.log`). NLP time for the bounds: one warm `/parse` of f1, 296 ms.
+
+| Phase | Step | Result | Time (ms) | Note |
+|---|---|---|---|---|
+| P-4..P-6 setup | POST /parse alone (the NLP time the bounds use) | 200 | 296 |  |
+| P-4 github-evidence down | POST /api/analyze (f1) | PASS | 1168 | expected: 200 within 2296 ms (NLP 296 + 2000); available:false, reason_code:service_unavailable, parsing weight 1; observed: 200 in 1168 ms, available:false, reason_code:service_unavailable, parsing weight 1 |
+| P-4 github-evidence down | GET /api/jobs afterwards | PASS | 79 | expected: 200; observed: 200 |
+| P-5 github-evidence hung | GET /api/jobs 1 s into analyze | PASS | 106 | expected: 200 while analyze is still pending; observed: 200, analyze still pending |
+| P-5 github-evidence hung | POST /api/analyze (f1) | PASS | 8710 | expected: 200 within 10296 ms (8000 + NLP 296 + 2000); available:false, reason_code:timeout; observed: 200 in 8710 ms, available:false, reason_code:timeout, parsing weight 1 |
+| P-5 github-evidence hung | connections the stub saw | PASS |  | expected: 1 (a timeout is not retried); observed: 1; received 462 bytes, sent nothing |
+| P-5 github-evidence hung | GET /api/jobs afterwards | PASS | 341 | expected: 200; observed: 200 |
+| P-6 GitHub rate-limited | POST /api/analyze (f1), first | PASS | 929 | expected: 200 within 4296 ms; available:false, reason_code:github_rate_limited; GitHub stub got 1 request; observed: 200 in 929 ms, available:false, reason_code:github_rate_limited, parsing weight 1; stub requests 1 |
+| P-6 GitHub rate-limited | POST /api/analyze (f1), second | PASS | 568 | expected: 200; reason_code:github_rate_limited; 0 more GitHub requests (low-water mark); observed: 200 in 568 ms, available:false, reason_code:github_rate_limited, parsing weight 1; 0 more |
+| P-6 GitHub rate-limited | GitHub traffic | PASS |  | expected: only the local stub saw requests (GITHUB_API_URL is the stub); observed: stub log: GET /users/example-mokafor |
