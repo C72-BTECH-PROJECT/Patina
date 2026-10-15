@@ -47,7 +47,6 @@ class EvidenceRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     username: StrictStr
-    # Accepted so the contract is stable; used from T-0012 on.
     claimed_skills: Optional[list[StrictStr]] = Field(default=None, max_length=200)
     window_days: Optional[StrictInt] = Field(default=None, ge=1, le=730)
 
@@ -77,6 +76,9 @@ class RepoItem(BaseModel):
     archived: bool
     pushed_at: Optional[str]
     primary_language: Optional[str]
+    # T-0012: null unless the repo is a detail repo and the call succeeded.
+    authored_commits_window: Optional[int] = None
+    languages: Optional[dict[str, int]] = None
 
 
 class Repositories(BaseModel):
@@ -86,7 +88,50 @@ class Repositories(BaseModel):
     archived: int
     considered: int
     truncated: bool
+    detailed: int = 0  # T-0012: detail repos selected (owned, archived included, GITHUB_DETAIL_REPOS most recent)
+    with_authored_commits: Optional[int] = None  # detail repos with at least one authored commit; null without commit data
     items: list[RepoItem]
+
+
+class Language(BaseModel):
+    name: str
+    bytes: int
+    share: float
+
+
+class CommitActivity(BaseModel):
+    available: bool
+    window_days: int
+    authored_commits: Optional[int]
+    active_weeks: Optional[int]
+    weeks: int
+    weekly: Optional[list[int]]
+
+
+class Claim(BaseModel):
+    skill: str
+    language: Optional[str]
+    status: str  # evidenced | not_found | not_checkable
+    share: Optional[float]
+    repos: list[str]
+    last_activity: Optional[str]
+
+
+class Component(BaseModel):
+    key: str
+    value: Optional[float]
+    weight: float
+    available: bool
+    reason: Optional[str]
+
+
+class SubScore(BaseModel):
+    available: bool
+    value: Optional[float]
+    reason_code: Optional[str]
+    weights_source: str
+    partial: bool
+    components: list[Component]
 
 
 class RateLimit(BaseModel):
@@ -98,9 +143,13 @@ class Evidence(BaseModel):
     contract_version: str
     request_id: str
     username: str
-    status: str  # "complete" now; "partial" arrives with per-repo calls (T-0012)
+    status: str  # "complete" | "partial" (a detail call failed, or the deadline hit after the repo list)
     fetched_at: str
     profile: Profile
     repositories: Repositories
+    languages: list[Language]
+    commit_activity: CommitActivity
+    claims: list[Claim]
+    sub_score: SubScore
     limitations: list[str]
     rate_limit: RateLimit

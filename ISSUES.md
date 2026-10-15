@@ -52,6 +52,8 @@ diff you're already writing.
 | I-0044 | ROADMAP §1.6 names `pytest-socket --disable-socket`; T-0011 uses `--allow-hosts=127.0.0.1,::1` | `ROADMAP.md` | P3 | OPEN | 2026-10-15, T-0011 |
 | I-0045 | T-0012, T-0014 and T-0015 cite "ROADMAP §1.2" for the contract, env vars and timeouts; the service contract moved to `github-evidence/README.md` | `tasks/T-0012-github-evidence-metrics.md`, `tasks/T-0014-core-github-integration.md`, `tasks/T-0015-github-outage-probe.md` | P3 | OPEN | 2026-10-15, T-0011 |
 | I-0046 | Starlette's `TestClient` warns that using it with `httpx` is deprecated ("install `httpx2` instead") | `github-evidence/requirements-dev.txt` | P3 | OPEN | 2026-10-15, T-0011 |
+| I-0047 | ROADMAP §1.3 has no row for the sub-score reason `insufficient_evidence` | `ROADMAP.md`, core mapping (T-0014) | P2 | OPEN | 2026-10-15, T-0012 |
+| I-0048 | An inactive account with corroborated claims scores 0.30 from corroboration alone; commit counts trust author-set dates | `github-evidence/app/scoring.py` | P2 | OPEN | 2026-10-15, T-0012 |
 
 ---
 
@@ -621,6 +623,23 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Module:** `github-evidence/requirements-dev.txt`, `tests/github/`
 **Evidence:** Every `tests/github` run prints `StarletteDeprecationWarning: Using httpx with starlette.testclient is deprecated; install httpx2 instead` (starlette 1.3.1, httpx 0.28.1; `tests/.out/t0011-green.log`). The suite is green; a later Starlette may drop httpx support in `TestClient`.
 **Proposed fix:** When bumping pins, try `httpx2` for the test client only (the service itself keeps httpx, and respx mocks httpx), or pin Starlette below the removal.
+
+### I-0047 — ROADMAP §1.3 has no row for `insufficient_evidence`
+**Status:** OPEN
+**Severity:** P2
+**Module:** `ROADMAP.md`, core mapping (T-0014)
+**Evidence:** The service can answer `sub_score.available: false` with `reason_code: "insufficient_evidence"` (owned repos exist but no component could be computed, e.g. `GITHUB_DETAIL_REPOS=0` and no claims; `github-evidence/app/scoring.py`, `tests/github/test_metrics.py::test_no_detail_repos`). ROADMAP §1.3 lists only `no_public_repositories` as a service-side unavailable reason, so T-0014 has no reason text for it.
+**Proposed fix:** Add a §1.3 row (cause, draft text such as "The GitHub account's repositories gave too little data to score.") and map it in T-0014.
+
+### I-0048 — Sub-score calibration notes for P3-12
+**Status:** OPEN
+**Severity:** P2
+**Module:** `github-evidence/app/scoring.py`
+**Evidence:**
+- The real octocat recording has 0 commits in its window and fully corroborated claims; its sub-score is 0.30 (`tests/github/snapshots/octocat.json`), all of it from the corroboration weight. An inactive account therefore scores 0.30 before anything else counts. That follows the provisional weights (owner, 2026-10-15) and is not a bug.
+- Commit counts use the commit's author date, which the author sets (a backdated or trivial commit counts like any other). `author=<login>` also matches by email.
+**Impact:** The score can be nudged by cheap commits, and a stale account is not near 0. Relevant to GR-1 (cheating) in spirit, though that item is about the assessment.
+**Proposed fix:** Decide in P3-12 whether corroboration needs a floor on activity, and whether P1-6 quality signals should discount trivial commits.
 
 ## Resolved
 

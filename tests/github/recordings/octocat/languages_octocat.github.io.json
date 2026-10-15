@@ -1,0 +1,24 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/repos/octocat/octocat.github.io/languages",
+    "query": {}
+  },
+  "response": {
+    "body": {
+      "CSS": 14694,
+      "HTML": 3983,
+      "JavaScript": 48
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "etag": "W/\"9c1b20790afe4c26429c72e25bd5dbd4d3cead90fd48cf9838bf82097b0ee17f\"",
+      "x-ratelimit-limit": "5000",
+      "x-ratelimit-remaining": "4984",
+      "x-ratelimit-reset": "1792038568",
+      "x-ratelimit-resource": "core",
+      "x-ratelimit-used": "16"
+    },
+    "status": 200
+  }
+}

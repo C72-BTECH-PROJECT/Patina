@@ -909,10 +909,10 @@
       "content-type": "application/json; charset=utf-8",
       "etag": "W/\"5220e0024f8a22bcae6f554de7b20cc2b0f50595881b809642447cc5f4e45703\"",
       "x-ratelimit-limit": "5000",
-      "x-ratelimit-remaining": "4989",
+      "x-ratelimit-remaining": "4986",
       "x-ratelimit-reset": "1792038568",
       "x-ratelimit-resource": "core",
-      "x-ratelimit-used": "11"
+      "x-ratelimit-used": "14"
     },
     "status": 200
   }

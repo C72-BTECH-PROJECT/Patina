@@ -9,7 +9,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Mapping, Optional
+from typing import Callable, Mapping, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -17,14 +17,17 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from . import metrics, scoring
+from .claims import build_claims
 from .config import Settings, get_logger, request_id_var
 from .contract import (
-    CONTRACT_VERSION, ERRORS, SERVICE_NAME, Evidence, EvidenceRequest, Health, Profile,
-    RateLimit, Repositories, RepoItem, error_body, is_valid_request_id,
+    CONTRACT_VERSION, ERRORS, SERVICE_NAME, Claim, CommitActivity, Evidence, EvidenceRequest, Health,
+    Language, Profile, RateLimit, Repositories, RepoItem, SubScore, error_body, is_valid_request_id,
 )
-from .github_client import GitHubClient, GitHubError, RateLimitState
+from .github_client import DetailSpec, Fetched, GitHubClient, GitHubError, RateLimitState
 
 log = get_logger()
+DEFAULT_WINDOW_DAYS = metrics.DEFAULT_WINDOW_DAYS
 
 
 def error_response(code: str, retry_after: Optional[int] = None, headers: Optional[Mapping[str, str]] = None) -> JSONResponse:
@@ -42,14 +45,100 @@ def _iso(epoch: Optional[int]) -> Optional[str]:
     return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if epoch is not None else None
 
 
-def create_app(environ: Optional[Mapping[str, str]] = None) -> FastAPI:
-    """Build the app. Raises ConfigError (naming the variable, never a value) if GITHUB_TOKEN is unset."""
+def build_evidence(fetched: Fetched, *, body: EvidenceRequest, settings: Settings, weights: scoring.Weights,
+                   now: datetime, window_days: int, request_id: str, rate: RateLimitState) -> Evidence:
+    """Turn what GitHub returned into contract v1: metrics, claims, the sub-score, and the partial labels."""
+    repos = fetched.repos
+    owned = [r for r in repos if metrics.is_owned(r)]
+    details = fetched.details
+    failed = [n for n in fetched.selected if details[n].languages is None or details[n].commits is None]
+    partial = bool(failed) or fetched.deadline_hit
+
+    languages_by_repo = {n: d.languages for n, d in details.items() if d.languages is not None}
+    breakdown = metrics.language_breakdown(languages_by_repo.values())
+    commits_by_repo = {n: d.commits for n, d in details.items() if d.commits is not None}
+    have_commits = bool(commits_by_repo)
+    if have_commits:
+        times = [t for ts in commits_by_repo.values() for t in ts]
+        weekly = metrics.weekly_buckets(times, now)
+        authored, active_weeks = len(times), sum(1 for n in weekly if n)
+        with_commits = sum(1 for ts in commits_by_repo.values() if ts)
+    else:
+        weekly, authored, active_weeks, with_commits = None, None, None, None
+
+    claims = build_claims(body.claimed_skills, owned, languages_by_repo, breakdown)
+    sub_score = scoring.compute_subscore(
+        owned_nonfork=len(owned), authored_commits=authored, active_weeks=active_weeks,
+        owned_with_commits=with_commits,
+        evidenced=sum(1 for c in claims if c["status"] == "evidenced"),
+        not_found=sum(1 for c in claims if c["status"] == "not_found"),
+        weights=weights, partial=partial,
+    )
+
+    limitations = ["deadline_reached"] if fetched.deadline_hit else []
+    limitations.append("public_repositories_only")
+    if fetched.selected:
+        limitations += ["default_branch_only", "author_matched_by_login_or_email"]
+    if fetched.truncated:
+        limitations.append(f"repository_list_capped:{settings.max_repos}")
+    if len(owned) > len(fetched.selected):
+        limitations.append(f"detail_repos_capped:{settings.detail_repos}")
+    limitations += [f"commit_pages_capped:{n}" for n in fetched.selected if details[n].commit_pages_capped]
+    limitations += [f"repo_detail_failed:{n}" for n in failed]
+
+    def item(r) -> RepoItem:
+        d = details.get(r["name"])
+        return RepoItem(
+            name=r["name"], fork=bool(r.get("fork")), archived=bool(r.get("archived")),
+            pushed_at=_text_or_none(r.get("pushed_at")), primary_language=_text_or_none(r.get("language")),
+            authored_commits_window=len(d.commits) if d is not None and d.commits is not None else None,
+            languages=d.languages if d is not None else None,
+        )
+
+    return Evidence(
+        contract_version=CONTRACT_VERSION,
+        request_id=request_id,
+        username=body.username,
+        status="partial" if partial else "complete",
+        fetched_at=metrics.fmt_ts(now),
+        profile=Profile(public_repos=fetched.profile["public_repos"], html_url=fetched.profile["html_url"]),
+        repositories=Repositories(
+            listed=len(repos),
+            owned=len(owned),
+            forked=len(repos) - len(owned),
+            archived=sum(1 for r in repos if r.get("archived")),
+            considered=len(owned),
+            truncated=fetched.truncated,
+            detailed=len(fetched.selected),
+            with_authored_commits=with_commits,
+            items=[item(r) for r in repos],
+        ),
+        languages=[Language(**x) for x in breakdown],
+        commit_activity=CommitActivity(
+            available=have_commits, window_days=window_days, authored_commits=authored,
+            active_weeks=active_weeks, weeks=metrics.WEEKS, weekly=weekly,
+        ),
+        claims=[Claim(**c) for c in claims],
+        sub_score=SubScore(**sub_score),
+        limitations=limitations,
+        rate_limit=RateLimit(remaining=rate.remaining, reset_at=_iso(rate.reset)),
+    )
+
+
+def create_app(environ: Optional[Mapping[str, str]] = None,
+               clock: Optional[Callable[[], datetime]] = None) -> FastAPI:
+    """Build the app. Raises ConfigError (naming the variable, never a value) if GITHUB_TOKEN is unset.
+
+    `clock` returns the current time as an aware datetime. Tests pin it to a recording's `fetched_at`.
+    """
     settings = Settings.from_env(os.environ if environ is None else environ)
     logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
     app = FastAPI(title=SERVICE_NAME, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.settings = settings
     app.state.rate = RateLimitState()
+    app.state.weights = scoring.load_weights(settings.subscore_weights)
+    now_utc = clock or (lambda: datetime.now(timezone.utc))
 
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next):
@@ -87,40 +176,20 @@ def create_app(environ: Optional[Mapping[str, str]] = None) -> FastAPI:
     @app.post("/v1/evidence")
     async def evidence(body: EvidenceRequest, request: Request):
         rate = app.state.rate
+        now = now_utc().astimezone(timezone.utc).replace(microsecond=0)
+        window_days = body.window_days or DEFAULT_WINDOW_DAYS
         try:
-            fetched = await GitHubClient(settings, rate).fetch(body.username)
+            fetched = await GitHubClient(settings, rate).fetch(body.username, DetailSpec(now, window_days))
         except GitHubError as exc:
             log.info("evidence request_id=%s outcome=%s", request.state.request_id, exc.code)
             return error_response(exc.code, exc.retry_after)
 
-        repos = fetched.repos
-        owned = [r for r in repos if not r.get("fork")]
-        limitations = ["public_repositories_only"]
-        if fetched.truncated:
-            limitations.append(f"repository_list_capped:{settings.max_repos}")
-        log.info("evidence request_id=%s outcome=complete listed=%d truncated=%s",
-                 request.state.request_id, len(repos), fetched.truncated)
-        return Evidence(
-            contract_version=CONTRACT_VERSION,
-            request_id=request.state.request_id,
-            username=body.username,
-            status="complete",
-            fetched_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            profile=Profile(public_repos=fetched.profile["public_repos"], html_url=fetched.profile["html_url"]),
-            repositories=Repositories(
-                listed=len(repos),
-                owned=len(owned),
-                forked=len(repos) - len(owned),
-                archived=sum(1 for r in repos if r.get("archived")),
-                considered=len(owned),
-                truncated=fetched.truncated,
-                items=[RepoItem(name=r["name"], fork=bool(r.get("fork")), archived=bool(r.get("archived")),
-                                pushed_at=_text_or_none(r.get("pushed_at")),
-                                primary_language=_text_or_none(r.get("language"))) for r in repos],
-            ),
-            limitations=limitations,
-            rate_limit=RateLimit(remaining=rate.remaining, reset_at=_iso(rate.reset)),
-        )
+        result = build_evidence(fetched, body=body, settings=settings, weights=app.state.weights, now=now,
+                                window_days=window_days, request_id=request.state.request_id, rate=rate)
+        log.info("evidence request_id=%s outcome=%s listed=%d detailed=%d truncated=%s",
+                 request.state.request_id, result.status, len(fetched.repos), len(fetched.selected),
+                 fetched.truncated)
+        return result
 
     return app
 

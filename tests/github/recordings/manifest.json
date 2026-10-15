@@ -1,6 +1,66 @@
 {
   "files": [
     {
+      "path": "octocat/commits_Hello-World_p1.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/commits_Spoon-Knife_p1.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/commits_git-consortium_p1.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/commits_hello-worId_p1.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/commits_octocat.github.io_p1.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/commits_test-repo1_p1.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/languages_Hello-World.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/languages_Spoon-Knife.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/languages_git-consortium.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/languages_hello-worId.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/languages_octocat.github.io.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/languages_test-repo1.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
       "path": "octocat/repos_p1.json",
       "source": "recorded",
       "date": "2026-10-15"
@@ -11,12 +71,117 @@
       "date": "2026-10-15"
     },
     {
+      "path": "synthetic/active/commits_app-main_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/active/commits_app-main_p2.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/active/commits_legacy-lib_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/active/commits_lib-core_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/active/commits_old-tool_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/active/languages_app-main.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/active/languages_legacy-lib.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/active/languages_lib-core.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/active/languages_old-tool.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/active/repos_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/active/user.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/archived/commits_arch-a_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/archived/commits_arch-b_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/archived/languages_arch-a.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/archived/languages_arch-b.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/archived/repos_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/archived/user.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
       "path": "synthetic/bad_credentials_401.json",
       "source": "synthetic",
       "date": "2026-10-15"
     },
     {
+      "path": "synthetic/empty/repos_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/empty/user.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
       "path": "synthetic/forbidden_403.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/forks/repos_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/forks/user.json",
       "source": "synthetic",
       "date": "2026-10-15"
     },
@@ -37,6 +202,36 @@
     },
     {
       "path": "synthetic/missing_user_404.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/partial/commits_bad_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/partial/commits_good_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/partial/languages_bad.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/partial/languages_good.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/partial/repos_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/partial/user.json",
       "source": "synthetic",
       "date": "2026-10-15"
     },
@@ -65,5 +260,25 @@
       "source": "synthetic",
       "date": "2026-10-15"
     }
-  ]
+  ],
+  "accounts": {
+    "octocat": {
+      "fetched_at": "2026-10-15T03:58:45Z"
+    },
+    "synthetic/active": {
+      "fetched_at": "2026-10-15T12:00:00Z"
+    },
+    "synthetic/archived": {
+      "fetched_at": "2026-10-15T12:00:00Z"
+    },
+    "synthetic/empty": {
+      "fetched_at": "2026-10-15T12:00:00Z"
+    },
+    "synthetic/forks": {
+      "fetched_at": "2026-10-15T12:00:00Z"
+    },
+    "synthetic/partial": {
+      "fetched_at": "2026-10-15T12:00:00Z"
+    }
+  }
 }

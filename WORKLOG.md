@@ -280,3 +280,13 @@ rollup per archived month at the top of this file.
 - Files changed: new github-evidence/, tests/github/ (incl. recordings/octocat/); tests/run-suite.ps1, tests/README.md, ROADMAP.md (§1.2, P1-1/P1-2 issue cells), AUDIT.md (2.3, 2.13 evidence only, statuses unchanged), ISSUES.md, tasks/T-0011, WORKLOG.md.
 - Issues logged: I-0044 (ROADMAP §1.6 flag), I-0045 (specs cite ROADMAP §1.2), I-0046 (TestClient httpx deprecation); I-0043 cite moved to `ROADMAP.md:218`.
 - Next: owner commits T-0011; T-0012 (metrics) builds on this client.
+
+## L-0024 · 2026-10-15 · T-0012 github-evidence metrics and sub-score (P1-2)
+- Prompt: execute the approved T-0012 spec: tests first, red log, implement, full harness, Result, AUDIT, WORKLOG; no commits. Owner changes during planning: archived owned repos are detail repos; an empty detail set makes activity/consistency/ownership unavailable (never 0); the recorder is extended and the owner re-records octocat; tests pin the clock to the manifest `fetched_at`; octocat is the real inactive-account case; active-window, no-repos, partial and deadline use synthetic accounts.
+- Task: T-0012 (13/13 criteria PASS; 13 with a noted deviation: T-0011 tests were edited minimally for the new detail calls).
+- Done: `metrics.py`, `claims.py`, `skill_languages.py`, `scoring.py`; detail calls (`/languages`, paginated `/commits`) with a semaphore and a 5-page cap; `status: partial` with named limitations; injectable clock; recorder records detail files and `fetched_at`; README (formula, provisional weights, budget 22 calls / ~227 candidates an hour, limitations).
+- Verification: red `tests/.out/t0012-red.log` (29 failed, 45 passed, 6 skipped); green `t0012-green.log` 80 passed, 0 skipped; full harness nlp 0, backend 0, docs 0 (0 warnings), github 0, frontend 1 = the existing CreateJob/Jobs lint warnings.
+- Findings: octocat's 2024 pushes give 0 commits in the window, and the account still scores 0.30 from corroboration (formula as specified); spec criterion 13 cannot hold literally; commit dates are author-set.
+- Files changed: github-evidence/app (4 new, 5 mod), tools/record_github.py, .env.example, README; tests/github (2 new test files, snapshot, 5 synthetic accounts, 12 octocat files, conftest, 2 tests, manifest); AUDIT (2.3, 2.4, 2.5, 2.7, 2.13), ISSUES, ROADMAP, tests/README.md, tasks/T-0012, WORKLOG.
+- Issues logged: I-0047 (ROADMAP §1.3 lacks `insufficient_evidence`), I-0048 (calibration notes for P3-12).
+- Next: owner reviews the snapshot and formula and commits (suggested split: service code + tests + recordings, then trackers); T-0014 maps `sub_score` and `insufficient_evidence`; P1-6 adds code quality.

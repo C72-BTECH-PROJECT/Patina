@@ -4,8 +4,8 @@ Internal Python service that fetches a GitHub user's public profile and reposito
 and answers in **contract v1**. It is stateless (DEC-6), internal only (DEC-5: core calls
 it, the browser never does) and holds the only copy of the GitHub token (NFR-9).
 
-This is the skeleton from T-0011 (ROADMAP P1-1). Language, commit and claim metrics and
-the sub-score arrive in T-0012 (P1-2); core integration in T-0014 (P1-4).
+T-0011 (ROADMAP P1-1) built the skeleton; T-0012 (P1-2) added the language, commit and claim
+metrics and the sub-score. Core integration is T-0014 (P1-4).
 
 ## Start
 
@@ -35,7 +35,9 @@ read-only** access and nothing else.
 | `GITHUB_HTTP_TIMEOUT_S` | 4 | Timeout per GitHub call |
 | `GITHUB_DEADLINE_S` | 6 | Deadline for the whole request |
 | `GITHUB_MIN_REMAINING` | 100 | Low-water mark for the rate limit |
-| `GITHUB_DETAIL_REPOS`, `GITHUB_CONCURRENCY`, `GITHUB_SUBSCORE_WEIGHTS` | reserved | Arrive with T-0012 (ROADMAP §1.2 listed them). **Not read yet** |
+| `GITHUB_DETAIL_REPOS` | 10 | Owned, non-fork repos (archived included), most recently pushed first, that get `/languages` and `/commits` calls. 0 turns the detail calls off |
+| `GITHUB_CONCURRENCY` | 5 | Detail calls in flight at once |
+| `GITHUB_SUBSCORE_WEIGHTS` | unset | JSON that overrides the sub-score weights (see "Sub-score"). Invalid values fall back to the defaults |
 
 Core-side variables (`GITHUB_EVIDENCE_URL`, `GITHUB_EVIDENCE_TIMEOUT_MS`) belong to core
 and stay in ROADMAP §1.2.
@@ -66,10 +68,10 @@ It makes no GitHub call.
 
 `username` is a GitHub login: 1 to 39 ASCII letters, digits and single hyphens, with no
 hyphen at either end. Anything else, including a missing or non-string field, is `400
-invalid_request` and no GitHub call is made. `claimed_skills` and `window_days` are
-accepted and validated (`window_days` 1..730) but unused until T-0012.
+invalid_request` and no GitHub call is made. `claimed_skills` (up to 200 strings, optional) are
+the resume's skills to cross-check; `window_days` (1..730, default 365) is the commit window.
 
-- `200` body in this version (the P1-2 metric fields are added by T-0012):
+- `200` body (`sub_score` is explained under "Sub-score"):
 
 ```json
 {
@@ -84,10 +86,24 @@ accepted and validated (`window_days` 1..730) but unused until T-0012.
     "items": [ { "name": "hello-world", "fork": false, "archived": false,
                  "pushed_at": "2026-09-30T08:00:00Z", "primary_language": "Python" } ]
   },
-  "limitations": ["public_repositories_only"],
+  "languages": [ { "name": "Python", "bytes": 12345, "share": 0.62 } ],
+  "commit_activity": { "available": true, "window_days": 365, "authored_commits": 120, "active_weeks": 30,
+                       "weeks": 52, "weekly": [0, 3, 1] },
+  "claims": [ { "skill": "python", "language": "Python", "status": "evidenced", "share": 0.62,
+                "repos": ["hello-world"], "last_activity": "2026-09-30T08:00:00Z" },
+              { "skill": "react", "language": null, "status": "not_checkable", "share": null,
+                "repos": [], "last_activity": null } ],
+  "sub_score": { "available": true, "value": 0.64, "reason_code": null, "weights_source": "default",
+                 "partial": false,
+                 "components": [ { "key": "activity", "value": 0.7, "weight": 0.25, "available": true, "reason": null } ] },
+  "limitations": ["public_repositories_only", "default_branch_only", "author_matched_by_login_or_email"],
   "rate_limit": { "remaining": 4780, "reset_at": "2026-10-14T11:00:00Z" }
 }
 ```
+
+(`weekly` above is shortened; it always has 52 integers. Each `items` entry also carries
+`authored_commits_window` and `languages` (bytes per language), both `null` for repos without
+detail data. `repositories` also carries `detailed` and `with_authored_commits`.)
 
 - `listed` is every repository returned (up to the cap), `forked` those with `fork: true`,
   `owned` the rest, and `considered` the owned, non-fork repositories (archived ones are
@@ -95,28 +111,9 @@ accepted and validated (`window_days` 1..730) but unused until T-0012.
   was reached while GitHub still had more pages; `limitations` then also holds
   `repository_list_capped:<cap>`.
 - `status: "partial"` means some per-repo calls failed, or the 6 s deadline hit after the
-  profile and repository list arrived. It is part of the contract and cannot occur yet:
-  this version makes no per-repo calls, and a deadline hit while the list is incomplete
-  is `504 github_timeout`.
-- **Target shape** (moved here from ROADMAP §1.2; T-0012 fills the metric fields, so these
-  are not returned yet):
-
-```json
-{
-  "repositories": { "items": [ { "name": "hello-world", "fork": false, "pushed_at": "…",
-                                 "primary_language": "Python", "authored_commits_window": 12,
-                                 "languages": { "Python": 12345 } } ] },
-  "languages": [ { "name": "Python", "bytes": 12345, "share": 0.62 } ],
-  "commit_activity": { "window_days": 365, "authored_commits": 120, "active_weeks": 30, "weeks": 52, "weekly": [0, 3, 1] },
-  "claims": [ { "skill": "python", "language": "Python", "status": "evidenced", "share": 0.62, "repos": ["hello-world"],
-                "last_activity": "2026-09-30T08:00:00Z" },
-              { "skill": "react", "language": null, "status": "not_checkable" } ],
-  "sub_score": { "available": true, "value": 0.64, "reason_code": null, "weights_source": "default",
-    "components": [ { "key": "activity", "value": 0.7, "weight": 0.25, "available": true } ] },
-  "limitations": ["public_repositories_only", "default_branch_only", "detail_repos_capped:10"]
-}
-```
-
+  profile and repository list arrived. Then `limitations` names what is missing
+  (`repo_detail_failed:<repo>`, `deadline_reached`) and `sub_score.partial` is true. A deadline
+  hit while the repository list is incomplete is still `504 github_timeout`.
 - Claim statuses:
   - `evidenced`: any owned, non-fork repo uses the claimed language, at any age.
     `last_activity` (latest `pushed_at` among those repos) is reported per claim and does
@@ -124,6 +121,58 @@ accepted and validated (`window_days` 1..730) but unused until T-0012.
   - `not_found`: a checkable language that no owned, non-fork repo uses (never "too old");
   - `not_checkable`: frameworks and tools that language statistics cannot show. These are
     never counted against the candidate.
+
+### Metrics
+
+- **Owned** means "not a fork". **Detail repos** are the `GITHUB_DETAIL_REPOS` most recently pushed owned repos.
+  Archived ones are included: they are the candidate's work. Forks get no detail call. If more owned
+  repos exist, `limitations` has `detail_repos_capped:<n>`.
+- **Languages:** bytes from `/languages`, summed over the detail repos; `share` sums to 1.
+- **Commit activity:** commits authored by the login (`/commits?author=<login>&since=<now - window_days>`),
+  up to 5 pages of 100 per repo (`commit_pages_capped:<repo>` if more). `weekly` is the last 52 weeks
+  ending now, oldest first; a commit inside the window but older than 52 weeks counts in
+  `authored_commits` only. `active_weeks` is the number of non-zero weeks. With no detail repos or no
+  successful commit call, `commit_activity.available` is false and the numbers are `null`, never 0.
+- **Claims:** each claimed skill is mapped to a GitHub language (`app/skill_languages.py`; case,
+  spaces, `-`, `_` and `.` are ignored, so `Golang` is `Go`, `C++` and `C#` stay distinct).
+  - `evidenced`: any owned, non-fork repo uses it at any age, from the repo list's primary
+    `language` (all owned repos) or `/languages` (detail repos).
+  - `not_found`: no owned, non-fork repo uses it. A language used only by a fork is `not_found`.
+  - `not_checkable`: frameworks and tools (react, docker, aws ...).
+  - `last_activity` is the latest `pushed_at` among those repos. It is reported only and changes
+    neither the status nor the score.
+
+### Sub-score
+
+A graded number in [0, 1], never a pass/fail gate. **The weights and saturation points below are
+provisional starting values** (owner, 2026-10-15); P3-12 calibrates them against human ratings.
+
+| Component | Formula | Default weight |
+|---|---|---|
+| `activity` | `min(1, ln(1 + authored_commits) / ln(1 + 200))` | 0.25 |
+| `consistency` | `min(1, active_weeks / 26)` | 0.25 |
+| `ownership` | `min(1, owned_repos_with_authored_commits / 5)` | 0.20 |
+| `corroboration` | `evidenced / (evidenced + not_found)` over the checkable claims | 0.30 |
+
+- The value is the weighted sum, with the weights renormalised over the available components. An
+  unavailable component has `value: null` and `weight: 0`, and `reason` says why
+  (`no_commit_data`, `no_checkable_claims`). The `weight` reported is the one actually used.
+- `GITHUB_SUBSCORE_WEIGHTS` is JSON such as `{"corroboration": 0.5}`. Keys you give replace the
+  defaults; unknown keys and negative or non-numeric values are ignored; a total of 0 or invalid
+  JSON (logged as a warning) falls back to the defaults. `weights_source` is `env` only if at least
+  one key was applied, else `default`. Same rules as `CREDIBILITY_WEIGHTS` in core.
+- `sub_score.available: false` with `reason_code`:
+  - `no_public_repositories`: the user owns no non-fork repo (GF-4: unavailable, never 0);
+  - `insufficient_evidence`: owned repos exist but no component could be computed.
+- An inactive account with real, corroborated claims is available and low, not unavailable.
+
+### Limitations
+
+- Public repositories only. Commits are read from each repo's default branch only, and
+  `author=<login>` matches the commit author's login or email, so commits under another email are missed.
+- Maintenance work (PRs, reviews, commits to others' repos) is not scored yet (P3-4); code quality
+  is P1-6.
+- Claims only cover languages: a frameworks-only resume yields no corroboration.
 
 ### Errors
 
@@ -164,7 +213,12 @@ deadline so the service can still answer `partial`; see ROADMAP §1.2.
   is at most 1 s and fits the deadline; otherwise 503 with GitHub's `Retry-After`.
 - **5xx and connection errors:** one retry with jitter (50 to 250 ms), inside the deadline.
   A call that times out is not retried.
-- **Budget:** about 2 to 3 calls per candidate in this version; 5,000 per hour per token.
+- **Calls per candidate:** 1 profile + 1 repo-list page (per 100 repos) + 2 per detail repo
+  (`/languages` and the first commit page) + extra commit pages. With the defaults that is
+  `2 + 2 x 10 = 22` calls for an ordinary account, so about **227 candidates per hour** at 5,000
+  requests an hour. The bound is `2 + 10 + 10 x 5 = 62` calls (80 candidates per hour) when every
+  detail repo hits the 5-page commit cap. Forks and repos beyond the cap cost nothing. Detail calls
+  stop once the remaining quota is below `GITHUB_MIN_REMAINING`.
 
 ## Tests
 
@@ -200,5 +254,11 @@ github-evidence\venv\Scripts\python github-evidence\tools\record_github.py octoc
 
   The recorder calls the same endpoints through the service's own client, writes
   `tests/github/recordings/octocat/` and adds the files to the manifest. The octocat
-  recording was made on 2026-10-15; `test_evidence_octocat` skips with a PENDING message if
-  it is absent. Re-run the recorder to refresh it; the manifest date changes.
+  recording also holds `languages_<repo>.json` and `commits_<repo>_p<N>.json` for the detail
+  repos (T-0012). The recorder stores the run's time as `accounts.octocat.fetched_at` in the
+  manifest, and the tests pin the service clock to it, so results do not depend on the day they run.
+  The octocat tests skip with a PENDING message if the recording is absent. Re-run the recorder to
+  refresh it; the manifest date and `fetched_at` change, and `snapshots/octocat.json` must be
+  regenerated.
+- The `synthetic/<name>/` folders (active, forks, empty, partial, archived) are whole fake accounts
+  with the same file layout, pinned the same way.

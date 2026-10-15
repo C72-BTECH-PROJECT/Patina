@@ -13,7 +13,7 @@
       "created_at": "2011-01-25T18:44:36Z",
       "email": "octocat@github.com",
       "events_url": "https://api.github.com/users/octocat/events{/privacy}",
-      "followers": 24598,
+      "followers": 24599,
       "followers_url": "https://api.github.com/users/octocat/followers",
       "following": 9,
       "following_url": "https://api.github.com/users/octocat/following{/other_user}",
@@ -42,12 +42,12 @@
     },
     "headers": {
       "content-type": "application/json; charset=utf-8",
-      "etag": "W/\"e61b98a2bfe6bf6a91fe040b2b3675be5ae4ef9c633a7184fe39631f6639d715\"",
+      "etag": "W/\"010ebd33c140456a9c4e5960746af4101b6d960ca5afaca44c2d3fca33f69539\"",
       "x-ratelimit-limit": "5000",
-      "x-ratelimit-remaining": "4990",
+      "x-ratelimit-remaining": "4987",
       "x-ratelimit-reset": "1792038568",
       "x-ratelimit-resource": "core",
-      "x-ratelimit-used": "10"
+      "x-ratelimit-used": "13"
     },
     "status": 200
   }

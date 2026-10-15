@@ -1,0 +1,25 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/users/synth-active",
+    "query": {}
+  },
+  "response": {
+    "body": {
+      "html_url": "https://github.com/synth-active",
+      "id": 9100000,
+      "login": "synth-active",
+      "public_repos": 5,
+      "type": "User"
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5000",
+      "x-ratelimit-remaining": "4990",
+      "x-ratelimit-reset": "1760000000",
+      "x-ratelimit-resource": "core",
+      "x-ratelimit-used": "10"
+    },
+    "status": 200
+  }
+}

@@ -2,7 +2,7 @@
 import contextvars
 import logging
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Mapping, Optional
 
 DEFAULT_API_URL = "https://api.github.com"
 
@@ -50,6 +50,9 @@ class Settings:
     http_timeout_s: float = 4.0
     deadline_s: float = 6.0
     min_remaining: int = 100
+    detail_repos: int = 10
+    concurrency: int = 5
+    subscore_weights: Optional[str] = None  # raw JSON; scoring.load_weights parses it
 
     def __repr__(self) -> str:  # the token must not reach a log through repr()
         return "Settings(token=<hidden>, ...)"
@@ -67,4 +70,7 @@ class Settings:
             http_timeout_s=float(_number(environ, "GITHUB_HTTP_TIMEOUT_S", 4, integer=False, minimum=0.1)),
             deadline_s=float(_number(environ, "GITHUB_DEADLINE_S", 6, integer=False, minimum=0.1)),
             min_remaining=int(_number(environ, "GITHUB_MIN_REMAINING", 100, integer=True, minimum=0)),
+            detail_repos=int(_number(environ, "GITHUB_DETAIL_REPOS", 10, integer=True, minimum=0)),
+            concurrency=int(_number(environ, "GITHUB_CONCURRENCY", 5, integer=True, minimum=1)),
+            subscore_weights=(environ.get("GITHUB_SUBSCORE_WEIGHTS") or "").strip() or None,
         )

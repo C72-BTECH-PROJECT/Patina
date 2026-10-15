@@ -1,0 +1,121 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/users/synth-active/repos",
+    "query": {
+      "direction": "desc",
+      "page": "1",
+      "per_page": "100",
+      "sort": "pushed",
+      "type": "owner"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "archived": false,
+        "default_branch": "main",
+        "disabled": false,
+        "fork": false,
+        "full_name": "synth-active/app-main",
+        "html_url": "https://github.com/synth-active/app-main",
+        "id": 1,
+        "language": "Python",
+        "name": "app-main",
+        "owner": {
+          "id": 9100000,
+          "login": "synth-active",
+          "type": "User"
+        },
+        "private": false,
+        "pushed_at": "2026-10-10T08:00:00Z",
+        "updated_at": "2026-10-10T08:00:00Z"
+      },
+      {
+        "archived": false,
+        "default_branch": "main",
+        "disabled": false,
+        "fork": true,
+        "full_name": "synth-active/fork-rust",
+        "html_url": "https://github.com/synth-active/fork-rust",
+        "id": 2,
+        "language": "Rust",
+        "name": "fork-rust",
+        "owner": {
+          "id": 9100000,
+          "login": "synth-active",
+          "type": "User"
+        },
+        "private": false,
+        "pushed_at": "2026-09-01T08:00:00Z",
+        "updated_at": "2026-09-01T08:00:00Z"
+      },
+      {
+        "archived": false,
+        "default_branch": "main",
+        "disabled": false,
+        "fork": false,
+        "full_name": "synth-active/lib-core",
+        "html_url": "https://github.com/synth-active/lib-core",
+        "id": 3,
+        "language": "Go",
+        "name": "lib-core",
+        "owner": {
+          "id": 9100000,
+          "login": "synth-active",
+          "type": "User"
+        },
+        "private": false,
+        "pushed_at": "2026-06-01T08:00:00Z",
+        "updated_at": "2026-06-01T08:00:00Z"
+      },
+      {
+        "archived": true,
+        "default_branch": "main",
+        "disabled": false,
+        "fork": false,
+        "full_name": "synth-active/legacy-lib",
+        "html_url": "https://github.com/synth-active/legacy-lib",
+        "id": 4,
+        "language": "Perl",
+        "name": "legacy-lib",
+        "owner": {
+          "id": 9100000,
+          "login": "synth-active",
+          "type": "User"
+        },
+        "private": false,
+        "pushed_at": "2024-01-01T08:00:00Z",
+        "updated_at": "2024-01-01T08:00:00Z"
+      },
+      {
+        "archived": false,
+        "default_branch": "main",
+        "disabled": false,
+        "fork": false,
+        "full_name": "synth-active/old-tool",
+        "html_url": "https://github.com/synth-active/old-tool",
+        "id": 5,
+        "language": "Ruby",
+        "name": "old-tool",
+        "owner": {
+          "id": 9100000,
+          "login": "synth-active",
+          "type": "User"
+        },
+        "private": false,
+        "pushed_at": "2023-10-01T08:00:00Z",
+        "updated_at": "2023-10-01T08:00:00Z"
+      }
+    ],
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5000",
+      "x-ratelimit-remaining": "4990",
+      "x-ratelimit-reset": "1760000000",
+      "x-ratelimit-resource": "core",
+      "x-ratelimit-used": "10"
+    },
+    "status": 200
+  }
+}

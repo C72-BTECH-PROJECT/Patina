@@ -10,7 +10,7 @@ import httpx
 import pytest
 from pytest_socket import SocketConnectBlockedError
 
-from conftest import API_URL, RECORDINGS, TOKEN, load_recording, mount
+from conftest import API_URL, RECORDINGS, TOKEN, load_recording, mount, mount_details_stub
 
 PER_PAGE = {"type": "owner", "sort": "pushed", "direction": "desc", "per_page": "100"}
 
@@ -34,6 +34,7 @@ def assert_error_shape(resp, status, code):
 def mount_small(gh):
     mount(gh, "synthetic/small_user.json")
     mount(gh, "synthetic/small_repos.json")
+    mount_details_stub(gh, "synth-user")  # T-0012: owned repos now get /languages and /commits calls
 
 
 # ---- criterion 2
@@ -64,26 +65,7 @@ def test_health(client, gh):
     assert len(gh.calls) == 0
 
 
-# ---- criterion 4 (PENDING until the owner records octocat)
-
-def test_evidence_octocat(client, gh):
-    folder = RECORDINGS / "octocat"
-    files = sorted(folder.glob("*.json")) if folder.is_dir() else []
-    if not files:
-        pytest.skip("PENDING owner step: tests/github/recordings/octocat/ is not recorded yet (T-0011 criterion 4)")
-    items = []
-    for f in files:
-        mount(gh, f"octocat/{f.name}")
-        if f.name.startswith("repos"):
-            items.extend(load_recording(f"octocat/{f.name}")["response"]["body"])
-    resp = client.post("/v1/evidence", json={"username": "octocat"})
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["status"] == "complete"
-    repos = body["repositories"]
-    assert repos["listed"] == len(items)
-    assert repos["forked"] == sum(1 for r in items if r["fork"])
-    assert repos["owned"] == sum(1 for r in items if not r["fork"])
+# ---- criterion 4: the octocat recording is exercised in test_metrics.py (it needs the T-0012 detail files)
 
 
 def test_evidence_small_shape(client, gh):
@@ -102,13 +84,14 @@ def test_evidence_small_shape(client, gh):
         "listed": 3, "owned": 2, "forked": 1, "archived": 1, "considered": 2, "truncated": False,
     }
     assert [i["name"] for i in repos["items"]] == ["alpha", "beta", "gamma"]
-    assert repos["items"][0] == {
+    # T-0012 adds authored_commits_window and languages to each item; the T-0011 keys are unchanged.
+    assert {k: repos["items"][0][k] for k in ("name", "fork", "archived", "pushed_at", "primary_language")} == {
         "name": "alpha", "fork": False, "archived": False,
         "pushed_at": "2026-09-30T08:00:00Z", "primary_language": "Python",
     }
     assert "public_repositories_only" in body["limitations"]
     assert body["rate_limit"]["remaining"] == 4990
-    assert len(gh.calls) == 2
+    assert len([c for c in gh.calls if c.request.url.path.startswith("/users/")]) == 2  # profile + repo list
 
 
 # ---- criterion 5
@@ -118,6 +101,7 @@ def test_pagination(make_client, gh):
     mount(gh, "synthetic/many_user.json")
     mount(gh, "synthetic/many_repos_p1.json")
     mount(gh, "synthetic/many_repos_p2.json")
+    mount_details_stub(gh, "synth-many")
     resp = client.post("/v1/evidence", json={"username": "synth-many"})
     assert resp.status_code == 200, resp.text
     repos = resp.json()["repositories"]
@@ -136,13 +120,14 @@ def test_repo_cap(make_client, gh):
     mount(gh, "synthetic/many_user.json")
     mount(gh, "synthetic/many_repos_p1.json")
     mount(gh, "synthetic/many_repos_p2.json")
+    mount_details_stub(gh, "synth-many")
     resp = client.post("/v1/evidence", json={"username": "synth-many"})
     assert resp.status_code == 200, resp.text
     repos = resp.json()["repositories"]
     assert repos["listed"] == 100
     assert repos["truncated"] is True
     assert len(list_calls(gh)) == 1  # page 2 is never requested
-    assert len(gh.calls) == 2
+    assert len([c for c in gh.calls if c.request.url.path.startswith("/users/")]) == 2
 
 
 # ---- criterion 6
@@ -213,6 +198,7 @@ def test_rate_limit_low_water(client, gh):
     low = {"x-ratelimit-remaining": "50", "x-ratelimit-reset": str(int(time.time()) + 300)}
     mount(gh, "synthetic/small_user.json", headers=low)
     mount(gh, "synthetic/small_repos.json", headers=low)
+    mount_details_stub(gh, "synth-user")
     first = client.post("/v1/evidence", json={"username": "synth-user"})
     assert first.status_code == 200, first.text
     assert first.json()["rate_limit"]["remaining"] == 50
@@ -230,6 +216,7 @@ def test_upstream_retry(client, gh):
     ok_user = load_recording("synthetic/small_user.json")["response"]
     user = mount(gh, "synthetic/small_user.json")
     repos = mount(gh, "synthetic/small_repos.json")
+    mount_details_stub(gh, "synth-user")
 
     user.side_effect = [httpx.Response(502, json={"message": "Server Error"}),
                         httpx.Response(200, headers=ok_user["headers"], json=ok_user["body"])]
@@ -331,12 +318,13 @@ def test_auth_headers(client, gh):
     user_rec = load_recording("synthetic/small_user.json")["response"]["headers"]
     mount(gh, "synthetic/small_user.json", headers={**user_rec, "set-cookie": "session=abc; Path=/"})
     mount(gh, "synthetic/small_repos.json")
+    mount_details_stub(gh, "synth-user")
     resp = client.post(
         "/v1/evidence", json={"username": "synth-user"},
         headers={"Cookie": "caller=1", "Authorization": "Bearer caller-supplied"},
     )
     assert resp.status_code == 200, resp.text
-    assert len(gh.calls) == 2
+    assert len(gh.calls) >= 2  # profile, repo list, then the T-0012 detail calls; every one is checked below
     for call in gh.calls:
         h = call.request.headers
         assert h["authorization"] == f"Bearer {TOKEN}"

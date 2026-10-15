@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/repos/synth-active/lib-core/languages",
+    "query": {}
+  },
+  "response": {
+    "body": {
+      "Go": 4000
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 200
+  }
+}
