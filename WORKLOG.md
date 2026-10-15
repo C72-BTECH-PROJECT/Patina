@@ -365,3 +365,67 @@ rollup per archived month at the top of this file.
 - Root causes (quiz 502s): OpenRouter free slugs rotated (gpt-oss-20b:free → 404 "unavailable for free"); openrouter/free router itself returns 200; 60 s service timeout too short for long generations.
 - Verification: node --check clean; smoke 2/2; t0019 flow (2 LLM rounds + 409-limit) relaunched after the timeout fix — result pending, T-0019 Result to be updated.
 - Next: flow result → T-0019 Result → AUDIT/CHECKLIST/ISSUES updates.
+
+## L-0031 · 2026-10-15 · T-0020 apply-triggered parse → assessment pipeline
+- Prompt: connect STEP 3 — on apply, parse the stored resume vs the job and
+  auto-generate+persist the assessment; basic flow, no credibility score.
+- Task: T-0020 (criteria approved by owner; implemented).
+- Done: `assessment.controller.js`: extracted HTTP-free `generateAssessmentForJob`
+  (handler delegates, same bodies) + `runApplicationPipeline` (fire-and-forget,
+  never throws). `jobs.controller.js`: `applyToJob` fires the pipeline after the
+  application insert (no await; 201 unchanged). `JobDetail.jsx`: "Take assessment"
+  link to `/candidate/assessment?jobId=<id>` once applied. No `scores` writes.
+- Verification: `node --check` clean on both controllers; docs suite exit 0;
+  backend booted on :5000 (deps via `npm ci`); smoke 9/9 (`tests/.out/t0020-backend.log`).
+  Live apply→parse→generate→evaluate BLOCKED: `nlp-engine\venv` +
+  `assessment-service\.venv` missing, `tests\.env` missing.
+- Files changed: backend/Controllers/{assessment,jobs}.controller.js,
+  frontend/src/pages/candidate/JobDetail.jsx (mod); tasks/T-0020 (new), WORKLOG.md.
+- Issues logged: none new. Existing live-env gaps recorded in T-0020 Result.
+- Next: set up the two Python venvs + `tests/.env`, then run the T-0020 live
+  flow; owner commits.
+
+## L-0032 · 2026-10-15 · Environment setup: Python venvs + node dependencies
+- Prompt: install the missing Python venv packages and remaining node packages.
+- Done: created `nlp-engine\venv` + `assessment-service\.venv` (Python 3.11.9);
+  installed `nlp-engine/requirements.txt` (torch 2.14.1, spacy 3.8.16,
+  sentence-transformers 6.1.0, pdfplumber, python-docx, fastapi/uvicorn),
+  `tests/requirements.txt` (pytest 9.1.1), and the spaCy model
+  `en_core_web_sm` 3.8.0; assessment deps (fastapi/uvicorn/pydantic/openai/
+  python-dotenv); `npm ci` in `backend` (142 pkgs); `npm install` in `frontend`
+  (1383 pkgs).
+- Verification: `run-suite -Suites nlp` 9/9 PASS; `-Suites backend` 7/7 PASS;
+  docs suite exit 0; assessment service `GET /` 200; MiniLM already in the HF
+  cache so NLP offline boot works.
+- Notes: root `.venv`/`.venv-backup` left untouched; `tests\.env` still absent
+  (live tests skip); frontend not built.
+- Next: run the T-0020 live flow (needs `tests\.env` + a candidate/job + resume).
+
+## L-0033 · 2026-10-15 · T-0020 live end-to-end verified (apply → parse → generate → evaluate)
+- Prompt: "when candidate applies to a job the nlp parser in background must
+  work ... implement this if not there". The code was already in the tree from
+  T-0020 (uncommitted); what was missing was a live run, now possible after
+  L-0032.
+- Done: wrote the spec's one-off live script `tests/.out/t0020-flow.mjs`
+  (signs up `t0020_cand`/`t0020_recr`, publishes a job, uploads
+  `tests/fixtures/f1_dev_github.pdf`, applies, polls Supabase, then exercises
+  generate + evaluate), started backend :5000 + NLP :8000 +
+  assessment-service :8002, and ran it.
+- Verification: **10/10 checks PASS** — apply `201` in **172 ms** (no wait on
+  NLP/LLM); `resumes` `0 → 1` in **3.1 s** with 0 rows immediately after
+  apply (fire-and-forget); `assessments` reached `status='generated'` with
+  non-null `questions` + `answer_key` in **262.6 s** (LLM free tier);
+  `POST /api/assessment/generate` → 200, 20 questions, **no** `answer_key` in
+  the JSON; `POST /api/assessment/evaluate` → `score` number, row →
+  `completed` with `answers`/`score`/`evaluation`; `scores` stayed `0`
+  throughout. Backend log `[apply-pipeline] assessment ready …`. Regression:
+  docs suite exit 0, backend smoke 9/9 (`tests/.out/be.out.log`).
+- Issues logged: none in code. Environment: Supabase free-tier email rate
+  limit blocks the app's own `POST /api/auth/signup` ("email rate limit
+  exceeded"), so the script falls back to the service-role admin API
+  (`email_confirm: true`, no email sent) + a `profiles` insert.
+- Notes: test data left in the shared Supabase: `t0020_cand`, `t0020_recr`,
+  1 job, 1 application, 1 `resumes` row, 1 `assessments` row. Score was 10
+  because the script answers every MCQ with its first option on purpose.
+- Next: owner commits; criterion 3 still needs one manual UI look.
+

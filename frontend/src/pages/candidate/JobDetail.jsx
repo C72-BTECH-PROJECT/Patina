@@ -290,6 +290,15 @@ function CandidateJobDetail() {
                   {applyMessage}
                 </span>
               )}
+              {applied && (
+                <Link
+                  to={`/candidate/assessment?jobId=${id}`}
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-5 py-2.5 text-sm font-semibold text-foreground no-underline transition hover:bg-accent"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Take assessment
+                </Link>
+              )}
             </div>
           </div>
 

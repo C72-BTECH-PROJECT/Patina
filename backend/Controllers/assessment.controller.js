@@ -149,171 +149,213 @@ const resolveResumeForAssessment = async (candidateId, job) => {
 };
 
 /**
- * POST /api/assessment/generate  { jobId }
+ * HTTP-free core of assessment generation (T-0017/T-0019/T-0020).
  *
  * Builds the AssessmentInput from the stored job + the candidate's latest
  * resume, forwards it to the assessment service, and persists the result.
+ * Used by the POST /generate handler below and by the apply-time pipeline
+ * (T-0020).
  *
- * One assessment per candidate per job (T-0017 scope):
- * - a completed attempt answers with 409 + the stored score;
+ * One open assessment per candidate per job:
+ * - a candidate past the 5-attempt limit answers with 409 + the stored score;
  * - an open ('generated') attempt is resumed: its stored questions are
  *   returned instead of burning a new LLM generation.
+ *
+ * Returns { ok: true, status, body } on success or
+ * { ok: false, status, body } on failure — never touches req/res.
  */
-export const generateAssessment = async (req, res) => {
+export const generateAssessmentForJob = async (candidateId, jobId) => {
+  if (!jobId) {
+    return { ok: false, status: 400, body: { message: 'jobId is required' } };
+  }
+
+  const { data: job, error: jobError } = await supabase
+    .from('jobs')
+    .select('id, title, description, required_skills, preferred_skills, experience_level')
+    .eq('id', String(jobId))
+    .eq('status', 'published')
+    .maybeSingle();
+  if (jobError || !job) {
+    return { ok: false, status: 404, body: { message: 'Job not found' } };
+  }
+
+  // T-0019: up to 5 attempts per candidate per job. An open attempt is
+  // always resumed; a new one may be generated while fewer than 5 are
+  // completed. The credibility score folds in the LATEST attempt.
+  const { data: openAttempt, error: openError } = await supabase
+    .from('assessments')
+    .select('id, questions')
+    .eq('candidate_id', candidateId)
+    .eq('job_id', job.id)
+    .eq('status', 'generated')
+    .maybeSingle();
+  if (openError) {
+    return { ok: false, status: 500, body: { message: 'Failed to load your assessment attempt', error: openError.message } };
+  }
+  if (openAttempt) {
+    // Resume the open attempt rather than regenerating.
+    console.log(`[assessment] resume open attempt ${openAttempt.id} for candidate=${candidateId} job=${job.id}`);
+    return { ok: true, status: 200, body: { assessmentId: openAttempt.id, ...openAttempt.questions } };
+  }
+
+  const MAX_ATTEMPTS = 5;
+  const { data: completed, error: completedError } = await supabase
+    .from('assessments')
+    .select('id, score, completed_at')
+    .eq('candidate_id', candidateId)
+    .eq('job_id', job.id)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false });
+  if (completedError) {
+    return { ok: false, status: 500, body: { message: 'Failed to load your attempts', error: completedError.message } };
+  }
+  if (completed.length >= MAX_ATTEMPTS) {
+    const latest = completed[0];
+    return {
+      ok: false,
+      status: 409,
+      body: {
+        message: `You have used all ${MAX_ATTEMPTS} attempts for this assessment.`,
+        assessmentId: latest.id,
+        score: Number(latest.score),
+        attempts_used: completed.length,
+        max_attempts: MAX_ATTEMPTS,
+      },
+    };
+  }
+
+  const resolved = await resolveResumeForAssessment(candidateId, job);
+  if (resolved.error) {
+    return { ok: false, status: resolved.error.status, body: { message: resolved.error.message } };
+  }
+  const { resume, resumeText } = resolved;
+
+  const payload = {
+    candidate_id: String(candidateId),
+    job_id: String(job.id),
+    job_title: job.title,
+    job_description: job.description,
+    required_skills: job.required_skills ?? [],
+    preferred_skills: job.preferred_skills ?? [],
+    resume_text: resumeText,
+    resume_skills: Array.isArray(resume?.skills) ? resume.skills : [],
+    resume_projects: Array.isArray(resume?.projects) ? resume.projects : [],
+    experience_level: job.experience_level ?? 'unspecified',
+  };
+
+  let response;
   try {
-    const candidateId = req.session.userId;
-    const { jobId } = req.body || {};
-    if (!jobId) {
-      return res.status(400).json({ message: 'jobId is required' });
-    }
+    response = await fetch(`${ASSESSMENT_SERVICE_URL}/generate-assessment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      // T-0019: free-tier LLM needs 2-4 min; the old 120 s abort cut slow
+      // generations with a misleading 502.
+      signal: AbortSignal.timeout(300000),
+    });
+  } catch {
+    return {
+      ok: false,
+      status: 502,
+      body: { message: 'Assessment service is unavailable. Start it (assessment-service) and try again.' },
+    };
+  }
 
-    const { data: job, error: jobError } = await supabase
-      .from('jobs')
-      .select('id, title, description, required_skills, preferred_skills, experience_level')
-      .eq('id', String(jobId))
-      .eq('status', 'published')
-      .maybeSingle();
-    if (jobError || !job) {
-      return res.status(404).json({ message: 'Job not found' });
-    }
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    return {
+      ok: false,
+      status: 502,
+      body: { message: 'Assessment generation failed', error: detail.slice(0, 500) },
+    };
+  }
 
-    // T-0019: up to 5 attempts per candidate per job. An open attempt is
-    // always resumed; a new one may be generated while fewer than 5 are
-    // completed. The credibility score folds in the LATEST attempt.
-    const { data: openAttempt, error: openError } = await supabase
+  // The service wraps the payload: questions = { assessment_id,
+  // model_used, prompt_version, questions: [...] }, answer_key =
+  // { assessment_id, answers: [...] }.
+  const data = await response.json();
+  const questionBundle = data.questions || {};
+  const answerBundle = data.answer_key || {};
+  const assessmentId = questionBundle.assessment_id;
+
+  if (!assessmentId || !Array.isArray(questionBundle.questions) || !Array.isArray(answerBundle.answers)) {
+    console.error('[assessment] malformed service payload:', Object.keys(data));
+    return { ok: false, status: 502, body: { message: 'Assessment service returned an unexpected payload. Please retry.' } };
+  }
+
+  // Persist so the answer key is available at submit time (T-0017). If the
+  // insert races another attempt, fall back to the stored open row.
+  const { data: inserted, error: insertError } = await supabase
+    .from('assessments')
+    .insert({
+      id: assessmentId,
+      candidate_id: candidateId,
+      job_id: job.id,
+      questions: questionBundle,
+      answer_key: answerBundle,
+      model_used: questionBundle.model_used ?? null,
+      prompt_version: questionBundle.prompt_version ?? null,
+      status: 'generated',
+    })
+    .select('id')
+    .single();
+
+  if (insertError) {
+    console.error('[assessment] insert failed:', insertError.message);
+    const { data: stored } = await supabase
       .from('assessments')
       .select('id, questions')
       .eq('candidate_id', candidateId)
       .eq('job_id', job.id)
       .eq('status', 'generated')
       .maybeSingle();
-    if (openError) {
-      return res.status(500).json({ message: 'Failed to load your assessment attempt', error: openError.message });
+    if (stored) {
+      return { ok: true, status: 200, body: { assessmentId: stored.id, ...stored.questions } };
     }
-    if (openAttempt) {
-      // Resume the open attempt rather than regenerating.
-      console.log(`[assessment] resume open attempt ${openAttempt.id} for candidate=${candidateId} job=${job.id}`);
-      return res.json({ assessmentId: openAttempt.id, ...openAttempt.questions });
-    }
-
-    const MAX_ATTEMPTS = 5;
-    const { data: completed, error: completedError } = await supabase
-      .from('assessments')
-      .select('id, score, completed_at')
-      .eq('candidate_id', candidateId)
-      .eq('job_id', job.id)
-      .eq('status', 'completed')
-      .order('completed_at', { ascending: false });
-    if (completedError) {
-      return res.status(500).json({ message: 'Failed to load your attempts', error: completedError.message });
-    }
-    if (completed.length >= MAX_ATTEMPTS) {
-      const latest = completed[0];
-      return res.status(409).json({
-        message: `You have used all ${MAX_ATTEMPTS} attempts for this assessment.`,
-        assessmentId: latest.id,
-        score: Number(latest.score),
-        attempts_used: completed.length,
-        max_attempts: MAX_ATTEMPTS,
-      });
-    }
-
-    const resolved = await resolveResumeForAssessment(candidateId, job);
-    if (resolved.error) {
-      return res.status(resolved.error.status).json({ message: resolved.error.message });
-    }
-    const { resume, resumeText } = resolved;
-
-    const payload = {
-      candidate_id: String(candidateId),
-      job_id: String(job.id),
-      job_title: job.title,
-      job_description: job.description,
-      required_skills: job.required_skills ?? [],
-      preferred_skills: job.preferred_skills ?? [],
-      resume_text: resumeText,
-      resume_skills: Array.isArray(resume?.skills) ? resume.skills : [],
-      resume_projects: Array.isArray(resume?.projects) ? resume.projects : [],
-      experience_level: job.experience_level ?? 'unspecified',
+    return {
+      ok: false,
+      status: 500,
+      body: { message: 'Assessment generated but could not be saved. Please retry.', error: insertError.message },
     };
+  }
 
-    let response;
-    try {
-      response = await fetch(`${ASSESSMENT_SERVICE_URL}/generate-assessment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        // T-0019: free-tier LLM needs 2-4 min; the old 120 s abort cut slow
-        // generations with a misleading 502.
-        signal: AbortSignal.timeout(300000),
-      });
-    } catch {
-      return res.status(502).json({
-        message: 'Assessment service is unavailable. Start it (assessment-service) and try again.',
-      });
-    }
+  console.log(`[assessment] generated ${inserted.id} model=${questionBundle.model_used ?? 'unknown'}`);
+  return { ok: true, status: 200, body: { assessmentId: inserted.id, ...stripKey(data) } };
+};
 
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      return res.status(502).json({
-        message: 'Assessment generation failed',
-        error: detail.slice(0, 500),
-      });
-    }
-
-    // The service wraps the payload: questions = { assessment_id,
-    // model_used, prompt_version, questions: [...] }, answer_key =
-    // { assessment_id, answers: [...] }.
-    const data = await response.json();
-    const questionBundle = data.questions || {};
-    const answerBundle = data.answer_key || {};
-    const assessmentId = questionBundle.assessment_id;
-
-    if (!assessmentId || !Array.isArray(questionBundle.questions) || !Array.isArray(answerBundle.answers)) {
-      console.error('[assessment] malformed service payload:', Object.keys(data));
-      return res.status(502).json({ message: 'Assessment service returned an unexpected payload. Please retry.' });
-    }
-
-    // Persist so the answer key is available at submit time (T-0017). If the
-    // insert races another attempt, fall back to the stored open row.
-    const { data: inserted, error: insertError } = await supabase
-      .from('assessments')
-      .insert({
-        id: assessmentId,
-        candidate_id: candidateId,
-        job_id: job.id,
-        questions: questionBundle,
-        answer_key: answerBundle,
-        model_used: questionBundle.model_used ?? null,
-        prompt_version: questionBundle.prompt_version ?? null,
-        status: 'generated',
-      })
-      .select('id')
-      .single();
-
-    if (insertError) {
-      console.error('[assessment] insert failed:', insertError.message);
-      const { data: stored } = await supabase
-        .from('assessments')
-        .select('id, questions')
-        .eq('candidate_id', candidateId)
-        .eq('job_id', job.id)
-        .eq('status', 'generated')
-        .maybeSingle();
-      if (stored) {
-        return res.json({ assessmentId: stored.id, ...stored.questions });
-      }
-      return res.status(500).json({
-        message: 'Assessment generated but could not be saved. Please retry.',
-        error: insertError.message,
-      });
-    }
-
-    console.log(`[assessment] generated ${inserted.id} model=${questionBundle.model_used ?? 'unknown'}`);
-    return res.json({ assessmentId: inserted.id, ...stripKey(data) });
+/**
+ * POST /api/assessment/generate  { jobId }
+ *
+ * Thin HTTP wrapper around generateAssessmentForJob (see above).
+ */
+export const generateAssessment = async (req, res) => {
+  try {
+    const result = await generateAssessmentForJob(req.session.userId, (req.body || {}).jobId);
+    return res.status(result.status).json(result.body);
   } catch (err) {
     console.error('[assessment] unhandled failure:', err);
     return res.status(500).json({ message: 'Assessment generation failed', error: String(err?.message || err) });
+  }
+};
+
+/**
+ * Apply-time pipeline (T-0020, STEP 3). Kicked off by applyToJob after the
+ * application row is saved, without awaiting. It parses the stored resume
+ * against the job (persisting a `resumes` row via resolveResumeForAssessment)
+ * and generates + persists the assessment (questions + server-side answer
+ * key) so the candidate can open the quiz straight from the job page.
+ * Never throws into the caller.
+ */
+export const runApplicationPipeline = async (candidateId, jobId) => {
+  try {
+    const result = await generateAssessmentForJob(candidateId, jobId);
+    if (result.ok) {
+      console.log(`[apply-pipeline] assessment ready id=${result.body.assessmentId} candidate=${candidateId} job=${jobId}`);
+    } else {
+      console.warn(`[apply-pipeline] assessment not generated (${result.status}): ${result.body?.message}`);
+    }
+  } catch (err) {
+    console.error('[apply-pipeline] failed:', err?.message || err);
   }
 };
 

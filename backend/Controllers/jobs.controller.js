@@ -1,5 +1,6 @@
 import supabase from '../Config/supabase.js';
 import { sendNotification } from '../Controllers/notification.controller.js';
+import { runApplicationPipeline } from '../Controllers/assessment.controller.js';
 
 const formatJob = (job) => ({
   id: job.id,
@@ -151,6 +152,12 @@ export const applyToJob = async (req, res) => {
     console.error('Apply failed:', error.message);
     return res.status(500).json({ message: 'Could not submit application.' });
   }
+
+  // T-0020 (STEP 3): parse this candidate's stored resume against the job and
+  // generate the assessment in the background, so the quiz is ready from the
+  // job page. Fire-and-forget: apply must never wait on NLP/LLM or fail with
+  // them (ARCHITECTURE.md §4.4).
+  runApplicationPipeline(req.session.userId, jobId);
 
   return res.status(201).json(data);
 };
