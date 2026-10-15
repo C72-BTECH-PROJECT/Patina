@@ -56,6 +56,8 @@ diff you're already writing.
 | I-0050 | Probe labels its login row "P-1 NLP down" even when phase 1 is not selected | `tests/arch/nlp-outage-probe.mjs` | P3 | OPEN | 2026-10-15, T-0015 |
 | I-0051 | AUDIT rows 0.1 and GR-2 still say "1 of the 3 services exists" and that `githubAggregator.js` is the only other code | `AUDIT.md` | P3 | OPEN | 2026-10-15, T-0015 |
 | I-0052 | A résumé whose GitHub link is only a hyperlink annotation behind the text "GitHub" gets `no_github_link`: the NLP text extraction does not read PDF link annotations | `nlp-engine/app` (extraction), `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-10-15, T-0014 manual check |
+| I-0053 | Recruiter's per-job list drops a candidate whose latest score is for another job | `backend/Controllers/analysis.controller.js`, `frontend/src/pages/recruiter/JobDetails.jsx` | P2 | OPEN | 2026-10-15, T-0016 |
+| I-0054 | Recruiter Jobs page always shows "0 Applications Total" | `frontend/src/pages/recruiter/Jobs.jsx` | P3 | OPEN | 2026-10-15, T-0016 |
 
 ---
 
@@ -659,6 +661,25 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Evidence (T-0014 manual check, 2026-10-15):** analyzing `tests/private/Anthony_Jennis_Resume.pdf` returned `github_evidence.available: false`, `reason_code: no_github_link`, and the backend logged `github=no_github_link`. The PDF's text mentions "GitHub" but contains no `github.com/` string; the PDF has 9 link annotations, 3 of them to github.com (checked with pdfplumber, counts only). The visible text is a label and the URL lives in the annotation, which the text extraction does not read. No call reached github-evidence.
 **Impact:** Many real résumés (Word/LaTeX exports) link icons or labels this way, so a candidate with a real GitHub account is scored as having no GitHub link. That is unfair under GF-4 only in the sense that the evidence is lost silently; the reason text ("No GitHub profile link was found on the resume") is also wrong for the candidate.
 **Proposed fix:** read link annotations (PDF) and hyperlink targets (DOCX) in the NLP extraction and append their URLs to the text/entities before contact parsing; add a test with a label-only link fixture.
+**Note (2026-10-15, T-0016):** mapped to the new ROADMAP item P1-10, first in the execution order (owner); spec `tasks/T-0017-link-annotations.md`. The spec feeds the URLs to the contact parser only and does **not** append them to the text, so skills, `raw_text_preview` and the semantic score do not change; LinkedIn is read from the same annotations.
+
+### I-0053 — Recruiter's per-job list drops a candidate whose latest score is for another job
+**Status:** OPEN
+**Severity:** P2
+**Module:** `backend/Controllers/analysis.controller.js`, `frontend/src/pages/recruiter/JobDetails.jsx`
+**Spec ref:** FR-14 (AUDIT 5.5, 5.15)
+**Evidence (T-0016, read at `af8947d`):** `getAllCandidates` reads the recruiter's scores and keeps one row per `candidate_id`, the newest across all of that recruiter's jobs (`backend/Controllers/analysis.controller.js:434-439`). The per-job page then keeps only rows for its job (`frontend/src/pages/recruiter/JobDetails.jsx:99`).
+**Impact:** a candidate scored for job A and later for job B disappears from job A's list. Hidden today only because the UI creates no scores (AUDIT 5.14).
+**Proposed fix:** P2-3 (T-0020): the per-job view reads one row per application of that job. The cross-job Dashboard is merged in P2-5.
+
+### I-0054 — Recruiter Jobs page always shows "0 Applications Total"
+**Status:** OPEN
+**Severity:** P3
+**Module:** `frontend/src/pages/recruiter/Jobs.jsx`
+**Spec ref:** n/a (UI)
+**Evidence (T-0016, read at `af8947d`):** the job card is rendered with a hardcoded `count={0}` (`frontend/src/pages/recruiter/Jobs.jsx:125`), shown as "{count} Applications Total"; the page fetches only `/api/jobs/mine`.
+**Impact:** the recruiter sees 0 applications for every job, even when candidates applied.
+**Proposed fix:** P2-5 (merged application-centric dashboard) shows the real count.
 
 ## Resolved
 

@@ -34,6 +34,11 @@ ARCHITECTURE.md (DEC-1..DEC-6) and the open entries in ISSUES.md.
 
   It warns, without failing, when an open issue or a CODE_REVIEWED_UNTESTED row is
   not mapped to any item.
+- **Execution order** (owner, 2026-10-15, T-0016): P1-10 → P2-1 → P1-8 → P2-3 → P2-2 →
+  P2-4, then the rest of Phase 1 (P1-6, P1-7, P1-9), then the remaining Phase 2 items
+  (P2-5, P2-6, P2-7, P2-8, P2-9). Each item comes after everything in its "Depends on"; the
+  checker does not read this line, so T-0016's Result holds the dependency check. Standing
+  rule: the frontend test runner (P1-8) lands before any task that changes frontend pages.
 
 ## Decisions this roadmap rests on
 
@@ -106,10 +111,13 @@ only core decides.
   second analyze made no GitHub call. The probe exercises only the core timeout. The
   service's own 4 s per call and 6 s deadline are covered by the `github` suite, not
   by the probe, so they stay as set in T-0011.
-- Core → NLP: 15 s (ARCHITECTURE §4.8). Analyze is synchronous, so its worst case is
-  15 s for NLP plus 8 s for GitHub, which is more than the gateway's 20 s.
-- Recommendation: remove `/api/analyze` once score-on-apply scores asynchronously
-  (decided in P2-3). If it stays, its gateway timeout must be at least 25 s.
+- Core → NLP: **5 s, planned in T-0018 (P2-1)** from the measured parse times (p95 of the
+  recorded single parses 1.16 s, × 1.35 for T-0015's slower run, × 3 for two parses queued
+  ahead); ARCHITECTURE §4.8's starting value was 15 s. T-0018 re-measures and records the
+  final value here. Analyze's worst case becomes 5 s for NLP plus 8 s for GitHub, under the
+  gateway's 20 s.
+- `/api/analyze` is removed in P2-3 (decided in T-0020's spec, pending its approval); scoring
+  then runs in the background after apply, so no request waits for NLP and GitHub together.
 
 **Core environment variables (names only).** The service's variables are in the
 README.
@@ -226,8 +234,9 @@ never silently counted as missing (CHECKLIST 2.10).
 | P1-5 | Outage probe P-4 service down, P-5 service hung, P-6 GitHub rate-limited, as asserting rows; timings feed the §1.2 timeout values | P1-4 | S | `tests/arch/nlp-outage-probe.mjs`, `tests/README.md`, `ARCHITECTURE.md` (as-is refresh of the GitHub path) | 0.7 PART (evidence); 2.8 PART (evidence); 2.13 DONE (evidence); GR-2 PART (evidence) | I-0049 | T-0015 |
 | P1-6 | 8DFS (FR-7): up to 8 core logic files per analysed repo (top repos by authored commits); skips vendor, config, lock, generated, minified and test files; `lizard` for cyclomatic complexity, function length and parameter counts; smell flags; a quality component in the sub-score | P1-2 | L | `github-evidence/app/{dfs8,quality}.py`, `github-evidence/app/scoring.py`, `github-evidence/requirements.txt`, `tests/github/test_dfs8.py`, recordings of git trees and blobs | 2.6 MIS→DONE; 2.4 PART→DONE; 2.12 DONE | — | later |
 | P1-7 | `github` schema and `github_svc` role (DEC-6): Repository entity, SHA-keyed analysis cache, ETags, cross-schema denial test, idempotent migration | P1-6 | M | `supabase/migrations/<date>_github_schema.sql`, `github-evidence/app/store.py`, `github-evidence/requirements.txt`, `tests/github/test_store.py` | 2.11 PART→DONE; 0.2 PART; 0.3 PART→DONE | — | later |
-| P1-8 | Frontend test runner (`react-scripts test --watchAll=false` as a run-suite step) plus characterisation tests of today's recruiter pages, so every later frontend change runs under them | — | S | `frontend/package.json`, `tests/run-suite.ps1`, `tests/README.md`, `tests/frontend/{jobdetails-filters,evidence-limited,skill-evidence}.test.jsx` (location settled in the task: CRA's Jest only looks under `src/`), `AUDIT.md` | 5.6 CRU→DONE; 5.10 CRU→DONE; 5.11 CRU→DONE | — | later |
+| P1-8 | Frontend test runner (`react-scripts test --watchAll=false --ci` as its own `frontend-test` run-suite step, so the build's known lint failure cannot mask it) plus characterisation tests of today's recruiter pages, so every later frontend change runs under them; the docs checker accepts `frontend/src/__tests__/` as test evidence (owner, 2026-10-15) | — | S | `frontend/src/setupTests.js`, `frontend/src/__tests__/{jobdetails-filters,evidence-limited,skill-evidence}.test.jsx` (CRA's Jest only looks under `src/`), `frontend/package.json` (only if Jest overrides are needed), `tests/run-suite.ps1`, `tests/README.md`, `tests/docs/check-trackers.mjs`, `AUDIT.md` | 5.6 CRU→DONE; 5.10 CRU→DONE; 5.11 CRU→DONE | — | T-0019 |
 | P1-9 | Recruiter view of GitHub evidence: a GitHub column in the per-skill table, a repo drill-down (which repo, which metric), GitHub contradiction flags such as "claimed language absent from all repos" | P1-4, P1-8 | M | `backend/Services/explainability.js` (`buildFlags`), `frontend/src/components/recruiter/{ScoreBreakdown,CandidateModal}.jsx`, `tests/frontend/`, `tests/backend/explainability.test.mjs` | 4.6 MIS→PART; 5.7 PART; 5.8 PART; 5.9 PART | I-0040 | later |
+| P1-10 | Link targets read from the résumé file: PDF URI annotations and DOCX hyperlink targets feed the contact parser (GitHub and LinkedIn) after the text matches, under T-0013's rule; the URLs are never added to the text, so skills, `raw_text_preview` and the semantic score do not change; an annotation-only PDF fixture and a hyperlink-only DOCX fixture | — | S | `nlp-engine/app/{extractor,ner,main}.py`, `nlp-engine/requirements.txt` (lower bounds only), `tests/fixtures/{make_fixtures.py,manifest.json}`, `tests/nlp/test_link_annotations.py`, `tests/nlp/snapshots/current/`, `tests/backend/live-analyze-github.test.mjs`, `AUDIT.md` | 2.1 PART (resume path: links behind labels); 1.16 PART (LinkedIn from annotations); 1.9 PART | I-0052 | T-0017 |
 
 ### 1.8 FR-4..FR-7 coverage
 
@@ -242,11 +251,11 @@ never silently counted as missing (CHECKLIST 2.10).
 
 | Id | Item | Depends on | Size | Files | Moves | Issues | Task |
 |---|---|---|---|---|---|---|---|
-| P2-1 | M1 NLP failure isolation: core → NLP over `internalHttp` (15 s, one retry on connect errors), `503 {"error":"nlp_unavailable"}` with `Retry-After`, no raw text on any path; `/parse` becomes a plain `def`; probe P-1/P-2 assert | P1-4 | S | `backend/Controllers/analysis.controller.js`, `nlp-engine/app/main.py`, `tests/arch/nlp-outage-probe.mjs`, `tests/README.md` | 0.7 PART→DONE; GR-2 PART (evidence) | I-0036, I-0037, I-0050 | later |
-| P2-2 | M2 one API base: `src/config/api.js` (relative base), the CRA `proxy` in dev, the `window.fetch` patch removed, the 5 hardcoded calls fixed | P1-8 | S | `frontend/src/config/api.js` (new), the 14 files that declare `API_BASE_URL` (e.g. `frontend/src/context/AuthContext.jsx`, `frontend/src/pages/recruiter/CreateJob.jsx`, `frontend/src/pages/public/ResetPassword.jsx`), `frontend/package.json` | GR-2 PART (evidence) | I-0012 | later |
-| P2-3 | Score-on-apply (5.14, R9): `scores.application_id` plus status and reason (idempotent migration); scoring extracted from `analyzeResume` into `backend/Services/scoring.js` (stored resume → NLP → GitHub → `buildScoreRecord`); apply returns 201 with the score "pending" and never waits for NLP (ARCHITECTURE §4.4); a DB-row claim and a boot-time re-queue of stale pendings, safe with two core replicas; the candidate sees pending, scored or failed with a reason; `Processing.jsx` deleted; `/api/analyze` removed or kept by decision | P2-1 | L | `supabase/migrations/<date>_score_on_apply.sql`, `backend/Services/scoring.js` (new), `backend/Controllers/{jobs,analysis}.controller.js`, `backend/index.js`, `frontend/src/pages/candidate/{JobDetail,Results}.jsx`, `frontend/src/pages/candidate/Processing.jsx` (deleted), `frontend/src/App.jsx`, `tests/backend/live-score-on-apply.test.mjs`, `tests/backend/lib/testdb.mjs` | 5.14 MIS→DONE; 5.4 PART→DONE; 0.8 MIS→PART | I-0034 (the analyze file-type half) | later |
-| P2-4 | M3 API gateway (DEC-1, DEC-2): `gateway/` on :5000, core on :5001 with `trust proxy`; routing, forward-auth to `/api/auth/me` under the five constraints, rate limits and CORS moved out of core, `X-Request-ID`, aggregated `/health` | P2-2 | L | `gateway/{index.js,public-routes.js,package.json}` (new), `backend/index.js`, `backend/Routes/auth.routes.js`, `tests/gateway/*.test.mjs` (new), `tests/run-suite.ps1`, `tests/backend/lib/env.mjs`, `ARCHITECTURE.md` | GR-2 PART; 0.1 PART | I-0034 (NLP CORS half), I-0035 (rate-limiter half) | later |
-| P2-5 | Merged application-centric recruiter dashboard (5.15, R38): one view per application with score or "pending", status, shortlist and reject, and the explanation drill-down; applicants appear whether scored or not; email source decided once (I-0028) | P2-3, P1-8 | L | `frontend/src/pages/recruiter/{Dashboard,JobDetails}.jsx`, `frontend/src/components/recruiter/{CandidateModal,ScoreBreakdown}.jsx`, `backend/Controllers/analysis.controller.js` (`getAllApplicants`), `backend/Routes/analysis.routes.js`, `tests/frontend/`, `tests/backend/live-applicants.test.mjs` | 5.15 PART→DONE; 5.5 PART→DONE; 5.7 PART; 5.8 PART | I-0028 | later |
+| P2-1 | M1 NLP failure isolation: core → NLP over `internalHttp` (new `postForm`; 5 s from measured parse times, T-0018; one retry on connect errors), `503 {"error":"nlp_unavailable"}` with `Retry-After`, no raw text on any path; `/parse` becomes a plain `def`; probe P-1/P-2/P-3 assert | P1-4 | S | `backend/Services/{internalHttp,nlpClient}.js` (`nlpClient` new), `backend/Controllers/analysis.controller.js`, `backend/.env.example`, `nlp-engine/app/main.py`, `tests/backend/nlp-client.test.mjs`, `tests/nlp/test_parse_concurrency.py`, `tests/arch/nlp-outage-probe.mjs`, `tests/run-suite.ps1`, `tests/README.md`, `ARCHITECTURE.md` | 0.7 PART→DONE; GR-2 PART (evidence) | I-0036, I-0037, I-0050 | T-0018 |
+| P2-2 | M2 one API base: `src/config/api.js` (relative base), the CRA `proxy` in dev, the `window.fetch` patch removed, the 5 hardcoded calls fixed | P1-8 | S | `frontend/src/config/api.js` (new), the files that declare `API_BASE_URL` (13 once P2-3 deletes `Processing.jsx`; e.g. `frontend/src/context/AuthContext.jsx`, `frontend/src/pages/recruiter/CreateJob.jsx`, `frontend/src/pages/public/ResetPassword.jsx`), `frontend/package.json`, `frontend/src/__tests__/api-config.test.js` | GR-2 PART (evidence) | I-0012 | T-0021 |
+| P2-3 | Score-on-apply (5.14, R9): `scores.application_id`, status, reason and lease columns (idempotent migration, I-0010's rules); a trigger creates the pending row with the application, and existing applications are backfilled as pending (owner, 2026-10-15); scoring extracted from `analyzeResume` into `backend/Services/scoring.js` (stored resume → NLP → GitHub → `buildScoreRecord`); apply returns 201 with the score "pending" and never waits for NLP (ARCHITECTURE §4.4); retries by a periodic re-score job in each core process (first tick at boot) claiming rows with `FOR UPDATE SKIP LOCKED` and a lease, safe with two core replicas; the candidate sees pending, scored or failed with a reason; the recruiter's per-job view lists one row per application; `Processing.jsx` deleted; `/api/analyze` removed (T-0020) | P2-1, P1-8 | L | `supabase/migrations/<date>_score_on_apply.sql`, `backend/Services/scoring.js` (new), `backend/Controllers/{jobs,analysis}.controller.js`, `backend/Routes/analysis.routes.js`, `backend/index.js`, `frontend/src/pages/candidate/{JobDetail,Results}.jsx`, `frontend/src/pages/candidate/Processing.jsx` (deleted), `frontend/src/App.jsx`, `frontend/src/pages/recruiter/JobDetails.jsx`, `frontend/src/__tests__/`, `tests/backend/{scoring,migration-guards,live-score-on-apply}.test.mjs`, `tests/backend/lib/score.mjs`, the live tests that call analyze, `tests/arch/nlp-outage-probe.mjs` | 5.14 MIS→DONE; 5.4 PART→DONE; 0.8 MIS→PART; 0.7 DONE (evidence); 5.5 PART (evidence) | I-0034 (the analyze file-type half), I-0053 | T-0020 |
+| P2-4 | M3 API gateway (DEC-1, DEC-2): `gateway/` on :5000, core on :5001 with `trust proxy`; routing, forward-auth to `/api/auth/me` under the five constraints, rate limits and CORS moved out of core, `X-Request-ID` logged by gateway, core, NLP and github-evidence, aggregated `/health` over core, NLP and github-evidence (`degraded` when a dependency is down); no route to github-evidence (DEC-5) | P2-2 | L | `gateway/{index.js,public-routes.js,forwardAuth.js,requestId.js,health.js,package.json}` (new), `backend/index.js`, `backend/Routes/auth.routes.js`, `backend/Middlewares/requestId.js` (new), `nlp-engine/app/main.py`, `tests/gateway/*.test.mjs` (new), `tests/run-suite.ps1`, `tests/backend/lib/env.mjs`, `tests/arch/nlp-outage-probe.mjs`, `ARCHITECTURE.md` | GR-2 PART; 0.1 PART | I-0034 (NLP CORS half), I-0035 (rate-limiter half), I-0036 (health half) | T-0022 |
+| P2-5 | Merged application-centric recruiter dashboard (5.15, R38): one view per application with score or "pending", status, shortlist and reject, and the explanation drill-down; applicants appear whether scored or not; email source decided once (I-0028); the Jobs page shows the real application count | P2-3, P1-8 | L | `frontend/src/pages/recruiter/{Dashboard,JobDetails,Jobs}.jsx`, `frontend/src/components/recruiter/{CandidateModal,ScoreBreakdown}.jsx`, `backend/Controllers/analysis.controller.js` (`getAllApplicants`), `backend/Routes/analysis.routes.js`, `frontend/src/__tests__/`, `tests/backend/live-applicants.test.mjs` | 5.15 PART→DONE; 5.5 PART→DONE; 5.7 PART; 5.8 PART | I-0028, I-0054 | later |
 | P2-6 | M4 containers and one-command start: Dockerfiles for gateway (with the frontend build), core, nlp and github-evidence; `docker-compose.yml` and `docker-compose.test.yml` (ARCHITECTURE §4.7); pinned NLP requirements and one venv; the checker learns `.yml` cites | P2-4, P1-4 | M | `gateway/Dockerfile`, `backend/Dockerfile`, `nlp-engine/Dockerfile`, `github-evidence/Dockerfile`, `docker-compose.yml`, `docker-compose.test.yml`, `nlp-engine/requirements.txt`, `tests/run-suite.ps1`, `tests/docs/check-trackers.mjs`, `README.md` (run section) | GR-2 PART→DONE (AUDIT's promote rule); 0.1 PART | I-0038, I-0034 (NLP internal only), I-0042, I-0032 (run section) | later |
 | P2-7 | M5 stateless auth (DEC-3): Supabase access and refresh tokens in httpOnly cookies; `express-session` removed; single-flight refresh in the frontend; logout revokes. **Timing: after M4, before M6 and M7** | P2-6 | L | `backend/Controllers/auth.controller.js`, `backend/Middlewares/auth.Middleware.js`, `backend/index.js`, `backend/Routes/auth.routes.js`, `frontend/src/context/AuthContext.jsx`, `tests/backend/lib/session.mjs`, `tests/backend/live-auth-failclosed.test.mjs` | 0.4 BROKEN (stateless; OAuth now possible) | I-0035 | later |
 | P2-8 | M6 the gateway verifies tokens locally (`jose`, JWKS or HS256), strips client `X-User-*`, and replaces DEC-2's forward-auth | P2-4, P2-7 | M | `gateway/auth.js` (new), `gateway/index.js`, `tests/gateway/` | 0.4 BROKEN; GR-2 DONE (evidence) | — | later |
@@ -257,16 +266,20 @@ never silently counted as missing (CHECKLIST 2.10).
 Two tracks. They can run in parallel on different teammates once P2-1 is done:
 - **Architecture:** P2-1 → P2-2 → P2-4 → P2-6 → P2-7 → P2-8 → P2-9.
   GR-2's minimum (M1–M4) is complete at P2-6.
-- **Product:** P2-1 → P2-3 → P2-5.
+- **Product:** P2-1 → P1-8 → P2-3 → P2-5.
   Score-on-apply and the merged dashboard. After P2-3, the GitHub sub-score from
   Phase 1 shows in the app.
+
+The order the team actually takes them in is the "Execution order" line under "How to
+read this" (T-0016).
 
 Why this order:
 - **P2-1 first.** Both tracks need it. A background scorer must never hang on NLP,
   and it reuses Phase 1's `internalHttp`.
 - **P2-2 after P1-8.** M2 touches 14 frontend files, and P1-8's tests must already be
   in place when it does.
-- **P2-5 after P1-8.** Its characterisation tests are the regression net for the merge.
+- **P2-3 and P2-5 after P1-8.** Both change frontend pages (P2-3 the candidate pages), and
+  P1-8's characterisation tests are their regression net (owner's standing rule, T-0016).
 - **DEC-3: M5 (P2-7) comes after M4 (P2-6).**
   - GR-2's minimum doesn't need it: forward-auth (DEC-2) works with sessions.
   - Doing it after the containers exist tests cookies, refresh and `trust proxy`
@@ -304,14 +317,14 @@ pages (owner, T-0010). Each test is the one AUDIT names in that row's "Promote w
 | AUDIT row | Promoting test | Item |
 |---|---|---|
 | 4.7 weight redistribution | `tests/backend/explainability.test.mjs`: parsing alone → weight 1.0; parsing + GitHub renormalise to 0.40/0.75 and 0.35/0.75; `evidence_limited` | P1-4 (Phase 1 needs it for GF-4) |
-| 5.6 filters | `tests/frontend/jobdetails-filters.test.jsx` | P1-8 |
-| 5.10 evidence-limited display | `tests/frontend/evidence-limited.test.jsx` | P1-8 |
-| 5.11 per-skill badges | `tests/frontend/skill-evidence.test.jsx` | P1-8 |
+| 5.6 filters | `frontend/src/__tests__/jobdetails-filters.test.jsx` (location: owner, 2026-10-15) | P1-8 |
+| 5.10 evidence-limited display | `frontend/src/__tests__/evidence-limited.test.jsx` | P1-8 |
+| 5.11 per-skill badges | `frontend/src/__tests__/skill-evidence.test.jsx` | P1-8 |
 | 0.5 secrets server-side | `tests/backend/secrets-hygiene.test.mjs` | P3-1 |
 | 0.9 scope discipline | `tests/docs/scope-guard.test.mjs` | P3-1 |
 | 4.3 weights | `tests/backend/explainability.test.mjs` (defaults, `CREDIBILITY_WEIGHTS` override, fallbacks) | P3-1 |
 | 4.11 determinism | `tests/backend/explainability.test.mjs` (same input → same record apart from `generated_at`) | P3-1 |
-| 5.12 bias-free keys | live test on the scoring path; it moves to the apply path if P2-3 removes `/api/analyze` | P3-1 |
+| 5.12 bias-free keys | live test on the scoring path; it is written against the apply path, because T-0020 (P2-3) removes `/api/analyze` | P3-1 |
 
 ### LinkedIn and certificates (GF-1): an honest feasibility assessment
 
@@ -359,8 +372,8 @@ These are not in the three phases. Each is listed with what it waits for.
    recording and local runs. It goes into `github-evidence/.env` and is never committed.
 3. **Recorded account.** `octocat` by default. A teammate's real account would need
    their consent, because the recording is committed.
-4. **`/api/analyze`.** Remove it once P2-3 lands (recommended, §1.2), or keep it.
-   Decided in P2-3's spec.
+4. **`/api/analyze`.** Answered in P2-3's spec (T-0020): removed, and its live tests and
+   probe phases move to apply-then-poll. Final once the owner approves T-0020.
 5. **GF-1 scope.** Does the guide accept "ownership plus issuer-verified
    certificates" (see the feasibility section)?
 6. **I-0033.** Keep the SRS excerpt verbatim (AD-1 records the deviation), or edit it.
@@ -383,6 +396,7 @@ flowchart LR
     P1_8["P1-8 frontend runner"]
     P1_4 --> P1_9["P1-9 GitHub evidence UI"]
     P1_8 --> P1_9
+    P1_10["P1-10 link annotations"]
   end
   subgraph P2 [Phase 2: microservices + product flow]
     P2_1["P2-1 M1 NLP isolation"]
@@ -403,6 +417,7 @@ flowchart LR
   end
   P1_4 --> P2_1
   P1_8 --> P2_2
+  P1_8 --> P2_3
   P1_8 --> P2_5
   P1_4 --> P2_6
   subgraph P3 [Phase 3: improvements]

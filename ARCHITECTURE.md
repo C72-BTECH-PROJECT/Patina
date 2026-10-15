@@ -4,13 +4,18 @@ Written for guide-review item GR-2 ("identify the API gateway and verify the
 system follows the microservices architecture claimed in the SRS; fix it if it
 doesn't"). Task: T-0009.
 
-Verified at commit: `8e8e498` (branch `Anthony_V3`; application code identical to `2e87d44`).
+Verified at commit: `af8947d` (branch `Anthony_V3`).
 
-**Refreshed 2026-10-15 (T-0015, I-0049).** The GitHub path (§0, §1.1–§1.3, §1.7, §1.8, §2, Appendix A.2) and
-every cite into `backend/Controllers/analysis.controller.js`, `tests/run-suite.ps1` and
-`nlp-engine/app/ner.py` were re-verified against the working tree on top of `f65d5b2`, which
-holds the uncommitted T-0014 and T-0015 changes. Those cites are working-tree lines; the hash
-above is the last full verification. Other sections are unchanged from `8e8e498`.
+**What was read where (re-stamped 2026-10-15, T-0016).**
+- T-0015 (I-0049) refreshed the GitHub path (§0, §1.1–§1.3, §1.7, §1.8, §2, Appendix A.2) and
+  every cite into `backend/Controllers/analysis.controller.js`, `tests/run-suite.ps1` and
+  `nlp-engine/app/ner.py`, against its uncommitted working tree. That work is now committed as
+  `af8947d`.
+- T-0016 re-read, at `af8947d`, all 49 cites into those three files and into
+  `backend/Services/internalHttp.js` and `backend/Services/githubEvidence.js`: every one supports
+  its sentence. Two cites were added where a claim had none (§1.2 notes, §1.5 `scores` row).
+- Sections T-0015 did not refresh were last read at `8e8e498`. Their cites still resolve at
+  `af8947d` (docs suite), but were not re-read.
 
 **How to read it:**
 - Every as-is claim cites `file:line` at that commit, or a probe result `P-n`
@@ -80,7 +85,7 @@ config of any kind. A search for `Dockerfile*`, `docker-compose*`, `Procfile`,
 | Assessment Engine | not built | none | none | (designed) LLM assessment | `frontend/src/pages/candidate/Assessment.jsx:61` calls `/api/assessment/generate`, which no backend route serves; the page is unrouted |
 
 Notes:
-- **github-evidence is optional for scoring.** Core reads `GITHUB_EVIDENCE_URL` (default `http://localhost:8001`, empty = disabled) and `GITHUB_EVIDENCE_TIMEOUT_MS` (default 8000) on every call (`backend/Services/githubEvidence.js:59-65`). Nothing pings it at start-up, and the backend boots without it (P-4).
+- **github-evidence is optional for scoring.** Core reads `GITHUB_EVIDENCE_URL` (default `http://localhost:8001`, empty = disabled) and `GITHUB_EVIDENCE_TIMEOUT_MS` (default 8000) on every call (`backend/Services/githubEvidence.js:59-65`; empty URL → `service_disabled` at `backend/Services/githubEvidence.js:103`). Nothing pings it at start-up, and the backend boots without it (P-4).
 - **NLP start-up.** NLP loads its models at import: MiniLM at
   `nlp-engine/app/embedder.py:11`, and spaCy twice, at
   `nlp-engine/app/preprocessor.py:6` and `nlp-engine/app/ner.py:4`. Start-up to
@@ -168,7 +173,7 @@ Auth calls. The NLP service and the browser hold no database credentials.
 | `applications` | job detail (applied?), shortlist, applicants | apply insert; shortlist update | service role | `supabase/migrations/20260830_create_jobs_and_applications.sql:35`, `backend/Controllers/jobs.controller.js:137-138`, `backend/Controllers/jobs.controller.js:187-188`, `backend/Controllers/analysis.controller.js:476` |
 | `notifications` | candidate notifications | shortlist side effect; mark read | service role | `supabase/migrations/20260903_create_notifications.sql:6`, `backend/Controllers/notification.controller.js:4`, `backend/Controllers/notification.controller.js:21`, `backend/Controllers/notification.controller.js:45-46` |
 | `resumes` | embedded in score reads | analyze only | service role | `supabase/migrations/20260903_create_resumes_and_scores.sql:18`, `backend/Controllers/analysis.controller.js:315-316` |
-| `scores` | candidate analysis, recruiter candidates, applicants | analyze only | service role | `supabase/migrations/20260903_create_resumes_and_scores.sql:41`, `backend/Controllers/analysis.controller.js:348-349`, `backend/Controllers/analysis.controller.js:384`, `backend/Controllers/analysis.controller.js:521` |
+| `scores` | candidate analysis, recruiter candidates, applicants | analyze only | service role | `supabase/migrations/20260903_create_resumes_and_scores.sql:41`, `backend/Controllers/analysis.controller.js:348-349`, `backend/Controllers/analysis.controller.js:384`, `backend/Controllers/analysis.controller.js:422-423`, `backend/Controllers/analysis.controller.js:521` |
 | `auth.users` (Supabase Auth) | login, reset, applicants (`getUserById`) | sign-up, password update | anon (sign-in/sign-up), service role (admin API) | `backend/Controllers/auth.controller.js:238`, `backend/Controllers/auth.controller.js:310`, `backend/Controllers/analysis.controller.js:504` |
 | Storage bucket `resumes` | resume status, apply (has a resume?) | upload route (`candidates/<id>/resume.<ext>`, upsert, prune); analyze (`<id>/<uuid>.<ext>`) | service role | `supabase/migrations/20260903_create_resumes_and_scores.sql:14`, `backend/Controllers/analysis.controller.js:160-162`, `backend/Controllers/analysis.controller.js:288-290`, `backend/Controllers/analysis.controller.js:146-148`, `backend/Controllers/jobs.controller.js:106-108` |
 | NLP | nothing | a temporary file per request, deleted in `finally` | none | `nlp-engine/app/main.py:59-63`, `nlp-engine/app/main.py:106-108` |

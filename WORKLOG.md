@@ -326,3 +326,13 @@ rollup per archived month at the top of this file.
 - Result: `github=ok`, GitHub sub-score available 26.23/100 for `Arya-A-Nair` (35 owned repos, 10 languages, claims 3 evidenced / 2 not_found / 18 not_checkable), weights GitHub 0.4667 / parsing 0.5333, composite 36.74, same request id in the service log. Rate limit 4975/5000 (22 calls, as budgeted). Swept (0 remaining), services stopped, ports free.
 - Files changed: tasks/T-0014 (Result), WORKLOG.md. No code.
 - Next: owner commits T-0014; I-0052 still needs a roadmap slot.
+
+## L-0029 · 2026-10-15 · T-0016 specs for the next six roadmap items (docs only)
+- Prompt: re-stamp ARCHITECTURE at HEAD; specs for P2-1, P1-8, P2-3, P2-2, P2-4 with an execution order; P2-3 depends on P1-8; 0 warnings. Owner answers: I-0052 → new P1-10, first (spec too); backfill pending; FE tests in `frontend/src/__tests__/` + checker rule.
+- Task: T-0016 (8/8 criteria PASS; criterion 5 content is the owner's judgement).
+- Done: ARCHITECTURE verified at `af8947d` (49 cites re-read, all OK; 2 missing cites added); ROADMAP P1-10 row, Execution order line, P2-3 deps, rows/§1.2/backlog/Q4/graph aligned, Task cells; draft specs T-0017 (P1-10), T-0018 (P2-1), T-0019 (P1-8), T-0020 (P2-3), T-0021 (P2-2), T-0022 (P2-4).
+- Key choices: NLP timeout 5 s (p95 1.16 s × 1.35 × 3); NLP 500 = `nlp_error`, not unavailable; P2-3 periodic re-score job + SKIP LOCKED lease + fenced write, trigger-created pending row, `/api/analyze` removed; P2-4 corrects M3's "core down → 502" draft.
+- Verification: red `tests/.out/t0016-red.log` (8 problems); green `t0016-docs.log`: 91 rows, 230 cites, 36 items, 0 warnings; run-suite docs 0; per-spec count 65/65 criteria with "Checked by".
+- Files changed: ARCHITECTURE.md, ROADMAP.md, ISSUES.md, WORKLOG.md (mod); tasks/T-0016..T-0022 (new). No code.
+- Issues logged: I-0053 (per-job list drops candidates → P2-3), I-0054 (Jobs count hardcoded 0 → P2-5); I-0052 mapped to P1-10.
+- Next: owner reviews and approves T-0017 first (execution order); commits (suggested: ARCHITECTURE stamp, then ROADMAP/ISSUES/specs/WORKLOG).
