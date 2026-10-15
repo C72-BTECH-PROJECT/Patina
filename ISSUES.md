@@ -49,6 +49,9 @@ diff you're already writing.
 | I-0041 | `scores.subscores` comment in the migration says `"github_evidence": null`; code stores a full unavailable object | `supabase/migrations/20260903_create_resumes_and_scores.sql` | P3 | OPEN | 2026-10-14, T-0010 |
 | I-0042 | Docs checker silently skips cites to `.yml`/`.yaml`/`.toml`/`.ts` files and paths with spaces | `tests/docs/check-trackers.mjs` | P3 | OPEN | 2026-10-14, T-0010 |
 | I-0043 | ROADMAP P1-3 says the GitHub "full path" is captured; T-0013 returns the profile (repo owner) only | `ROADMAP.md` | P3 | OPEN | 2026-10-15, T-0013 |
+| I-0044 | ROADMAP §1.6 names `pytest-socket --disable-socket`; T-0011 uses `--allow-hosts=127.0.0.1,::1` | `ROADMAP.md` | P3 | OPEN | 2026-10-15, T-0011 |
+| I-0045 | T-0012, T-0014 and T-0015 cite "ROADMAP §1.2" for the contract, env vars and timeouts; the service contract moved to `github-evidence/README.md` | `tasks/T-0012-github-evidence-metrics.md`, `tasks/T-0014-core-github-integration.md`, `tasks/T-0015-github-outage-probe.md` | P3 | OPEN | 2026-10-15, T-0011 |
+| I-0046 | Starlette's `TestClient` warns that using it with `httpx` is deprecated ("install `httpx2` instead") | `github-evidence/requirements-dev.txt` | P3 | OPEN | 2026-10-15, T-0011 |
 
 ---
 
@@ -595,8 +598,29 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Status:** OPEN
 **Severity:** P3
 **Module:** `ROADMAP.md`
-**Evidence:** `ROADMAP.md:289` says "full path captured"; `tasks/T-0013-parser-contact-determinism.md` criterion 2 returns `github.com/<owner>` for a repo link. T-0013 was implemented as specced.
+**Evidence:** `ROADMAP.md:218` says "full path captured"; `tasks/T-0013-parser-contact-determinism.md` criterion 2 returns `github.com/<owner>` for a repo link. T-0013 was implemented as specced.
 **Proposed fix:** Reword P1-3 to "owner of the first repo link when no bare profile link exists".
+
+### I-0044 — ROADMAP §1.6 names the wrong pytest-socket flag
+**Status:** OPEN
+**Severity:** P3
+**Module:** `ROADMAP.md`
+**Evidence:** ROADMAP §1.6 says "`pytest-socket --disable-socket` turns any real network call into an error". T-0011 criterion 14 uses `--allow-hosts=127.0.0.1,::1` instead, because the Windows asyncio event loop needs a loopback socket pair (`tests/run-suite.ps1`, github suite; `tests/github/test_service.py::test_live_call_blocked`). `--disable-socket` was not tried.
+**Proposed fix:** Reword §1.6 to "`pytest-socket --allow-hosts=127.0.0.1,::1`".
+
+### I-0045 — Later task specs point at ROADMAP §1.2 for content that moved
+**Status:** OPEN
+**Severity:** P3
+**Module:** `tasks/`
+**Evidence:** T-0011 moved the service contract, error table, service timeouts and service env vars from ROADMAP §1.2 to `github-evidence/README.md`. `tasks/T-0012-github-evidence-metrics.md:23` ("as in ROADMAP §1.2"), `tasks/T-0014-core-github-integration.md:34,189` and `tasks/T-0015-github-outage-probe.md:26,36,78` still cite §1.2. §1.2 keeps only the core-side timeouts and variables (`GITHUB_EVIDENCE_URL`, `GITHUB_EVIDENCE_TIMEOUT_MS`), so the timeout cites (`T-0014:189`, `T-0015`) still resolve; the contract cites (`T-0012:23`, `T-0014:34`) do not.
+**Proposed fix:** When each spec is approved, point the contract cites at `github-evidence/README.md`.
+
+### I-0046 — `TestClient` deprecation warning for httpx
+**Status:** OPEN
+**Severity:** P3
+**Module:** `github-evidence/requirements-dev.txt`, `tests/github/`
+**Evidence:** Every `tests/github` run prints `StarletteDeprecationWarning: Using httpx with starlette.testclient is deprecated; install httpx2 instead` (starlette 1.3.1, httpx 0.28.1; `tests/.out/t0011-green.log`). The suite is green; a later Starlette may drop httpx support in `TestClient`.
+**Proposed fix:** When bumping pins, try `httpx2` for the test client only (the service itself keeps httpx, and respx mocks httpx), or pin Starlette below the removal.
 
 ## Resolved
 

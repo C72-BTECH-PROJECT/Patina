@@ -1,7 +1,7 @@
 # T-0011 — github-evidence-skeleton
 
-> Status: **spec only, awaiting owner approval** (written in T-0010, 2026-10-14).
-> ROADMAP item P1-1. No code until the acceptance criteria are approved.
+> Status: **implemented 2026-10-15; all 16 criteria PASS** (octocat recorded by the owner the same day) (spec written in T-0010, 2026-10-14, approved by the owner).
+> ROADMAP item P1-1.
 
 ## Context
 ROADMAP Phase 1 builds GitHub validation as its own internal Python service.
@@ -166,4 +166,29 @@ entry.
 ---
 
 ## Result
-<Filled at the end. One line per acceptance criterion.>
+Green: `tests/.out/t0011-green.log` = `run-suite.ps1 -Target current -Suites github`, **46 passed, 0 skipped** after the octocat recording (45 passed, 1 skipped before it).
+Red: `tests/.out/t0011-red.log`, run before any `app/*.py` existed (only an empty `app/__init__.py`): exit 1, 15 failed + 29 errors, 2 passed (`test_live_call_blocked`, `test_recordings_scrubbed`). First error line: `E       ModuleNotFoundError: No module named 'app.main'`. It surfaces at test time, not at collection as the spec predicted, because the tests import the app lazily inside fixtures and tests.
+
+1. **PASS** - `grep -vhE '^\s*(#|$)' github-evidence/requirements*.txt | grep -vc '=='` → 0. `.env.example` has only `GITHUB_TOKEN=` (no value) and commented names. README has the start command (`github-evidence/README.md:21`), the env table and contract v1. ROADMAP §1.2 is a pointer (`ROADMAP.md:93-98`). I kept the core-side timeouts and core env vars under the pointer, since they are not the service's contract.
+2. **PASS** - `test_requires_token` (unset and blank token; message names `GITHUB_TOKEN`).
+3. **PASS** - `test_health` (exact body, 0 respx calls).
+4. **PASS** - `test_evidence_octocat` against the owner's recording (`tests/github/recordings/octocat/{user,repos_p1}.json`, recorded 2026-10-15: 8 repositories, 2 forks, headers `content-type`, `etag`, `x-ratelimit-*` only): 200, `complete`, `listed/owned/forked` equal to the recording's counts. Before the recording it skipped as PENDING.
+5. **PASS** - `test_pagination` (150 repos, 2 list calls, `GITHUB_MAX_REPOS=200`) and `test_repo_cap` (cap 100 → `listed` 100, `truncated`, 1 list call even with page 2 mounted). The spec's first case needs the cap raised, because the default is 100.
+6. **PASS** - `test_invalid_username` (the 7 listed inputs plus a non-string and a list; each 400 `invalid_request`, 0 calls), `test_invalid_body_is_400`, `test_valid_username_boundaries` (1 and 39 chars, `a-b` accepted).
+7. **PASS** - `test_user_not_found`.
+8. **PASS** - `test_rate_limit_primary` (Retry-After within 600 ± 2, 1 call), `test_rate_limit_secondary` (503 in under 2 s, `Retry-After: 60`, 1 call), `test_rate_limit_low_water` (second request makes 0 calls). Also `test_client.py`: a short secondary wait (≤ 1 s) is retried once, and the low-water block lifts when the window resets.
+9. **PASS** - `test_upstream_retry`, `test_deadline` (`GITHUB_DEADLINE_S=1` → 504 in under 2 s), `test_auth_failed`. I read "after 2 calls" as 2 attempts at the failing request (the first endpoint is tried twice): in the 502-then-200 case the whole request makes 3 GitHub calls (user ×2, list ×1), and in the 502-twice case exactly 2.
+10. **PASS** - `test_no_echo` (5 GitHub error kinds, a hard 502, a 400 and a success: bodies are exactly `{error, message}` with the fixed text, and neither responses nor captured logs hold the token, `GHBODY-MARKER` or the API URL; it asserts that records were captured). It needed the `httpx` logger muted: httpx logs the URL at INFO (`github-evidence/app/github_client.py:30`). `test_unexpected_error_is_fixed_500` covers the catch-all.
+11. **PASS** - `test_auth_headers` (Bearer token, `X-GitHub-Api-Version: 2022-11-28`, own User-Agent; caller `Cookie`/`Authorization` headers and a GitHub `Set-Cookie` never reach a later request).
+12. **PASS** - `test_request_id` (valid ID echoed on header, body and log record; `bad id\n`, 65 chars, a space and empty each replaced by a UUID).
+13. **PASS** - `test_no_cors_no_docs`.
+14. **PASS** - `test_live_call_blocked` under `--allow-hosts=127.0.0.1,::1`, with every test inside `respx.mock(assert_all_mocked=True)` (`tests/github/conftest.py`). The test connects by host name, so pytest-socket blocks it before any DNS lookup. I did not run it without the flag, to avoid a real connection to api.github.com.
+15. **PASS** - `test_recordings_scrubbed` (11 synthetic files, manifest complete, allow-listed headers only, none of the five forbidden strings). The offline `test_recorder_scrubs_and_writes` (not a criterion) checks the recorder's scrubbing, manifest update and re-record behaviour, because I cannot run the recorder against the live API.
+16. **PASS** - `-Suites github` → github 0; `-Target baseline -Suites github` prints "skipped (no github-evidence in baseline)" and exits 0; `-Suites docs` → 0 (final run 0 warnings); `git status --porcelain -- backend frontend nlp-engine supabase` is empty.
+
+Full harness (`run-suite.ps1 -Target current -Live`, `tests/.out/t0011-full-harness.log`): nlp 0 (12 passed), backend 0 (27/27), docs 0, github 0, frontend 1 = the existing CI-mode ESLint warnings in `CreateJob.jsx` / `Jobs.jsx` (not touched; same as the T-0004..T-0013 Results). `git diff --stat tests/nlp/snapshots` is empty.
+
+**Owner step (criterion 4):** done. The recorder ran live against GitHub (exit 0, 2 files, manifest entries `source: recorded`); `test_recordings_scrubbed` passes on the new files. The full harness above ran before the recording, and the github suite was re-run after it (46 passed).
+
+Changes: new `github-evidence/` (`app/{config,contract,github_client,main}.py`, `tools/record_github.py`, `requirements*.txt`, `.env.example`, `README.md`) and `tests/github/`. Edited `tests/run-suite.ps1` (new `github` suite, also in the default list), `tests/README.md`, `ROADMAP.md` (§1.2 pointer; P1-1/P1-2 Issues cells), `AUDIT.md` (2.3, 2.13 evidence only; statuses unchanged; changelog and module note), `ISSUES.md` (I-0044..I-0046; I-0043 cite moved to `ROADMAP.md:218`).
+Decisions beyond the spec: `python-dotenv` pinned so the owner's `.env` loads at start (never in tests); the `Link` header is only a "next page exists" signal and its URL is never followed; the low-water check is at request admission; other 4xx from GitHub → 502 `github_upstream_error`; `considered` = owned non-fork repos (archived included).

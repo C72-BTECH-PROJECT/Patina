@@ -1,0 +1,33 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/users/synth-user",
+    "query": {}
+  },
+  "response": {
+    "body": {
+      "created_at": "2020-01-01T00:00:00Z",
+      "email": null,
+      "followers": 0,
+      "following": 0,
+      "html_url": "https://github.com/synth-user",
+      "id": 9000002,
+      "login": "synth-user",
+      "name": null,
+      "public_gists": 0,
+      "public_repos": 3,
+      "site_admin": false,
+      "type": "User",
+      "updated_at": "2026-10-01T00:00:00Z"
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5000",
+      "x-ratelimit-remaining": "4990",
+      "x-ratelimit-reset": "1760000000",
+      "x-ratelimit-resource": "core",
+      "x-ratelimit-used": "10"
+    },
+    "status": 200
+  }
+}

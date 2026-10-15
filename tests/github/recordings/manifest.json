@@ -1,0 +1,69 @@
+{
+  "files": [
+    {
+      "path": "octocat/repos_p1.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "octocat/user.json",
+      "source": "recorded",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/bad_credentials_401.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/forbidden_403.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/many_repos_p1.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/many_repos_p2.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/many_user.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/missing_user_404.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/primary_limit_403.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/secondary_limit_429.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/small_repos.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/small_user.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    },
+    {
+      "path": "synthetic/upstream_502.json",
+      "source": "synthetic",
+      "date": "2026-10-15"
+    }
+  ]
+}

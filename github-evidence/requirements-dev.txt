@@ -1,0 +1,10 @@
+# Test pins (T-0011). Repeats the runtime pins: every line must be name==version.
+fastapi==0.141.1
+starlette==1.3.1
+uvicorn==0.52.1
+httpx==0.28.1
+pydantic==2.13.4
+python-dotenv==1.2.2
+pytest==9.1.1
+respx==0.23.1
+pytest-socket==0.8.1

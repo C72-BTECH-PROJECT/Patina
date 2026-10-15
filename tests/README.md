@@ -35,9 +35,10 @@ nlp-engine\venv\Scripts\python tests\fixtures\make_fixtures.py
 ## Running
 
 ```powershell
-powershell -File tests\run-suite.ps1 -Target baseline                 # nlp + backend tier 1 + frontend build + docs
+powershell -File tests\run-suite.ps1 -Target baseline                 # nlp + backend tier 1 + frontend build + docs + github (skipped: no service in baseline)
 powershell -File tests\run-suite.ps1 -Target baseline -Suites nlp
 powershell -File tests\run-suite.ps1 -Target baseline -Suites backend -Live   # + tier 2 (writes to Supabase)
+powershell -File tests\run-suite.ps1 -Target current -Suites github         # github-evidence service vs recorded/synthetic GitHub responses (T-0011), no services, network blocked
 powershell -File tests\run-suite.ps1 -Target current -Suites docs           # CHECKLIST/AUDIT/CLAUDE.md/ARCHITECTURE.md/ROADMAP.md drift check (T-0008..T-0010), no services
 node tests\arch\nlp-outage-probe.mjs                                          # NLP down/hung/busy probe (T-0009); starts its own backend and NLP, ports 5000/8000 must be free
 ```
@@ -54,6 +55,7 @@ logs to `tests/.out/` (git-ignored).
 | Backend tier 1 | `backend/smoke.test.mjs` | No writes; one `profiles` read (unknown-username login). |
 | Backend tier 2 | `backend/live-analyze.test.mjs` | **Live.** Dedicated `t0001_cand` / `t0001_recr` accounts (`tests/.env`), a job tagged `[T-0001 TEST]`, sweep before and after. |
 | Frontend | `CI=true npm run build` | None. |
+| GitHub evidence | `github/test_service.py`, `github/test_client.py`, `github/recordings/` | None, and no network: `github-evidence/venv`, its own pytest call, FastAPI `TestClient`, every test inside `respx.mock(assert_all_mocked=True)`, and `--allow-hosts=127.0.0.1,::1` (pytest-socket) so any other connect raises. Recordings are listed in `recordings/manifest.json` (`recorded` or `synthetic`, dated) and scrubbed to allow-listed headers. `test_evidence_octocat` uses the owner's real recording (`github-evidence/tools/record_github.py octocat`, T-0011) and skips if it is absent. Skipped for `-Target baseline`. |
 | Docs | `docs/check-trackers.mjs` | None. Also checks that every `file:line` in `ARCHITECTURE.md` resolves (T-0009), and that `ROADMAP.md` items list Depends on/Size/Files/Moves/Issues/Task, depend only on earlier items, use S/M/L, and name only existing CHECKLIST, issue and task ids (T-0010). An open issue or a CODE_REVIEWED_UNTESTED row that no item maps prints a `warning:` line but does not fail. |
 | Architecture probe (not in the default suites) | `arch/nlp-outage-probe.mjs` | **Live.** One `[T-0001 TEST]` job and one upload under `resumes/candidates/<C>/`, swept before and after. With NLP down or hung, analyze stops before any write; P-1/P-2 refuse to run if :8000 answers. Prints a table only, asserts nothing (T-0009). |
 | Manual | `MANUAL_SMOKE.md` | Live, via the UI — finish with `node tests/backend/sweep.mjs`. |

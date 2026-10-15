@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/users/synth-missing",
+    "query": {}
+  },
+  "response": {
+    "body": {
+      "documentation_url": "https://docs.github.com/rest",
+      "message": "Not Found GHBODY-MARKER"
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5000",
+      "x-ratelimit-remaining": "4990",
+      "x-ratelimit-reset": "1760000000",
+      "x-ratelimit-resource": "core",
+      "x-ratelimit-used": "10"
+    },
+    "status": 404
+  }
+}

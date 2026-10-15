@@ -17,11 +17,14 @@
   Supabase project (scoped to the t0001_ test accounts; see tests\README.md).
   docs     = tests\docs\check-trackers.mjs (T-0008): CHECKLIST/AUDIT/CLAUDE.md drift check.
              Read-only, starts no services, always checks the current repo's files.
+  github   = tests\github (T-0011): the github-evidence service against recorded and synthetic
+             GitHub responses only. Own venv (github-evidence\venv), own pytest call, no services
+             started, and pytest-socket blocks every non-loopback connection. Skipped for baseline.
   Logs go to tests\.out\ (git-ignored).
 #>
 param(
   [Parameter(Mandatory = $true)][ValidateSet('baseline', 'current')][string]$Target,
-  [ValidateSet('nlp', 'backend', 'frontend', 'docs')][string[]]$Suites = @('nlp', 'backend', 'frontend', 'docs'),
+  [ValidateSet('nlp', 'backend', 'frontend', 'docs', 'github')][string[]]$Suites = @('nlp', 'backend', 'frontend', 'docs', 'github'),
   [switch]$Live
 )
 
@@ -116,6 +119,23 @@ try {
     $docsScript = Join-Path $tests 'docs\check-trackers.mjs'
     & cmd.exe /c "node `"$docsScript`" 2>&1" | Tee-Object (Join-Path $out "$Target-docs.log")
     $results['docs'] = $LASTEXITCODE
+  }
+
+  if ($Suites -contains 'github') {
+    Write-Host "== github suite (recorded responses only)"
+    if (-not (Test-Path (Join-Path $tree 'github-evidence'))) {
+      Write-Host "skipped (no github-evidence in $Target)"
+      $results['github'] = 0
+    } else {
+      $ghPython = Join-Path $repo 'github-evidence\venv\Scripts\python.exe'
+      if (-not (Test-Path $ghPython)) { throw "github-evidence venv missing: python -m venv github-evidence\venv; github-evidence\venv\Scripts\python -m pip install -r github-evidence\requirements-dev.txt" }
+      # Loopback stays open (the Windows event loop needs a socket pair); any other connect raises.
+      # Run through cmd.exe: it merges stderr (PowerShell 5.1 would raise NativeCommandError on pytest
+      # warnings) and leaves the comma in --allow-hosts alone (PowerShell would split it into an array).
+      $ghTests = Join-Path $tests 'github'
+      & cmd.exe /c "`"$ghPython`" -m pytest `"$ghTests`" -v -p no:cacheprovider --allow-hosts=127.0.0.1,::1 2>&1" | Tee-Object (Join-Path $out "$Target-github.log")
+      $results['github'] = $LASTEXITCODE
+    }
   }
 
   if ($Suites -contains 'frontend') {

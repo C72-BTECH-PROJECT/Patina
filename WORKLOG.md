@@ -270,3 +270,13 @@ rollup per archived month at the top of this file.
 - Files changed: nlp-engine/app/ner.py, tests/nlp/test_contact_determinism.py (new), tests/README.md, ISSUES.md, AUDIT.md (2.1, 1.9, 4.11 evidence; 1.16 cite), tasks/T-0013, WORKLOG.md.
 - Issues logged: I-0043 (ROADMAP wording); I-0015 resolved.
 - Next: owner commits T-0013; T-0014 (core GitHub integration) consumes `entities.github`.
+
+## L-0023 · 2026-10-15 · T-0011 github-evidence service skeleton (P1-1)
+- Prompt: execute the approved T-0011 spec: tests first, red log, implement, full harness, Result, AUDIT, WORKLOG; no commits. The owner then asked for the octocat recorder to be run.
+- Task: T-0011 (16/16 criteria PASS; criterion 4 passed once the octocat recording was made).
+- Done: `github-evidence/` FastAPI service on :8001 (contract v1 health + `POST /v1/evidence`, httpx client with pagination/cap, primary/secondary/low-water rate limits, one retry, deadline, request ID, safe errors, no CORS/docs), owner-run recorder, README (ROADMAP §1.2 moved; core-side lines stay as a pointer); `tests/github/` with 11 synthetic recordings and the real octocat recording (8 repos, 2 forks); new `github` suite in `run-suite.ps1`.
+- Verification: red `tests/.out/t0011-red.log` (`No module named 'app.main'`); green `t0011-green.log` 46 passed, 0 skipped (45 + 1 skipped before the recording); full harness nlp 0, backend 0 (27/27), docs 0 (0 warnings), github 0, frontend 1 = the existing CreateJob/Jobs CI lint warnings.
+- Findings: httpx logs request URLs at INFO (muted, or the API URL leaks into logs); the spec's 150-repo case needs `GITHUB_MAX_REPOS` above its default of 100; "after 2 calls" read as 2 attempts at the failing request.
+- Files changed: new github-evidence/, tests/github/ (incl. recordings/octocat/); tests/run-suite.ps1, tests/README.md, ROADMAP.md (§1.2, P1-1/P1-2 issue cells), AUDIT.md (2.3, 2.13 evidence only, statuses unchanged), ISSUES.md, tasks/T-0011, WORKLOG.md.
+- Issues logged: I-0044 (ROADMAP §1.6 flag), I-0045 (specs cite ROADMAP §1.2), I-0046 (TestClient httpx deprecation); I-0043 cite moved to `ROADMAP.md:218`.
+- Next: owner commits T-0011; T-0012 (metrics) builds on this client.

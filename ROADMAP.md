@@ -92,96 +92,25 @@ is still produced.
 
 ### 1.2 Contract v1 (core ↔ github-evidence)
 
-T-0011 moves this section into `github-evidence/README.md` next to the code, and
-replaces it here with a pointer.
+The service's contract lives in `github-evidence/README.md`, next to the code (moved
+there by T-0011). It covers `GET /health`, `POST /v1/evidence`, the 200 body and the
+target shape, claim statuses, the error table, the service-side timeouts, the service
+environment variables and the GitHub rate-limit rules (§1.5). What stays here is what
+only core decides.
 
-**`GET /health`** → `200 {"status":"ok","service":"github-evidence","contract_version":"1","token_configured":true}`.
-It makes no GitHub call.
-
-**`POST /v1/evidence`**
-- Request headers:
-  - `Content-Type: application/json`;
-  - `X-Request-ID`, optional.
-- Request ID rules:
-  - it is accepted only if it matches `^[A-Za-z0-9-]{1,64}$`; otherwise a UUID is
-    generated;
-  - it is echoed on the response and written in every log line for the request;
-  - core forwards the ID it received or generated. Once the gateway exists (P2-4),
-    the gateway generates it.
-- Request body:
-
-```json
-{ "username": "octocat", "claimed_skills": ["python", "react", "docker"], "window_days": 365 }
-```
-
-- `200` body (abridged; P1-2 fills the metric fields):
-
-```json
-{
-  "contract_version": "1",
-  "request_id": "3f6c…",
-  "username": "octocat",
-  "status": "complete",
-  "fetched_at": "2026-10-14T10:00:00Z",
-  "profile": { "public_repos": 8, "html_url": "https://github.com/octocat" },
-  "repositories": { "listed": 8, "owned": 6, "forked": 2, "archived": 0, "considered": 6, "truncated": false,
-    "items": [ { "name": "hello-world", "fork": false, "pushed_at": "…", "primary_language": "Python",
-                 "authored_commits_window": 12, "languages": { "Python": 12345 } } ] },
-  "languages": [ { "name": "Python", "bytes": 12345, "share": 0.62 } ],
-  "commit_activity": { "window_days": 365, "authored_commits": 120, "active_weeks": 30, "weeks": 52, "weekly": [0, 3, 1] },
-  "claims": [ { "skill": "python", "language": "Python", "status": "evidenced", "share": 0.62, "repos": ["hello-world"],
-                "last_activity": "2026-09-30T08:00:00Z" },
-              { "skill": "react", "language": null, "status": "not_checkable" } ],
-  "sub_score": { "available": true, "value": 0.64, "reason_code": null, "weights_source": "default",
-    "components": [ { "key": "activity", "value": 0.7, "weight": 0.25, "available": true } ] },
-  "limitations": ["public_repositories_only", "default_branch_only", "detail_repos_capped:10"],
-  "rate_limit": { "remaining": 4780, "reset_at": "2026-10-14T11:00:00Z" }
-}
-```
-
-- **`status: "partial"`** means some per-repo calls failed, or the 6 s deadline hit
-  after the profile and repository list arrived. The sub-score is computed from what
-  arrived, and `limitations` names what is missing (CHECKLIST 2.13).
-- **Claim statuses:**
-  - `evidenced`: any owned, non-fork repo uses the claimed language, at any age.
-    `last_activity` (latest `pushed_at` among those repos) is reported per claim and
-    does not change the status;
-  - `not_found`: a checkable language that no owned, non-fork repo uses (never "too old");
-  - `not_checkable`: frameworks and tools that language statistics cannot show.
-    These are never counted against the candidate.
-- **Errors** are always `{"error": "<code>", "message": "<fixed safe text>"}`. They
-  never echo GitHub's body, the token or an internal URL (the lesson of I-0036).
-
-| HTTP | `error` | When |
-|---|---|---|
-| 400 | `invalid_request` | Body or login fails validation; no GitHub call is made |
-| 404 | `github_user_not_found` | GitHub answers 404 for the user |
-| 503 | `github_rate_limited` | Primary or secondary limit, or below the low-water mark; carries `Retry-After` |
-| 503 | `github_auth_failed` | GitHub rejects our token (a misconfiguration) |
-| 502 | `github_upstream_error` | GitHub 5xx or connection errors after one retry, with nothing usable |
-| 504 | `github_timeout` | The deadline passed before the profile and repository list arrived |
-
-**Timeouts.** These are starting values; P1-5 measures them.
-- Inside the service: 4 s per GitHub call and a 6 s deadline per request.
-- Core → service: 8 s, longer than the deadline, so the service can still answer
-  `partial`.
+**Core-side timeouts.** These are starting values; P1-5 measures them.
+- Core → service: 8 s, longer than the service's 6 s deadline, so the service can
+  still answer `partial`.
 - Core → NLP: 15 s (ARCHITECTURE §4.8). Analyze is synchronous, so its worst case is
   15 s for NLP plus 8 s for GitHub, which is more than the gateway's 20 s.
 - Recommendation: remove `/api/analyze` once score-on-apply scores asynchronously
   (decided in P2-3). If it stays, its gateway timeout must be at least 25 s.
 
-**Environment variables (names only).**
+**Core environment variables (names only).** The service's variables are in the
+README.
 
 | Where | Variable | Default | Meaning |
 |---|---|---|---|
-| service | `GITHUB_TOKEN` | none; the service refuses to start without it | Fine-grained personal access token with public read only. Lives only in the service's env (NFR-9) |
-| service | `GITHUB_API_URL` | `https://api.github.com` | Tests and the probe point it at stubs |
-| service | `GITHUB_MAX_REPOS` | 100 | Repositories listed (pagination stops here; `truncated` is set) |
-| service | `GITHUB_DETAIL_REPOS` | 10 | Owned, non-fork repos (most recently pushed) that get per-repo language and commit calls |
-| service | `GITHUB_CONCURRENCY` | 3 | Concurrent GitHub calls per request. GitHub advises serial requests; set 1 to follow that strictly |
-| service | `GITHUB_HTTP_TIMEOUT_S` / `GITHUB_DEADLINE_S` | 4 / 6 | See timeouts |
-| service | `GITHUB_MIN_REMAINING` | 100 | Low-water mark for the rate limit |
-| service | `GITHUB_SUBSCORE_WEIGHTS` | documented in P1-2 | JSON override with the same fallback rules as `CREDIBILITY_WEIGHTS` |
 | core | `GITHUB_EVIDENCE_URL` | `http://localhost:8001` | Empty means disabled, reason `service_disabled` |
 | core | `GITHUB_EVIDENCE_TIMEOUT_MS` | 8000 | Core → service timeout |
 
@@ -284,8 +213,8 @@ never silently counted as missing (CHECKLIST 2.10).
 
 | Id | Item | Depends on | Size | Files | Moves | Issues | Task |
 |---|---|---|---|---|---|---|---|
-| P1-1 | Service skeleton: contract v1 (§1.2), GitHub client (token, pagination, rate limits §1.5, retry, deadline), username validation, request ID, recorded-response harness, `github` suite | — | M | `github-evidence/app/{main,config,contract,github_client}.py`, `github-evidence/{requirements.txt,requirements-dev.txt,README.md,.env.example}`, `github-evidence/tools/record_github.py`, `tests/github/{conftest.py,test_service.py,test_client.py,recordings/}`, `tests/run-suite.ps1`, `tests/README.md` | 2.3 PART (service half; DONE once P1-4 feeds the score); 2.13 BROKEN (service half) | — | T-0011 |
-| P1-2 | Metrics and sub-score: 52-week authored-commit activity, language breakdown, owned vs forked, consistency, claim cross-reference against the parsed skills, documented formula and weights, partial labelling, call budget | P1-1 | M | `github-evidence/app/{metrics,claims,scoring,skill_languages}.py`, `github-evidence/README.md`, `tests/github/{test_metrics.py,test_scoring.py,snapshots/}`, `tests/github/recordings/` | 2.4 MIS (all but quality); 2.5 MIS; 2.7 MIS (all DONE once P1-4 feeds the score) | — | T-0012 |
+| P1-1 | Service skeleton: contract v1 (§1.2), GitHub client (token, pagination, rate limits §1.5, retry, deadline), username validation, request ID, recorded-response harness, `github` suite | — | M | `github-evidence/app/{main,config,contract,github_client}.py`, `github-evidence/{requirements.txt,requirements-dev.txt,README.md,.env.example}`, `github-evidence/tools/record_github.py`, `tests/github/{conftest.py,test_service.py,test_client.py,recordings/}`, `tests/run-suite.ps1`, `tests/README.md` | 2.3 PART (service half; DONE once P1-4 feeds the score); 2.13 BROKEN (service half) | I-0044, I-0046 | T-0011 |
+| P1-2 | Metrics and sub-score: 52-week authored-commit activity, language breakdown, owned vs forked, consistency, claim cross-reference against the parsed skills, documented formula and weights, partial labelling, call budget | P1-1 | M | `github-evidence/app/{metrics,claims,scoring,skill_languages}.py`, `github-evidence/README.md`, `tests/github/{test_metrics.py,test_scoring.py,snapshots/}`, `tests/github/recordings/` | 2.4 MIS (all but quality); 2.5 MIS; 2.7 MIS (all DONE once P1-4 feeds the score) | I-0045 | T-0012 |
 | P1-3 | Deterministic contact fields in the parser: document order instead of `set()`; GitHub link prefers a bare profile URL; full path captured; trailing punctuation stripped. The `entities.github` output shape is unchanged | — | S | `nlp-engine/app/ner.py`, `tests/nlp/test_contact_determinism.py`, `tests/nlp/snapshots/current/` | 2.1 PART (resume path deterministic); 4.11 CRU (deterministic input) | I-0015, I-0043 | T-0013 |
 | P1-4 | Core integration: `backend/Services/internalHttp.js` (timeout, one retry on connect errors, request ID, safe errors) and `githubEvidence.js` (login normalisation, reason codes §1.3); `buildScoreRecord(nlpJson, { github })` and `buildGithubSubScore`; per-skill `sources.github`; flags stay "not available" (no false "no contradictions"); "public repositories only" in the explanation; `githubAggregator.js` deleted | P1-2, P1-3 | L | `backend/Services/{internalHttp,githubEvidence,explainability}.js`, `backend/Controllers/analysis.controller.js`, `backend/.env.example`, `backend/Controllers/githubAggregator.js` (deleted), `tests/backend/{explainability.test.mjs,github-evidence-client.test.mjs,live-analyze-github.test.mjs,lib/stub-server.mjs}`, `tests/run-suite.ps1`, `AUDIT.md` | 2.3 PART→DONE; 2.4 MIS→PART; 2.5 MIS→DONE; 2.7 MIS→DONE; 2.8 PART (now exercised with two sources; assessment-only needs Module 3); 2.10 MIS→DONE; 2.11 MIS→PART; 2.12 MIS→DONE; 2.13 BROKEN→DONE; 4.1 BROKEN (2 of 3 sources); 4.2 PART→DONE; 4.5 PART; 4.7 CRU→DONE; 0.3 PART; 0.5 CRU (GitHub key server-side); 0.7 MIS→PART (GitHub path) | I-0039 (githubAggregator part) | T-0014 |
 | P1-5 | Outage probe P-4 service down, P-5 service hung, P-6 GitHub rate-limited, as asserting rows; timings feed the §1.2 timeout values | P1-4 | S | `tests/arch/nlp-outage-probe.mjs`, `tests/README.md` | 0.7 PART (evidence); 2.8 PART (evidence); 2.13 DONE (evidence); GR-2 PART (evidence) | — | T-0015 |

@@ -1,0 +1,121 @@
+"""Owner-run recorder: save a real GitHub account's responses as test recordings (T-0011).
+
+    github-evidence/venv/Scripts/python github-evidence/tools/record_github.py octocat
+
+Needs GITHUB_TOKEN (a fine-grained token with public read only) in github-evidence/.env.
+It calls the same endpoints as the service, through the service's own client, keeps only
+allow-listed response headers, writes tests/github/recordings/<login>/ and adds the files
+to tests/github/recordings/manifest.json as `source: recorded`. The token is never written.
+"""
+import argparse
+import asyncio
+import json
+import os
+import re
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+SERVICE_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SERVICE_DIR))
+
+import httpx  # noqa: E402
+from dotenv import load_dotenv  # noqa: E402
+
+from app.config import ConfigError, Settings  # noqa: E402
+from app.contract import is_valid_login  # noqa: E402
+from app.github_client import GitHubClient, GitHubError, RateLimitState  # noqa: E402
+
+DEFAULT_ROOT = SERVICE_DIR.parent / "tests" / "github" / "recordings"
+ALLOWED_HEADERS = ("content-type", "link", "etag", "retry-after")
+ALLOWED_PREFIX = "x-ratelimit-"
+FORBIDDEN_TEXT = ("authorization", "ghp_", "github_pat_", "gho_", "bearer")
+
+
+def scrub_headers(headers) -> dict:
+    return {
+        name.lower(): value for name, value in headers.items()
+        if name.lower() in ALLOWED_HEADERS or name.lower().startswith(ALLOWED_PREFIX)
+    }
+
+
+def recording_from(request: httpx.Request, response: httpx.Response) -> dict:
+    return {
+        "request": {"method": request.method, "path": request.url.path, "query": dict(request.url.params)},
+        "response": {"status": response.status_code, "headers": scrub_headers(response.headers), "body": response.json()},
+    }
+
+
+def _file_name(rec: dict) -> str:
+    if rec["request"]["path"].endswith("/repos"):
+        return f"repos_p{rec['request']['query'].get('page', '1')}.json"
+    return "user.json"
+
+
+def _dump(rec: dict, token: str) -> str:
+    text = json.dumps(rec, indent=2, sort_keys=True) + "\n"
+    lowered = text.lower()
+    if token in text or any(bad in lowered for bad in FORBIDDEN_TEXT):
+        raise RuntimeError("refusing to write a recording that contains credential-like text")
+    return text
+
+
+def _update_manifest(root: Path, login: str, names: list, today: str) -> None:
+    path = root / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"files": []}
+    kept = [f for f in manifest["files"] if not f["path"].startswith(f"{login}/")]
+    kept += [{"path": f"{login}/{n}", "source": "recorded", "date": today} for n in names]
+    manifest["files"] = sorted(kept, key=lambda f: f["path"])
+    path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
+
+
+async def record(login: str, root: Path, settings: Settings, today: Optional[str] = None) -> list:
+    if not is_valid_login(login):
+        raise ValueError("not a GitHub login")
+    captured = []
+
+    def observer(request: httpx.Request, response: httpx.Response) -> None:
+        if response.status_code < 400:  # retries and errors are not recordings
+            captured.append(recording_from(request, response))
+
+    await GitHubClient(settings, RateLimitState(), observer).fetch(login)
+
+    texts = {_file_name(rec): _dump(rec, settings.token) for rec in captured}
+    folder = Path(root) / login
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.glob("*.json"):
+        old.unlink()
+    written = []
+    for name, text in sorted(texts.items()):
+        (folder / name).write_text(text, encoding="utf-8", newline="\n")
+        written.append(folder / name)
+    _update_manifest(Path(root), login, sorted(texts), today or datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    return written
+
+
+def main(argv: Optional[list] = None) -> int:
+    parser = argparse.ArgumentParser(description="Record a GitHub account's responses for the github test suite.")
+    parser.add_argument("login")
+    parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help="recordings folder (default: tests/github/recordings)")
+    args = parser.parse_args(argv)
+    if not re.fullmatch(r"[A-Za-z0-9-]{1,39}", args.login) or not is_valid_login(args.login):
+        print("error: not a valid GitHub login", file=sys.stderr)
+        return 2
+    load_dotenv(SERVICE_DIR / ".env")
+    try:
+        settings = Settings.from_env(os.environ)
+        written = asyncio.run(record(args.login, args.root, settings))
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except GitHubError as exc:
+        print(f"error: GitHub call failed ({exc.code}); nothing was written", file=sys.stderr)
+        return 1
+    for path in written:
+        print(f"wrote {path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
