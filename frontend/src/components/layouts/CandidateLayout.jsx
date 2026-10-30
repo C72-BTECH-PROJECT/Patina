@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Briefcase, LayoutDashboard, LogOut, User, Zap, Bell } from "lucide-react";
+import { Briefcase, LayoutDashboard, LogOut, User, Zap, Bell, ListChecks } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
@@ -13,12 +13,13 @@ function CandidateLayout() {
   const navItems = [
     { to: "/candidate/dashboard", icon: LayoutDashboard, label: "About" },
     { to: "/candidate/jobs", icon: Briefcase, label: "Jobs" },
+    { to: "/candidate/assessment", icon: ListChecks, label: "Assessment" },
     { to: "/candidate/profile", icon: User, label: "Profile" },
   ];
 
   const handleLogout = async () => {
     await logout();
-    navigate('/', { replace: true });
+    window.location.href = '/login';
   };
 
   useEffect(() => {

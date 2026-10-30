@@ -6,6 +6,7 @@ import jobsRoutes from './Routes/jobs.routes.js';
 import analysisRoutes from './Routes/analysis.routes.js';
 import adminRoutes from './Routes/admin.routes.js';
 import notificationRoutes from './Routes/notification.routes.js';
+import assessmentRoutes from './Routes/assessment.routes.js';
 
 import session from 'express-session';
 
@@ -58,6 +59,10 @@ app.use('/api', analysisRoutes);
 
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
+
+// assessmentRoutes defines:
+// POST /generate (T-0016: generate-only, no persistence)
+app.use('/api/assessment', assessmentRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

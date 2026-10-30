@@ -62,6 +62,28 @@ function CandidateJobDetail() {
     };
   }, [authFetch]);
 
+  // Check whether the candidate has already applied for this job.
+  useEffect(() => {
+    let cancelled = false;
+    const checkApplied = async () => {
+      try {
+        const response = await authFetch(`${API_BASE_URL}/api/jobs/my-applications`);
+        if (!response.ok) return;
+        const applications = await response.json();
+        const alreadyApplied = Array.isArray(applications) && applications.some((app) => app.job_id === id);
+        if (!cancelled) setApplied(alreadyApplied);
+      } catch {
+        // ignore
+      }
+    };
+    if (id) {
+      checkApplied();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [authFetch, id]);
+
   const handleApply = async () => {
     if (applying || applied) return;
     setApplying(true);

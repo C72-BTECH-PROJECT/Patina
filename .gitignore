@@ -3,6 +3,7 @@ node_modules/
 
 venv/
 .venv/
+.venv-backup/
 **/__pycache__/
 *.pyc
 *.pyo

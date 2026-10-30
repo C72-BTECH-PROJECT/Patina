@@ -200,6 +200,39 @@ export const getMyResumeStatus = async (req, res) => {
   });
 };
 
+// Generates a signed URL for a candidate's resume. Intended for recruiters
+// reviewing applicants; the frontend opens this URL in a new tab.
+export const getCandidateResume = async (req, res) => {
+  try {
+    const { candidateId } = req.params;
+
+    const { data: files } = await supabase.storage
+      .from('resumes')
+      .list(`candidates/${candidateId}`, { limit: 100 });
+
+    const resumeFile = Array.isArray(files)
+      ? files.find((f) => f.name.startsWith('resume'))
+      : null;
+
+    if (!resumeFile) {
+      return res.status(404).json({ message: 'No resume found for this candidate.' });
+    }
+
+    const storagePath = `candidates/${candidateId}/${resumeFile.name}`;
+    const { data: signed, error: signedError } = await supabase.storage
+      .from('resumes')
+      .createSignedUrl(storagePath, 60);
+
+    if (signedError || !signed?.signedUrl) {
+      return res.status(500).json({ message: 'Could not generate resume link.' });
+    }
+
+    return res.json({ url: signed.signedUrl, fileName: resumeFile.name });
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to load resume', error: String(err?.message || err) });
+  }
+};
+
 // Dedicated endpoint for uploading / replacing the candidate's single resume.
 // Each candidate profile has exactly one resume, stored at a fixed path, so a
 // re-upload simply overwrites the previous one (upsert).
@@ -343,7 +376,26 @@ export const analyzeResume = [
       const github = await fetchGithubEvidence({ githubLink: entities.github, claimedSkills: skills, requestId });
       console.log(`[analyze] request_id=${requestId} github=${github.ok ? 'ok' : github.reasonCode}`);
 
-      const score = buildScoreRecord(nlpJson, { github });
+      // Fold in a completed assessment when one exists (CHECKLIST 3.7 /
+      // T-0025). Guarded so analysis still works before the assessments
+      // table exists.
+      let assessmentEvaluation = null;
+      try {
+        const { data: completed } = await supabase
+          .from('assessments')
+          .select('evaluation')
+          .eq('candidate_id', candidateId)
+          .eq('job_id', job.id)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        assessmentEvaluation = completed?.evaluation ?? null;
+      } catch (assessErr) {
+        console.warn('[analysis] assessment lookup skipped:', assessErr?.message);
+      }
+
+      const score = buildScoreRecord(nlpJson, { github, assessmentEvaluation });
       const { data: scoreRow, error: scoreError } = await supabase
         .from('scores')
         .insert({
