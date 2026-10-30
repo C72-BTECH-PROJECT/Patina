@@ -1,4 +1,4 @@
-// T-0016/T-0017 backend smoke tests: black-box against BACKEND_BASE_URL.
+// T-0024/T-0025 backend smoke tests: black-box against BACKEND_BASE_URL.
 // No Supabase writes. Both tests run without a session and without the
 // assessment service: they prove the routes exist and are role-guarded.
 //

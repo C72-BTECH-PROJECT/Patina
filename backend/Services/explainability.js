@@ -28,7 +28,8 @@
 //     value:      null,           // 0-100 once available, null while not
 //     weight:     0,              // share of the composite, 0..1
 //     reason:     'The GitHub …', // why it is unavailable (null when available)
-//     components: null,           // raw source metrics, kept for audit
+//     components: null,           // raw source metrics, kept for audit; an
+//                                 // unavailable GitHub entry holds { reason_code }
 //     evidence:   [],             // EvidenceItem[] — see below
 //   }
 //
@@ -51,9 +52,9 @@
 //     `subScores.<key>.value`, which is null until that engine exists. It must
 //     render the unavailable state from `available`/`reason` rather than
 //     aliasing the composite, which is what it does today.
-//   * candidate `Assessment.jsx` (not routed yet) — once `/api/assessment/*`
-//     exists it should post results that a `buildAssessmentSubScore()` turns
-//     into the `assessment_results` entry above.
+//   * candidate `Assessment.jsx` — posts answers to `/api/assessment/evaluate`;
+//     the stored evaluation is what `buildAssessmentSubScore()` turns into the
+//     `assessment_results` entry above.
 
 export const SUBSCORE_KEYS = {
   PARSING: 'parsing_semantic_alignment',
@@ -67,11 +68,34 @@ export const SUBSCORE_LABELS = {
   [SUBSCORE_KEYS.ASSESSMENT]: 'Assessment Results',
 };
 
+// Why the GitHub sub-score is unavailable, by the reason code the client
+// (Services/githubEvidence.js) returns. Texts are ROADMAP §1.3's drafts;
+// `insufficient_evidence` is the I-0047 draft. Owner review of the wording is
+// pending (T-0014 test plan).
+export const GITHUB_REASONS = {
+  no_github_link:
+    'No GitHub profile link was found on the resume, so GitHub evidence was not used.',
+  invalid_github_link: 'The GitHub link on the resume is not a valid profile address.',
+  github_user_not_found: 'The GitHub account named on the resume does not exist.',
+  no_public_repositories: 'The GitHub account has no public repositories of its own to check.',
+  insufficient_evidence: "The GitHub account's repositories gave too little data to score.",
+  github_rate_limited:
+    "GitHub's request limit was reached, so repository activity was not checked for this score.",
+  service_unavailable:
+    'The GitHub evidence service was not reachable, so repository activity was not checked.',
+  timeout: 'The GitHub evidence check took too long and was skipped for this score.',
+  service_error: 'The GitHub evidence check failed, so repository activity was not checked.',
+  service_disabled:
+    'No GitHub evidence was collected for this candidate. The GitHub Aggregator service is not part of this deployment yet, so repository activity has not been checked.',
+  // Only from rebuildScoreRecord(), for a stored score that has no GitHub entry.
+  not_collected_for_score:
+    'This score was computed before GitHub evidence was collected, so repository activity was not checked. Re-analysing the resume would include it.',
+};
+
 // Why a source has no evidence. Surfaced to the recruiter verbatim so an empty
 // panel always says why it is empty (GF-4, CHECKLIST 5.10).
 const UNAVAILABLE_REASONS = {
-  [SUBSCORE_KEYS.GITHUB]:
-    'No GitHub evidence was collected for this candidate. The GitHub Aggregator service is not part of this deployment yet, so repository activity has not been checked.',
+  [SUBSCORE_KEYS.GITHUB]: GITHUB_REASONS.service_disabled,
   [SUBSCORE_KEYS.ASSESSMENT]:
     'No assessment has been completed by this candidate for this job yet. Candidates complete a generated technical assessment from their dashboard.',
 };
@@ -262,6 +286,174 @@ export const buildParsingSubScore = (semanticAnalysis) => {
   };
 };
 
+/** GitHub with no evidence: weight 0, value null, and the reason in words and as a code. */
+const githubUnavailable = (reasonCode) => {
+  const code = Object.hasOwn(GITHUB_REASONS, reasonCode) ? reasonCode : 'service_error';
+  return {
+    ...unavailableSubScore(SUBSCORE_KEYS.GITHUB, GITHUB_REASONS[code]),
+    components: { reason_code: code },
+  };
+};
+
+// Limitations every answer carries; anything else is worth naming to the recruiter.
+const STANDARD_GITHUB_LIMITATIONS = new Set([
+  'public_repositories_only',
+  'default_branch_only',
+  'author_matched_by_login_or_email',
+]);
+
+const GITHUB_PRIVATE_WORK_NOTE =
+  'Public repositories only: private or employer work is not visible to this check and is not counted against the candidate.';
+
+/** One metric per service component (github-evidence/README.md "Sub-score"). */
+const githubComponentMetric = (component, ev, claimCounts) => {
+  const value = clamp01(component.value);
+  const activity = ev.commit_activity || {};
+  const repos = ev.repositories || {};
+  const describe = {
+    activity: {
+      label: 'Commit activity',
+      display: `${activity.authored_commits ?? 0} authored commits in ${activity.window_days ?? 365} days`,
+      note: "Commits the candidate authored in their own public repositories (default branch) over the window.",
+    },
+    consistency: {
+      label: 'Consistency',
+      display: `${activity.active_weeks ?? 0} of ${activity.weeks ?? 52} weeks active`,
+      note: 'Weeks in the last year with at least one authored commit; steady work counts for more than one burst.',
+    },
+    ownership: {
+      label: 'Own repositories with commits',
+      display: `${repos.with_authored_commits ?? 0} of ${repos.considered ?? 0} own repositories`,
+      note: 'Own (non-fork) public repositories with commits by the candidate in the window. Forks are not counted.',
+    },
+    corroboration: {
+      label: 'Résumé languages found on GitHub',
+      display: `${claimCounts.evidenced} of ${claimCounts.evidenced + claimCounts.notFound} checkable languages`,
+      note:
+        "Languages claimed on the résumé that appear in the candidate's own public repositories." +
+        (claimCounts.notCheckable
+          ? ` ${claimCounts.notCheckable} claimed framework${claimCounts.notCheckable === 1 ? '' : 's'} or tool${claimCounts.notCheckable === 1 ? '' : 's'} cannot be checked from language statistics and ${claimCounts.notCheckable === 1 ? 'is' : 'are'} not counted against the candidate.`
+          : ''),
+    },
+  }[component.key] || { label: component.key, display: asPercent(value), note: '' };
+
+  return {
+    type: 'metric',
+    key: `github_${component.key}`,
+    label: describe.label,
+    value,
+    display: describe.display,
+    direction: value >= 0.5 ? 'positive' : 'negative',
+    weight_within_factor: Number(component.weight) || 0,
+    note: describe.note,
+  };
+};
+
+/**
+ * GitHub Evidence (CHECKLIST 2.4 / 2.5 / 2.7 / 2.10 / 2.12), from the result of
+ * fetchGithubEvidence(): `{ ok: true, evidence, requestId }` or
+ * `{ ok: false, reasonCode }`.
+ *
+ * `components` is the evidence snapshot that is persisted with the score (DEC-6,
+ * ROADMAP §1.4), so a later drill-down or re-explanation never calls GitHub again.
+ */
+export const buildGithubSubScore = (result) => {
+  if (!result?.ok) return githubUnavailable(result?.reasonCode);
+
+  const ev = result.evidence || {};
+  const sub = ev.sub_score || {};
+  const parts = asArray(sub.components);
+  const claims = asArray(ev.claims);
+  const limitations = asArray(ev.limitations);
+  const repos = ev.repositories || {};
+  const skillsWith = (status) => claims.filter((c) => c?.status === status).map((c) => c.skill);
+  const evidenced = skillsWith('evidenced');
+  const notFound = skillsWith('not_found');
+  const claimCounts = {
+    evidenced: evidenced.length,
+    notFound: notFound.length,
+    notCheckable: skillsWith('not_checkable').length,
+  };
+
+  const evidence = parts
+    .filter((c) => c?.available && c.value != null)
+    .map((c) => githubComponentMetric(c, ev, claimCounts));
+
+  if (evidenced.length + notFound.length) {
+    evidence.push({
+      type: 'skill_set',
+      key: 'github_claims_evidenced',
+      label: "Résumé languages found in the candidate's own repositories",
+      direction: 'positive',
+      items: evidenced,
+      count: evidenced.length,
+    });
+    evidence.push({
+      type: 'skill_set',
+      key: 'github_claims_not_found',
+      label: "Résumé languages not found in the candidate's own repositories",
+      direction: 'negative',
+      items: notFound,
+      count: notFound.length,
+    });
+  }
+
+  // CHECKLIST 2.10: the limitation is always stated, on the first item shown.
+  const partial = ev.status === 'partial' || sub.partial === true;
+  const extra = limitations.filter((l) => !STANDARD_GITHUB_LIMITATIONS.has(l));
+  const lead =
+    GITHUB_PRIVATE_WORK_NOTE +
+    (partial ? ' Partial result: some repository data could not be fetched.' : '') +
+    (extra.length ? ` Limits of this check: ${extra.join(', ')}.` : '');
+  if (evidence.length) {
+    evidence[0] = { ...evidence[0], note: [lead, evidence[0].note].filter(Boolean).join(' ') };
+  }
+
+  return {
+    key: SUBSCORE_KEYS.GITHUB,
+    label: SUBSCORE_LABELS[SUBSCORE_KEYS.GITHUB],
+    available: true,
+    value: toPoints(sub.value),
+    weight: 0, // set by aggregate()
+    reason: null,
+    components: {
+      username: ev.username ?? null,
+      request_id: result.requestId ?? ev.request_id ?? null,
+      fetched_at: ev.fetched_at ?? null,
+      contract_version: ev.contract_version ?? null,
+      status: ev.status ?? null,
+      partial,
+      repositories: {
+        listed: repos.listed ?? null,
+        owned: repos.owned ?? null,
+        forked: repos.forked ?? null,
+        archived: repos.archived ?? null,
+        considered: repos.considered ?? null,
+        truncated: repos.truncated ?? null,
+        detailed: repos.detailed ?? null,
+        with_authored_commits: repos.with_authored_commits ?? null,
+        items: asArray(repos.items).map((r) => ({
+          name: r?.name ?? null,
+          fork: r?.fork ?? null,
+          archived: r?.archived ?? null,
+          pushed_at: r?.pushed_at ?? null,
+          primary_language: r?.primary_language ?? null,
+          authored_commits_window: r?.authored_commits_window ?? null,
+        })),
+      },
+      languages: asArray(ev.languages),
+      commit_activity: ev.commit_activity ?? null,
+      claims,
+      limitations,
+      sub_score_value: sub.value ?? null,
+      weights_source: sub.weights_source ?? null,
+      component_weights: Object.fromEntries(parts.map((c) => [c.key, c.weight])),
+      sub_score_components: parts,
+    },
+    evidence,
+  };
+};
+
 /**
  * Assessment Results (CHECKLIST 3.7 / 4.1, GF-5).
  *
@@ -376,9 +568,9 @@ export const aggregate = (subScores, baseWeights = BASE_WEIGHTS) => {
 /**
  * One row per skill that either the job asked for or the résumé claimed, with
  * how many of the *available* evidence sources confirm it. No invented
- * per-skill percentages: with parsing alone, a skill is either a confirmed job
- * requirement, an unmet job requirement, or a claim with nothing to check it
- * against.
+ * per-skill percentages: parsing says matched / missing / claimed only, and
+ * GitHub (when available) says evidenced / not_found / not_checkable from the
+ * service's claim cross-reference. Only `evidenced` confirms a skill.
  */
 export const buildSkillEvidence = (subScores) => {
   const parsing = subScores[SUBSCORE_KEYS.PARSING];
@@ -391,19 +583,28 @@ export const buildSkillEvidence = (subScores) => {
   const matchedSet = new Set(matched.map((s) => s.toLowerCase()));
   const jdSet = new Set(jdSkills.map((s) => s.toLowerCase()));
 
-  const row = (name, status, confirming) => ({
-    name,
-    status, // 'matched' | 'missing' | 'claimed_only'
-    required_by_job: jdSet.has(name.toLowerCase()),
-    claimed_on_resume: status !== 'missing',
-    sources: {
-      parsing: status,
-      github: null, // null = that evidence source is unavailable, not "failed"
-      assessment: null,
-    },
-    evidence_sources_confirming: confirming,
-    evidence_sources_available: sourcesAvailable,
-  });
+  const github = subScores[SUBSCORE_KEYS.GITHUB];
+  const githubClaims = github?.available
+    ? new Map(asArray(github.components?.claims).map((c) => [String(c?.skill).toLowerCase(), c?.status ?? null]))
+    : null;
+
+  const row = (name, status, parsingConfirms) => {
+    // null = not checked: GitHub is unavailable, or this skill was not claimed.
+    const githubStatus = githubClaims?.get(name.toLowerCase()) ?? null;
+    return {
+      name,
+      status, // 'matched' | 'missing' | 'claimed_only'
+      required_by_job: jdSet.has(name.toLowerCase()),
+      claimed_on_resume: status !== 'missing',
+      sources: {
+        parsing: status,
+        github: githubStatus, // 'evidenced' | 'not_found' | 'not_checkable' | null
+        assessment: null,
+      },
+      evidence_sources_confirming: parsingConfirms + (githubStatus === 'evidenced' ? 1 : 0),
+      evidence_sources_available: sourcesAvailable,
+    };
+  };
 
   const rows = [
     ...matched.map((name) => row(name, 'matched', 1)),
@@ -438,9 +639,15 @@ export const buildFlags = (subScores) => {
     };
   }
 
-  // Sources exist: real comparison logic belongs here, keyed off each source's
-  // `components`. Left unimplemented deliberately — see CHECKLIST 4.6.
-  return { flags: [], flags_available: true, flags_unavailable_reason: null };
+  // A corroborating source exists, but no comparison rule does yet (CHECKLIST
+  // 4.6; GitHub rules come with ROADMAP P1-9). Saying "available" with an empty
+  // list would read as an all-clear that nothing checked, so stay unavailable.
+  return {
+    flags: [],
+    flags_available: false,
+    flags_unavailable_reason:
+      'Checks that compare résumé claims against GitHub or assessment evidence are not built yet, so no inconsistency flags are shown. This is not a finding that the claims are consistent.',
+  };
 };
 
 // --- Explanation record -----------------------------------------------------
@@ -521,14 +728,17 @@ export const buildExplanation = (subScores, composite) => {
 // --- Entry point ------------------------------------------------------------
 
 /**
- * Build everything a `scores` row persists, from one NLP parse result.
- * GitHub enters as soon as its builder exists; the assessment subscore is
- * built when a completed assessment evaluation is supplied (CHECKLIST 3.7).
+ * Build everything a `scores` row persists, from one NLP parse result, the
+ * github-evidence result (`fetchGithubEvidence()`) and the latest completed
+ * assessment's evaluation (CHECKLIST 3.7). Without `github` the GitHub
+ * sub-score is unavailable with `service_disabled`; without
+ * `assessmentEvaluation` the assessment sub-score is unavailable.
  */
-export const buildScoreRecord = (nlpJson, assessmentEvaluation = null) => {
+export const buildScoreRecord = (nlpJson, { github, assessmentEvaluation } = {}) => {
   const subscores = {
     [SUBSCORE_KEYS.PARSING]: buildParsingSubScore(nlpJson?.semantic_analysis),
-    [SUBSCORE_KEYS.GITHUB]: unavailableSubScore(SUBSCORE_KEYS.GITHUB),
+    [SUBSCORE_KEYS.GITHUB]:
+      github === undefined ? githubUnavailable('service_disabled') : buildGithubSubScore(github),
     [SUBSCORE_KEYS.ASSESSMENT]: buildAssessmentSubScore(assessmentEvaluation),
   };
 
@@ -549,12 +759,13 @@ export const buildScoreRecord = (nlpJson, assessmentEvaluation = null) => {
 };
 
 /**
- * Rebuild a stored score once new evidence arrives (T-0017: a candidate
+ * Rebuild a stored score once new evidence arrives (T-0025: a candidate
  * completes their assessment after the résumé was already analysed).
  *
  * `storedSubscores` is the `scores.subscores` object as persisted — every
- * source keeps its value/components/evidence, only the weights and the
- * composite are recomputed against the new evidence set.
+ * source keeps its value/components/evidence (the GitHub snapshot is never
+ * re-fetched), only the weights and the composite are recomputed against the
+ * new evidence set.
  */
 export const rebuildScoreRecord = (storedSubscores, assessmentEvaluation) => {
   const stored = storedSubscores || {};
@@ -562,7 +773,7 @@ export const rebuildScoreRecord = (storedSubscores, assessmentEvaluation) => {
     [SUBSCORE_KEYS.PARSING]:
       stored[SUBSCORE_KEYS.PARSING] ?? unavailableSubScore(SUBSCORE_KEYS.PARSING),
     [SUBSCORE_KEYS.GITHUB]:
-      stored[SUBSCORE_KEYS.GITHUB] ?? unavailableSubScore(SUBSCORE_KEYS.GITHUB),
+      stored[SUBSCORE_KEYS.GITHUB] ?? githubUnavailable('not_collected_for_score'),
     [SUBSCORE_KEYS.ASSESSMENT]: buildAssessmentSubScore(assessmentEvaluation),
   };
 

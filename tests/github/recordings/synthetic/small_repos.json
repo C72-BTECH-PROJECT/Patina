@@ -1,0 +1,95 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/users/synth-user/repos",
+    "query": {
+      "direction": "desc",
+      "page": "1",
+      "per_page": "100",
+      "sort": "pushed",
+      "type": "owner"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "archived": false,
+        "created_at": "2020-02-01T00:00:00Z",
+        "default_branch": "main",
+        "disabled": false,
+        "fork": false,
+        "forks_count": 0,
+        "full_name": "synth-user/alpha",
+        "html_url": "https://github.com/synth-user/alpha",
+        "id": 700001,
+        "language": "Python",
+        "name": "alpha",
+        "owner": {
+          "id": 9000002,
+          "login": "synth-user",
+          "type": "User"
+        },
+        "private": false,
+        "pushed_at": "2026-09-30T08:00:00Z",
+        "size": 11,
+        "stargazers_count": 0,
+        "updated_at": "2026-09-30T08:00:00Z"
+      },
+      {
+        "archived": false,
+        "created_at": "2020-02-01T00:00:00Z",
+        "default_branch": "main",
+        "disabled": false,
+        "fork": true,
+        "forks_count": 0,
+        "full_name": "synth-user/beta",
+        "html_url": "https://github.com/synth-user/beta",
+        "id": 700002,
+        "language": "Go",
+        "name": "beta",
+        "owner": {
+          "id": 9000002,
+          "login": "synth-user",
+          "type": "User"
+        },
+        "private": false,
+        "pushed_at": "2026-08-01T08:00:00Z",
+        "size": 12,
+        "stargazers_count": 0,
+        "updated_at": "2026-08-01T08:00:00Z"
+      },
+      {
+        "archived": true,
+        "created_at": "2020-02-01T00:00:00Z",
+        "default_branch": "main",
+        "disabled": false,
+        "fork": false,
+        "forks_count": 0,
+        "full_name": "synth-user/gamma",
+        "html_url": "https://github.com/synth-user/gamma",
+        "id": 700003,
+        "language": null,
+        "name": "gamma",
+        "owner": {
+          "id": 9000002,
+          "login": "synth-user",
+          "type": "User"
+        },
+        "private": false,
+        "pushed_at": "2024-03-01T08:00:00Z",
+        "size": 13,
+        "stargazers_count": 0,
+        "updated_at": "2024-03-01T08:00:00Z"
+      }
+    ],
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5000",
+      "x-ratelimit-remaining": "4990",
+      "x-ratelimit-reset": "1760000000",
+      "x-ratelimit-resource": "core",
+      "x-ratelimit-used": "10"
+    },
+    "status": 200
+  }
+}

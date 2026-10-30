@@ -271,7 +271,75 @@ rollup per archived month at the top of this file.
 - Issues logged: I-0043 (ROADMAP wording); I-0015 resolved.
 - Next: owner commits T-0013; T-0014 (core GitHub integration) consumes `entities.github`.
 
-## L-0023 · 2026-10-14 · T-0016 assessment generate-only (partial, key-independent work)
+## L-0023 · 2026-10-15 · T-0011 github-evidence service skeleton (P1-1)
+- Prompt: execute the approved T-0011 spec: tests first, red log, implement, full harness, Result, AUDIT, WORKLOG; no commits. The owner then asked for the octocat recorder to be run.
+- Task: T-0011 (16/16 criteria PASS; criterion 4 passed once the octocat recording was made).
+- Done: `github-evidence/` FastAPI service on :8001 (contract v1 health + `POST /v1/evidence`, httpx client with pagination/cap, primary/secondary/low-water rate limits, one retry, deadline, request ID, safe errors, no CORS/docs), owner-run recorder, README (ROADMAP §1.2 moved; core-side lines stay as a pointer); `tests/github/` with 11 synthetic recordings and the real octocat recording (8 repos, 2 forks); new `github` suite in `run-suite.ps1`.
+- Verification: red `tests/.out/t0011-red.log` (`No module named 'app.main'`); green `t0011-green.log` 46 passed, 0 skipped (45 + 1 skipped before the recording); full harness nlp 0, backend 0 (27/27), docs 0 (0 warnings), github 0, frontend 1 = the existing CreateJob/Jobs CI lint warnings.
+- Findings: httpx logs request URLs at INFO (muted, or the API URL leaks into logs); the spec's 150-repo case needs `GITHUB_MAX_REPOS` above its default of 100; "after 2 calls" read as 2 attempts at the failing request.
+- Files changed: new github-evidence/, tests/github/ (incl. recordings/octocat/); tests/run-suite.ps1, tests/README.md, ROADMAP.md (§1.2, P1-1/P1-2 issue cells), AUDIT.md (2.3, 2.13 evidence only, statuses unchanged), ISSUES.md, tasks/T-0011, WORKLOG.md.
+- Issues logged: I-0044 (ROADMAP §1.6 flag), I-0045 (specs cite ROADMAP §1.2), I-0046 (TestClient httpx deprecation); I-0043 cite moved to `ROADMAP.md:218`.
+- Next: owner commits T-0011; T-0012 (metrics) builds on this client.
+
+## L-0024 · 2026-10-15 · T-0012 github-evidence metrics and sub-score (P1-2)
+- Prompt: execute the approved T-0012 spec: tests first, red log, implement, full harness, Result, AUDIT, WORKLOG; no commits. Owner changes during planning: archived owned repos are detail repos; an empty detail set makes activity/consistency/ownership unavailable (never 0); the recorder is extended and the owner re-records octocat; tests pin the clock to the manifest `fetched_at`; octocat is the real inactive-account case; active-window, no-repos, partial and deadline use synthetic accounts.
+- Task: T-0012 (13/13 criteria PASS; 13 with a noted deviation: T-0011 tests were edited minimally for the new detail calls).
+- Done: `metrics.py`, `claims.py`, `skill_languages.py`, `scoring.py`; detail calls (`/languages`, paginated `/commits`) with a semaphore and a 5-page cap; `status: partial` with named limitations; injectable clock; recorder records detail files and `fetched_at`; README (formula, provisional weights, budget 22 calls / ~227 candidates an hour, limitations).
+- Verification: red `tests/.out/t0012-red.log` (29 failed, 45 passed, 6 skipped); green `t0012-green.log` 80 passed, 0 skipped; full harness nlp 0, backend 0, docs 0 (0 warnings), github 0, frontend 1 = the existing CreateJob/Jobs lint warnings.
+- Findings: octocat's 2024 pushes give 0 commits in the window, and the account still scores 0.30 from corroboration (formula as specified); spec criterion 13 cannot hold literally; commit dates are author-set.
+- Files changed: github-evidence/app (4 new, 5 mod), tools/record_github.py, .env.example, README; tests/github (2 new test files, snapshot, 5 synthetic accounts, 12 octocat files, conftest, 2 tests, manifest); AUDIT (2.3, 2.4, 2.5, 2.7, 2.13), ISSUES, ROADMAP, tests/README.md, tasks/T-0012, WORKLOG.
+- Issues logged: I-0047 (ROADMAP §1.3 lacks `insufficient_evidence`), I-0048 (calibration notes for P3-12).
+- Next: owner reviews the snapshot and formula and commits (suggested split: service code + tests + recordings, then trackers); T-0014 maps `sub_score` and `insufficient_evidence`; P1-6 adds code quality.
+
+## L-0025 · 2026-10-15 · T-0014 core GitHub integration (P1-4)
+- Prompt: execute the approved T-0014 spec: tests first, red log, implement, full harness, Result, AUDIT, WORKLOG; no commits. Owner decisions in planning: D1 10th reason `insufficient_evidence` (I-0047); D2 fixture = synthetic/active replayed through the real service, login renamed, marked synthetic; D3 404 only by error code; D4 4 ARCHITECTURE cites rewritten as history. Approval added: frontend = exactly the 5 known warnings; a pending manual real-token check.
+- Task: T-0014 (12/12 criteria PASS; manual end-to-end check with the owner's token pending).
+- Done: `backend/Services/internalHttp.js` (timeout over the whole call, one retry on connect errors, typed errors without body/URL), `githubEvidence.js` (login normalisation, 10 reason codes); `explainability.js` (`buildGithubSubScore` with snapshot and public-repos note, per-skill `sources.github`, flags stay unavailable, `buildScoreRecord(nlp, { github })`); analyze forwards/generates `X-Request-ID`; `githubAggregator.js` deleted; `.env.example` names.
+- Tests: `explainability.test.mjs`, `github-evidence-client.test.mjs`, `live-analyze-github.test.mjs`, `lib/stub-server.mjs`, fixture + `make-github-evidence-fixture.py` (byte-stable); `run-suite.ps1` (current only).
+- Verification: red `tests/.out/t0014-red.log` (29/39; C9 already passed at HEAD); green `t0014-green.log` 66/66; full harness `t0014-full-harness.log`: nlp 0, backend 0, docs 0, github 0 (80), frontend = exactly the 5 known lint warnings; sweep --check 0; both greps 0 lines.
+- Files changed: backend/Services/{internalHttp,githubEvidence}.js (new), explainability.js, Controllers/analysis.controller.js, .env.example, githubAggregator.js (deleted); tests/backend (5 new), tests/run-suite.ps1, tests/README.md; AUDIT.md (17 rows, 38 cites re-pointed, summary 3→11 DONE), ARCHITECTURE.md (4 cites), ROADMAP.md (§1.3 row), ISSUES.md, tasks/T-0014, WORKLOG.md.
+- Issues logged: I-0049 (ARCHITECTURE as-is refresh for the GitHub path; unmapped in ROADMAP → 1 checker warning). I-0047 resolved; I-0039 githubAggregator part done; I-0045 T-0014 cite fixed.
+- Next: owner reviews the reason texts, commits (suggested split: backend + tests, then trackers), runs the manual real-token check, decides where I-0049 goes (P1-5?); then T-0015 (outage probe).
+
+## L-0026 · 2026-10-15 · T-0015 outage probe P-4..P-6 (P1-5) + I-0049
+- Prompt: execute the approved T-0015 spec: tests first, red log, implement, full harness, Result, AUDIT, WORKLOG; no commits. Owner additions: map I-0049 to P1-5 and resolve it (ARCHITECTURE as-is GitHub path with cites, P-4..P-6 in the appendix); docs suite at 0 warnings.
+- Task: T-0015 (7/7 criteria PASS).
+- Done: `tests/arch/nlp-outage-probe.mjs` gains asserting phases P-4 (service down), P-5 (service hung, TCP stub), P-6 (real github-evidence, dummy token, local 403 GitHub stub); `hangStub` helper (P-2 now uses it); `check` rows print expected/observed/PASS|FAIL; exit 1 on any FAIL; default phases 1-6; table to `t0015-probe.md`. The probe starts NLP for P-4..P-6 so the score is produced. ROADMAP §1.2: core → service 8 s confirmed.
+- Verification: red (`GITHUB_EVIDENCE_TIMEOUT_MS=60000`) `tests/.out/t0015-red.log`: P-5 analyze FAIL, exit 1; green `t0015-green.log` (phases 1-6, exit 0) and `t0015-green-456.log` (9/9 PASS); full harness `t0015-full-harness.log`: nlp 0, backend 0 (66/66), github 0 (80), docs 0, frontend 1 = the 5 known lint warnings; final docs run 0 warnings (`t0015-docs.log`); sweep --check 0, ports 5000/8000/8001 free.
+- Measured: down 0.7-1.2 s, hung 8.6-8.7 s, rate-limited 0.9 s then 0.6 s with 0 more GitHub requests.
+- Files changed: tests/arch/nlp-outage-probe.mjs, tests/README.md, ROADMAP.md (§1.2, P1-5 row, P2-1/P2-9 issue cells), ARCHITECTURE.md (GitHub path, shifted cites, Appendix A.2), AUDIT.md (0.7, 2.8, 2.13, GR-2 evidence), ISSUES.md, tasks/T-0015, WORKLOG.md. No production code.
+- Issues logged: I-0050 (probe login row label), I-0051 (AUDIT 0.1/GR-2 "1 of 3 services"). I-0049 resolved.
+- Next: owner commits (suggested split: probe + README, then ARCHITECTURE/AUDIT/ROADMAP/ISSUES/task/WORKLOG); ARCHITECTURE's verified-at hash is still `8e8e498` because the work is uncommitted, so re-stamp it after the commit; then P1-6 (8DFS).
+
+## L-0027 · 2026-10-15 · T-0014 manual real-token check
+- Prompt: run the pending manual check with the real services and GitHub API on `tests/private/Anthony_Jennis_Resume`; show only the sub-score facts; sweep, stop services, record. No commits.
+- Task: T-0014 manual check - NOT EXERCISED (not a pass or a fail of the code).
+- Done: confirmed env presence (URL set, token set, not printed); started NLP, github-evidence, backend; seeded, logged in as `t0001_cand`, analyzed; swept (recount 0); stopped all three, ports free.
+- Result: HTTP 200, GitHub sub-score unavailable with `no_github_link`; github-evidence never called. The PDF's GitHub link is a hyperlink annotation behind the word "GitHub", which text extraction does not read. Weights fell back to parsing 1.0 (GF-4 behaviour confirmed). Rate limit 4997/5000 (untouched).
+- Files changed: tasks/T-0014 (Result), ISSUES.md, WORKLOG.md. No production code, no tests.
+- Issues logged: I-0052 (P1, link annotations not extracted).
+- Next: owner decides - re-run with a résumé that prints the URL as text, or fix I-0052 first (needs a roadmap slot; unmapped, so the docs checker may warn).
+
+## L-0028 · 2026-10-15 · T-0014 manual check, second run
+- Prompt: re-run the manual check with `tests/private/resume.pdf` against the test job. No commits.
+- Task: T-0014 manual check - PASS (L-0027's run was not exercised, I-0052).
+- Result: `github=ok`, GitHub sub-score available 26.23/100 for `Arya-A-Nair` (35 owned repos, 10 languages, claims 3 evidenced / 2 not_found / 18 not_checkable), weights GitHub 0.4667 / parsing 0.5333, composite 36.74, same request id in the service log. Rate limit 4975/5000 (22 calls, as budgeted). Swept (0 remaining), services stopped, ports free.
+- Files changed: tasks/T-0014 (Result), WORKLOG.md. No code.
+- Next: owner commits T-0014; I-0052 still needs a roadmap slot.
+
+## L-0029 · 2026-10-15 · T-0016 specs for the next six roadmap items (docs only)
+- Prompt: re-stamp ARCHITECTURE at HEAD; specs for P2-1, P1-8, P2-3, P2-2, P2-4 with an execution order; P2-3 depends on P1-8; 0 warnings. Owner answers: I-0052 → new P1-10, first (spec too); backfill pending; FE tests in `frontend/src/__tests__/` + checker rule.
+- Task: T-0016 (8/8 criteria PASS; criterion 5 content is the owner's judgement).
+- Done: ARCHITECTURE verified at `af8947d` (49 cites re-read, all OK; 2 missing cites added); ROADMAP P1-10 row, Execution order line, P2-3 deps, rows/§1.2/backlog/Q4/graph aligned, Task cells; draft specs T-0017 (P1-10), T-0018 (P2-1), T-0019 (P1-8), T-0020 (P2-3), T-0021 (P2-2), T-0022 (P2-4).
+- Key choices: NLP timeout 5 s (p95 1.16 s × 1.35 × 3); NLP 500 = `nlp_error`, not unavailable; P2-3 periodic re-score job + SKIP LOCKED lease + fenced write, trigger-created pending row, `/api/analyze` removed; P2-4 corrects M3's "core down → 502" draft.
+- Verification: red `tests/.out/t0016-red.log` (8 problems); green `t0016-docs.log`: 91 rows, 230 cites, 36 items, 0 warnings; run-suite docs 0; per-spec count 65/65 criteria with "Checked by".
+- Files changed: ARCHITECTURE.md, ROADMAP.md, ISSUES.md, WORKLOG.md (mod); tasks/T-0016..T-0022 (new). No code.
+- Issues logged: I-0053 (per-job list drops candidates → P2-3), I-0054 (Jobs count hardcoded 0 → P2-5); I-0052 mapped to P1-10.
+- Next: owner reviews and approves T-0017 first (execution order); commits (suggested: ARCHITECTURE stamp, then ROADMAP/ISSUES/specs/WORKLOG).
+
+> L-0030..L-0037 were written on `main` (2026-10-14/15) as L-0023..L-0030 and renumbered at the T-0023 merge, because `Anthony_V3` had already used L-0023..L-0029. Entry text is unchanged, so their T-0016..T-0019 mean the assessment specs now at T-0024..T-0027 (mapping in L-0038).
+
+## L-0030 · 2026-10-14 · T-0016 assessment generate-only (partial, key-independent work)
 - Prompt: plan then build assessment wiring, generate-only scope approved.
 - Task: T-0016 (spec written + approved; Result partial: criteria 1, 3 PASS; 2, 4, 5, 6 PENDING).
 - Done: `backend/Controllers/assessment.controller.js` + `Routes/assessment.routes.js`
@@ -288,7 +356,7 @@ rollup per archived month at the top of this file.
 - Issues logged: none new.
 - Next: owner supplies OPENROUTER_API_KEY → live criteria 2, 4, 5, 6; then commit.
 
-## L-0024 · 2026-10-14 · Session rollup: pull, password reset, T-0016 build
+## L-0031 · 2026-10-14 · Session rollup: pull, password reset, T-0016 build
 - Prompt: pull teammates' changes into aditya-ui-work; one-off authorized password
   reset; history + assessment reviews; plan + build T-0016 (generate-only, approved).
 - Pull: `origin/main` had all but 2 Anthony_V3 commits; stashed tree (`stash@{0}`
@@ -306,7 +374,7 @@ rollup per archived month at the top of this file.
 - Next: key → live checks → commit; decide `stash@{0}`; review
   `frontend/package-lock.json` (modified before this session).
 
-## L-0025 · 2026-10-14 · T-0016 live verification (key supplied, all green)
+## L-0032 · 2026-10-14 · T-0016 live verification (key supplied, all green)
 - Prompt: verify criteria 2, 4, 6 live after owner added the key.
 - Key rescue: owner put the real key in tracked `.env.example`; moved it to
   ignored `assessment-service/.env` (copied, values never printed) and restored
@@ -325,7 +393,7 @@ rollup per archived month at the top of this file.
   Myuser). Everything else read-only; test servers stopped after runs.
 - Next: owner does manual UI check (criterion 5) → commit; then T-0017 evaluate.
 
-## L-0026 · 2026-10-14 · Assessment nav item (T-0016 follow-up)
+## L-0033 · 2026-10-14 · Assessment nav item (T-0016 follow-up)
 - Prompt: assessment page had no entry point in the UI; add it.
 - Done: "Assessment" item (`/candidate/assessment`, ListChecks icon) added to
   the candidate navbar in `CandidateLayout.jsx` (import + navItems entry).
@@ -335,7 +403,7 @@ rollup per archived month at the top of this file.
   uncommitted.
 - Next: owner UI check → commit.
 
-## L-0027 · 2026-10-14 · Assessment options clickable (practice mode)
+## L-0034 · 2026-10-14 · Assessment options clickable (practice mode)
 - Prompt: MCQ options were dead divs; make them clickable.
 - Done: options are now toggle buttons with selected styling; short-answer
   got a draft textarea + word count; nav dots mark answered questions.
@@ -345,23 +413,39 @@ rollup per archived month at the top of this file.
 - Files changed: frontend/src/pages/candidate/Assessment.jsx (mod), uncommitted.
 - Next: owner UI check → commit; then T-0017 evaluate.
 
-## L-0028 · 2026-10-15 · T-0017 evaluate loop complete
+## L-0035 · 2026-10-15 · T-0017 evaluate loop complete
 - Prompt: finish the evaluate loop (submit → server-side score → persisted → credibility fold-in).
 - Done: service POST /evaluate-assessment (MCQ deterministic incl. `_mcq_result` string-index fix; short answers LLM rubric); backend generate/evaluate controllers (nested payload, 409/open-attempt resume); Assessment.jsx submit→score UI; migration 20261015_create_assessments applied; rebuildScoreRecord folds latest attempt.
 - Verification: smoke 2/2; assessment-evaluate-live.test.mjs added (skips w/o tests/.env); owner UI-tested submit→score; scores row fd263c50 (job a103c197) composite 51.34 with assessment_results 30 available:true ("3 of 10 correct").
 - Files changed: assessment-service/app/*, backend/Controllers/assessment.controller.js + Routes/assessment.routes.js (new), explainability.js, Assessment.jsx, assessments migration, tasks/T-0017, smoke/live tests.
 - Next: T-0018 (quiz demanded a resume right after upload).
 
-## L-0029 · 2026-10-15 · T-0018 resume parse fallback (quiz from stored NLP + JD)
+## L-0036 · 2026-10-15 · T-0018 resume parse fallback (quiz from stored NLP + JD)
 - Prompt: quiz "asks to add resume every time" though uploaded; quiz must use the stored NLP parse + JD, never re-upload.
 - Done: generateAssessment resolves the resume from Supabase (resolveResumeForAssessment); file-but-no-row (or file newer than row) → download Storage file → NLP /parse (same contract as /analyze) → persist a resumes row → use it; 502/500/400 mapping; stored-result fallback when NLP is down.
 - Verification: pre-fix repro (fresh t0001_cand18: upload 200, rows 0, generate → 400 "Upload a resume first" — tests/.out/t0018-prefix.log); post-fix rows 0→1 (preview 300, file_ref set), unchanged file → stays 1, re-upload → 2; smoke 2/2; owner UI run 04:01 parsed resume.pdf → row ba4a2c79.
 - Ops: a 401-squatter on :8000 found and cleared (nlp-engine has no auth — 401s are never ours); all four ports killed/restarted (3000/5000/8000/8002).
 - Next: T-0019 five-attempt limit.
 
-## L-0030 · 2026-10-15 · T-0019 five attempts + quiz outage fixes + run/test doc
+## L-0037 · 2026-10-15 · T-0019 five attempts + quiz outage fixes + run/test doc
 - Prompt: 5 attempts per user per job (latest score counts); then a doc for running/testing everything.
 - Done: dropped assessments_candidate_job_completed_idx (migration allow_five_assessment_attempts applied; file added); generate resumes an open attempt, regenerates while <5 completed, else 409 {attempts_used, max_attempts, latest score}; Assessment.jsx Retake button + "up to 5 attempts" copy; backend generate abort 120s→300s; assessment-service .env timeout 60→240, retries 2→3 (untracked); docs/HOW_TO_RUN_AND_TEST.md.
 - Root causes (quiz 502s): OpenRouter free slugs rotated (gpt-oss-20b:free → 404 "unavailable for free"); openrouter/free router itself returns 200; 60 s service timeout too short for long generations.
 - Verification: node --check clean; smoke 2/2; t0019 flow (2 LLM rounds + 409-limit) relaunched after the timeout fix — result pending, T-0019 Result to be updated.
 - Next: flow result → T-0019 Result → AUDIT/CHECKLIST/ISSUES updates.
+
+## L-0038 · 2026-10-31 · T-0023 integrate `main` into `Anthony_V3` (merge resolved, unstaged)
+- Prompt: execute approved T-0023 (a)-(j): resolve the 3 conflicts, keep V3 `login()`, rename main's specs, delta-audit main, trackers; owner stages and commits.
+- Task: T-0023 (criteria 1-3, 5 PASS; 4 PASS but 1 test needs the DB, I-0070; 6 written, not run).
+- Done: one `buildScoreRecord(nlp, { github, assessmentEvaluation })`; `rebuildScoreRecord` keeps the stored GitHub entry, fallback `not_collected_for_score`; V3 `login()` restored; specs moved; 3 new explainability tests; assessment smoke in the offline suite; AUDIT 16 rows, ARCHITECTURE assessment-service, 124+14 cites re-pointed.
+- Id mapping (commit messages cannot change; `3f53f80` says "T-0016-T-0019"; main's L-0030..L-0037 and both 20261015 migrations keep the old ids):
+
+  | main's id | now | spec |
+  |---|---|---|
+  | T-0016 | T-0024 | `tasks/T-0024-assessment-generate-only.md` |
+  | T-0017 | T-0025 | `tasks/T-0025-assessment-evaluate-loop.md` |
+  | T-0018 | T-0026 | `tasks/T-0026-assessment-resume-parse-fallback.md` |
+  | T-0019 | T-0027 | `tasks/T-0027-five-assessment-attempts.md` |
+- Verification: `t0023-full-harness.log` nlp 0 (12), docs 0 (18 warnings), github 0 (80), backend 45/46, frontend 1 (5 known + 4 new lint); explainability 9/9; Supabase project host does not resolve (DNS ENOTFOUND).
+- Issues logged: I-0055..I-0070 (P0: I-0055, I-0056, I-0066, I-0070); I-0010 updated; I-0005 resolved.
+- Next: owner fixes I-0070, `git add` + commit; then I-0055 spec; decide I-0056/I-0066 fixes and I-0065.

@@ -1,0 +1,262 @@
+{
+  "contract_version": "1",
+  "username": "octocat",
+  "status": "complete",
+  "profile": {
+    "public_repos": 8,
+    "html_url": "https://github.com/octocat"
+  },
+  "repositories": {
+    "listed": 8,
+    "owned": 6,
+    "forked": 2,
+    "archived": 0,
+    "considered": 6,
+    "truncated": false,
+    "detailed": 6,
+    "with_authored_commits": 0,
+    "items": [
+      {
+        "name": "Spoon-Knife",
+        "fork": false,
+        "archived": false,
+        "pushed_at": "2024-08-21T15:25:42Z",
+        "primary_language": "HTML",
+        "authored_commits_window": 0,
+        "languages": {
+          "CSS": 256,
+          "HTML": 355
+        }
+      },
+      {
+        "name": "Hello-World",
+        "fork": false,
+        "archived": false,
+        "pushed_at": "2024-08-20T23:54:42Z",
+        "primary_language": null,
+        "authored_commits_window": 0,
+        "languages": {}
+      },
+      {
+        "name": "linguist",
+        "fork": true,
+        "archived": false,
+        "pushed_at": "2024-08-14T07:35:16Z",
+        "primary_language": "Ruby",
+        "authored_commits_window": null,
+        "languages": null
+      },
+      {
+        "name": "octocat.github.io",
+        "fork": false,
+        "archived": false,
+        "pushed_at": "2024-08-11T11:57:01Z",
+        "primary_language": "CSS",
+        "authored_commits_window": 0,
+        "languages": {
+          "CSS": 14694,
+          "HTML": 3983,
+          "JavaScript": 48
+        }
+      },
+      {
+        "name": "git-consortium",
+        "fork": false,
+        "archived": false,
+        "pushed_at": "2024-07-12T15:04:33Z",
+        "primary_language": null,
+        "authored_commits_window": 0,
+        "languages": {}
+      },
+      {
+        "name": "boysenberry-repo-1",
+        "fork": true,
+        "archived": false,
+        "pushed_at": "2024-05-26T07:02:05Z",
+        "primary_language": null,
+        "authored_commits_window": null,
+        "languages": null
+      },
+      {
+        "name": "hello-worId",
+        "fork": false,
+        "archived": false,
+        "pushed_at": "2024-05-06T10:29:56Z",
+        "primary_language": null,
+        "authored_commits_window": 0,
+        "languages": {}
+      },
+      {
+        "name": "test-repo1",
+        "fork": false,
+        "archived": false,
+        "pushed_at": "2024-03-07T11:37:27Z",
+        "primary_language": null,
+        "authored_commits_window": 0,
+        "languages": {}
+      }
+    ]
+  },
+  "languages": [
+    {
+      "name": "CSS",
+      "bytes": 14950,
+      "share": 0.773169
+    },
+    {
+      "name": "HTML",
+      "bytes": 4338,
+      "share": 0.224348
+    },
+    {
+      "name": "JavaScript",
+      "bytes": 48,
+      "share": 0.002482
+    }
+  ],
+  "commit_activity": {
+    "available": true,
+    "window_days": 365,
+    "authored_commits": 0,
+    "active_weeks": 0,
+    "weeks": 52,
+    "weekly": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "claims": [
+    {
+      "skill": "html",
+      "language": "HTML",
+      "status": "evidenced",
+      "share": 0.224348,
+      "repos": [
+        "Spoon-Knife",
+        "octocat.github.io"
+      ],
+      "last_activity": "2024-08-21T15:25:42Z"
+    },
+    {
+      "skill": "css",
+      "language": "CSS",
+      "status": "evidenced",
+      "share": 0.773169,
+      "repos": [
+        "Spoon-Knife",
+        "octocat.github.io"
+      ],
+      "last_activity": "2024-08-21T15:25:42Z"
+    },
+    {
+      "skill": "javascript",
+      "language": "JavaScript",
+      "status": "evidenced",
+      "share": 0.002482,
+      "repos": [
+        "octocat.github.io"
+      ],
+      "last_activity": "2024-08-11T11:57:01Z"
+    },
+    {
+      "skill": "react",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    }
+  ],
+  "sub_score": {
+    "available": true,
+    "value": 0.3,
+    "reason_code": null,
+    "weights_source": "default",
+    "partial": false,
+    "components": [
+      {
+        "key": "activity",
+        "value": 0.0,
+        "weight": 0.25,
+        "available": true,
+        "reason": null
+      },
+      {
+        "key": "consistency",
+        "value": 0.0,
+        "weight": 0.25,
+        "available": true,
+        "reason": null
+      },
+      {
+        "key": "ownership",
+        "value": 0.0,
+        "weight": 0.2,
+        "available": true,
+        "reason": null
+      },
+      {
+        "key": "corroboration",
+        "value": 1.0,
+        "weight": 0.3,
+        "available": true,
+        "reason": null
+      }
+    ]
+  },
+  "limitations": [
+    "public_repositories_only",
+    "default_branch_only",
+    "author_matched_by_login_or_email"
+  ]
+}

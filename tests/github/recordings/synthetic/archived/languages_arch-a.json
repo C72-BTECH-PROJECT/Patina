@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/repos/synth-arch/arch-a/languages",
+    "query": {}
+  },
+  "response": {
+    "body": {
+      "Python": 3000
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 200
+  }
+}

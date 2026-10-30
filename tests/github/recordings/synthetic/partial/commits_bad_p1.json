@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/repos/synth-part/bad/commits",
+    "query": {
+      "author": "synth-part",
+      "page": "1",
+      "per_page": "100",
+      "since": "2025-10-15T12:00:00Z"
+    }
+  },
+  "response": {
+    "body": [],
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 200
+  }
+}

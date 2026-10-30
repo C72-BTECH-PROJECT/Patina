@@ -15,13 +15,19 @@
   current  = this repo, ports NLP 8000 / backend 5000 (HEAD hardcodes both).
   -Live adds tests\backend\live-analyze.test.mjs, which writes to the shared
   Supabase project (scoped to the t0001_ test accounts; see tests\README.md).
-  docs     = tests\docs\check-trackers.mjs (T-0008): CHECKLIST/AUDIT/CLAUDE.md drift check.
+  backend (current only, T-0014): explainability + github-evidence-client unit tests and the
+             assessment route-guard smoke (T-0023) always; -Live adds live-analyze-github.test.mjs,
+             which binds a github-evidence stub on :8001, and assessment-evaluate-live.test.mjs.
+  docs    = tests\docs\check-trackers.mjs (T-0008): CHECKLIST/AUDIT/CLAUDE.md drift check.
              Read-only, starts no services, always checks the current repo's files.
+  github   = tests\github (T-0011): the github-evidence service against recorded and synthetic
+             GitHub responses only. Own venv (github-evidence\venv), own pytest call, no services
+             started, and pytest-socket blocks every non-loopback connection. Skipped for baseline.
   Logs go to tests\.out\ (git-ignored).
 #>
 param(
   [Parameter(Mandatory = $true)][ValidateSet('baseline', 'current')][string]$Target,
-  [ValidateSet('nlp', 'backend', 'frontend', 'docs')][string[]]$Suites = @('nlp', 'backend', 'frontend', 'docs'),
+  [ValidateSet('nlp', 'backend', 'frontend', 'docs', 'github')][string[]]$Suites = @('nlp', 'backend', 'frontend', 'docs', 'github'),
   [switch]$Live
 )
 
@@ -99,10 +105,23 @@ try {
     Write-Host "== backend suite"
     $env:BACKEND_BASE_URL = $beUrl
     $files = @((Join-Path $tests 'backend\smoke.test.mjs'))
+    # Offline unit tests (T-0014): explainability layer and the github-evidence client against a
+    # local stub. They import this repo's backend modules, so they mean nothing for baseline.
+    if ($Target -eq 'current') {
+      foreach ($f in 'explainability', 'github-evidence-client') {
+        $files += (Join-Path $tests "backend\$f.test.mjs")
+      }
+      # T-0024/T-0025 route guards (T-0023): no session, no assessment service, no LLM. Baseline has no route.
+      $files += (Join-Path $tests 'backend\assessment-generate.smoke.mjs')
+    }
     if ($Live) {
       $files += (Join-Path $tests 'backend\live-analyze.test.mjs')
+      # T-0014: analyze with a github-evidence stub on :8001 (needs :8001 free). Not in baseline.
+      if ($Target -eq 'current') { $files += (Join-Path $tests 'backend\live-analyze-github.test.mjs') }
+      # T-0025 evaluate input guards (no LLM call, no writes). Not in baseline.
+      if ($Target -eq 'current') { $files += (Join-Path $tests 'backend\assessment-evaluate-live.test.mjs') }
       # Cross-user authorization tests (T-0004..T-0007); they skip if the second accounts are not in tests\.env.
-      foreach ($f in 'live-shortlist-authz', 'live-notifications-authz', 'live-auth-failclosed', 'live-analysis-isolation', 'assessment-evaluate-live') {
+      foreach ($f in 'live-shortlist-authz', 'live-notifications-authz', 'live-auth-failclosed', 'live-analysis-isolation') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
     }
@@ -116,6 +135,23 @@ try {
     $docsScript = Join-Path $tests 'docs\check-trackers.mjs'
     & cmd.exe /c "node `"$docsScript`" 2>&1" | Tee-Object (Join-Path $out "$Target-docs.log")
     $results['docs'] = $LASTEXITCODE
+  }
+
+  if ($Suites -contains 'github') {
+    Write-Host "== github suite (recorded responses only)"
+    if (-not (Test-Path (Join-Path $tree 'github-evidence'))) {
+      Write-Host "skipped (no github-evidence in $Target)"
+      $results['github'] = 0
+    } else {
+      $ghPython = Join-Path $repo 'github-evidence\venv\Scripts\python.exe'
+      if (-not (Test-Path $ghPython)) { throw "github-evidence venv missing: python -m venv github-evidence\venv; github-evidence\venv\Scripts\python -m pip install -r github-evidence\requirements-dev.txt" }
+      # Loopback stays open (the Windows event loop needs a socket pair); any other connect raises.
+      # Run through cmd.exe: it merges stderr (PowerShell 5.1 would raise NativeCommandError on pytest
+      # warnings) and leaves the comma in --allow-hosts alone (PowerShell would split it into an array).
+      $ghTests = Join-Path $tests 'github'
+      & cmd.exe /c "`"$ghPython`" -m pytest `"$ghTests`" -v -p no:cacheprovider --allow-hosts=127.0.0.1,::1 2>&1" | Tee-Object (Join-Path $out "$Target-github.log")
+      $results['github'] = $LASTEXITCODE
+    }
   }
 
   if ($Suites -contains 'frontend') {

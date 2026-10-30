@@ -1,0 +1,23 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/users/synth-user",
+    "query": {}
+  },
+  "response": {
+    "body": {
+      "documentation_url": "https://docs.github.com/rest/overview/rate-limits-for-the-rest-api",
+      "message": "You have exceeded a secondary rate limit. GHBODY-MARKER"
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "retry-after": "60",
+      "x-ratelimit-limit": "5000",
+      "x-ratelimit-remaining": "4990",
+      "x-ratelimit-reset": "1760000000",
+      "x-ratelimit-resource": "core",
+      "x-ratelimit-used": "10"
+    },
+    "status": 429
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/repos/octocat/Spoon-Knife/languages",
+    "query": {}
+  },
+  "response": {
+    "body": {
+      "CSS": 256,
+      "HTML": 355
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "etag": "W/\"fd874c773ead5b5631e0a190675b243527d6daf89b201a39386bf74b57cc9bb5\"",
+      "x-ratelimit-limit": "5000",
+      "x-ratelimit-remaining": "4985",
+      "x-ratelimit-reset": "1792038568",
+      "x-ratelimit-resource": "core",
+      "x-ratelimit-used": "15"
+    },
+    "status": 200
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/repos/synth-active/lib-core/commits",
+    "query": {
+      "author": "synth-active",
+      "page": "1",
+      "per_page": "100",
+      "since": "2025-10-15T12:00:00Z"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "commit": {
+          "author": {
+            "date": "2026-10-12T15:00:00Z"
+          },
+          "committer": {
+            "date": "2026-10-12T15:00:00Z"
+          }
+        },
+        "sha": "00000000000000000000000000000000000000c9"
+      },
+      {
+        "commit": {
+          "author": {
+            "date": "2026-06-03T09:00:00Z"
+          },
+          "committer": {
+            "date": "2026-06-03T09:00:00Z"
+          }
+        },
+        "sha": "00000000000000000000000000000000000000ca"
+      },
+      {
+        "commit": {
+          "author": {
+            "date": "2026-06-02T09:00:00Z"
+          },
+          "committer": {
+            "date": "2026-06-02T09:00:00Z"
+          }
+        },
+        "sha": "00000000000000000000000000000000000000cb"
+      },
+      {
+        "commit": {
+          "author": {
+            "date": "2026-05-01T09:00:00Z"
+          },
+          "committer": {
+            "date": "2026-05-01T09:00:00Z"
+          }
+        },
+        "sha": "00000000000000000000000000000000000000cc"
+      }
+    ],
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 200
+  }
+}

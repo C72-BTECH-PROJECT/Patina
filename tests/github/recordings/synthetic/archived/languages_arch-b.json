@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/repos/synth-arch/arch-b/languages",
+    "query": {}
+  },
+  "response": {
+    "body": {
+      "JavaScript": 1000
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 200
+  }
+}

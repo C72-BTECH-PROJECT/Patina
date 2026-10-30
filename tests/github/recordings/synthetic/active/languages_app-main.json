@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/repos/synth-active/app-main/languages",
+    "query": {}
+  },
+  "response": {
+    "body": {
+      "HTML": 2000,
+      "Python": 6000
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 200
+  }
+}

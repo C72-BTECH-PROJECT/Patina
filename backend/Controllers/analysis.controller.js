@@ -6,8 +6,17 @@ import fetch from 'node-fetch';
 
 import supabase from '../Config/supabase.js';
 import { buildScoreRecord, SUBSCORE_KEYS } from '../Services/explainability.js';
+import { fetchGithubEvidence } from '../Services/githubEvidence.js';
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Same rule as github-evidence (github-evidence/README.md): an incoming ID is
+// kept only if it is this shape, otherwise core generates one.
+const REQUEST_ID_RE = /^[A-Za-z0-9-]{1,64}$/;
+const resolveRequestId = (req) => {
+  const incoming = req.get('X-Request-ID');
+  return incoming && REQUEST_ID_RE.test(incoming) ? incoming : crypto.randomUUID();
+};
 
 const NLP_PARSE_URL = process.env.NLP_PARSE_URL || 'http://localhost:8000/parse';
 const PARSER_VERSION = 'nlp-engine@1.0.0';
@@ -264,6 +273,8 @@ export const analyzeResume = [
   async (req, res) => {
     try {
       const candidateId = req.session.userId;
+      const requestId = resolveRequestId(req);
+      console.log(`[analyze] request_id=${requestId}`);
       const { jobId } = req.body || {};
       if (!req.file) {
         return res.status(400).json({ message: 'Resume file is required (field name: resume)' });
@@ -360,8 +371,13 @@ export const analyzeResume = [
         });
       }
 
+      // GitHub evidence (GF-4: optional). Never throws: any failure comes back as
+      // a reason code and the score is still produced from the other sources.
+      const github = await fetchGithubEvidence({ githubLink: entities.github, claimedSkills: skills, requestId });
+      console.log(`[analyze] request_id=${requestId} github=${github.ok ? 'ok' : github.reasonCode}`);
+
       // Fold in a completed assessment when one exists (CHECKLIST 3.7 /
-      // T-0017). Guarded so analysis still works before the assessments
+      // T-0025). Guarded so analysis still works before the assessments
       // table exists.
       let assessmentEvaluation = null;
       try {
@@ -379,7 +395,7 @@ export const analyzeResume = [
         console.warn('[analysis] assessment lookup skipped:', assessErr?.message);
       }
 
-      const score = buildScoreRecord(nlpJson, assessmentEvaluation);
+      const score = buildScoreRecord(nlpJson, { github, assessmentEvaluation });
       const { data: scoreRow, error: scoreError } = await supabase
         .from('scores')
         .insert({

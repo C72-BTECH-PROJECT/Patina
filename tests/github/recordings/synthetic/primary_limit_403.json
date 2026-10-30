@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/users/synth-user",
+    "query": {}
+  },
+  "response": {
+    "body": {
+      "documentation_url": "https://docs.github.com/rest/rate-limit",
+      "message": "API rate limit exceeded for user ID 9000002. GHBODY-MARKER"
+    },
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5000",
+      "x-ratelimit-remaining": "0",
+      "x-ratelimit-reset": "1760000000",
+      "x-ratelimit-resource": "core",
+      "x-ratelimit-used": "5000"
+    },
+    "status": 403
+  }
+}

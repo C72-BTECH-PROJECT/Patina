@@ -1,0 +1,25 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/repos/octocat/Spoon-Knife/commits",
+    "query": {
+      "author": "octocat",
+      "page": "1",
+      "per_page": "100",
+      "since": "2025-10-15T03:58:45Z"
+    }
+  },
+  "response": {
+    "body": [],
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "etag": "\"d0db1295df42c3ded49fc93f5d6f52e92dec400961bc26df4cbb13293213ac6c\"",
+      "x-ratelimit-limit": "5000",
+      "x-ratelimit-remaining": "4981",
+      "x-ratelimit-reset": "1792038568",
+      "x-ratelimit-resource": "core",
+      "x-ratelimit-used": "19"
+    },
+    "status": 200
+  }
+}

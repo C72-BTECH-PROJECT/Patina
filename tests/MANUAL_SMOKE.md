@@ -119,6 +119,46 @@ what the run left behind, and agrees with the owner's observations:
 
 ---
 
+## D. Merged (T-0023: `main` assessment + `Anthony_V3` GitHub evidence): 3000 / 5000 / 8000 / 8001 / 8002
+
+Goal: one score whose explanation lists **all three sources** (parsing, GitHub,
+assessment). **Every "Expected" cell is a prediction from reading the code, not
+observed behaviour.**
+
+Prerequisites:
+- The Supabase project resolves and answers (ISSUES I-0070: on 2026-10-31 its
+  host did not resolve, so nothing below can pass until that is fixed).
+- `github-evidence/.env` has a real `GITHUB_TOKEN`; `assessment-service/.env` has
+  `OPENROUTER_API_KEY` (never print either).
+- A résumé that prints a real GitHub profile URL as text (`tests/private/resume.pdf`
+  worked in L-0028; `f1_dev_github.pdf` names a synthetic account, and a link that
+  is only a PDF annotation is not read, I-0052).
+- No UI path calls `/api/analyze` (Processing is unreachable; score-on-apply is
+  P2-3), so step D4 calls it with `curl.exe`.
+
+Start (five terminals, from the repo root):
+```powershell
+cd nlp-engine; $env:PYTHONHASHSEED='0'; venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+cd github-evidence; venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+cd assessment-service; .venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8002   # NOT the README's 8000 (I-0060)
+cd backend; node index.js                                   # port 5000
+cd frontend; npm start                                      # port 3000
+```
+Seed the job first: `node tests/backend/sweep.mjs --seed-job` (note the job id).
+
+| # | Step | Expected (prediction) | Observed |
+|---|---|---|---|
+| D1 | Sign in as `t0001_cand` at `http://localhost:3000/login` | Lands on `/candidate/dashboard` | |
+| D2 | `/candidate/upload`: upload the résumé | Success state; "Resume on file" after reload | |
+| D3 | `/candidate/jobs` → "[T-0001 TEST] harness job" → **Apply** | "Application submitted successfully!", button shows **Applied** | |
+| D4 | Analyze from a terminal (fill in the password from `tests/.env` and the job id): `curl.exe -s -c $env:TEMP\p.jar -H "Content-Type: application/json" -d '{\"username\":\"t0001_cand\",\"password\":\"<pw>\"}' http://localhost:5000/api/auth/login` then `curl.exe -s -b $env:TEMP\p.jar -F "resume=@tests/private/resume.pdf" -F "jobId=<job id>" http://localhost:5000/api/analyze` | HTTP 200 JSON. Backend log: `[analyze] request_id=… github=ok`. Response sub-scores: parsing available, GitHub available, assessment **unavailable** with "No assessment has been completed by this candidate for this job yet…" | |
+| D5 | Back in the browser, `/candidate/assessment`, pick the test job, generate | Questions appear after up to 2-4 min (free-tier models); no answer key in the Network response (`/api/assessment/generate`) | |
+| D6 | Answer every question and submit | A score is shown. Backend log: `[assessment] completed … score=…` then `[assessment] score <id> rebuilt composite=…` | |
+| D7 | Sign out. Sign in as `t0001_recr`, open `/recruiter/dashboard`, open `t0001_cand` | Composite score with three factors: Résumé ↔ Job Semantic Alignment, GitHub Evidence (with "Public repositories only…" note) and Assessment Results ("Assessment score … X of Y points"). Weights 0.40 / 0.35 / 0.25. Not "evidence limited". | |
+| D8 | Stop the five processes. Clean up: `node tests/backend/sweep.mjs`; `del $env:TEMP\p.jar` | `remaining:` all `0`; exit code 0. The sweep does not count `assessments` (`tests/backend/sweep.mjs` never names the table); the test's rows go with the seeded job through `job_id … on delete cascade` (`supabase/migrations/20261015_create_assessments.sql:14`), so the job removal is what cleans them. | |
+
+---
+
 If any sweep reports a non-zero count, or a guard error, stop and don't
 delete anything by hand. The guard means something other than the test
 accounts would have been touched.

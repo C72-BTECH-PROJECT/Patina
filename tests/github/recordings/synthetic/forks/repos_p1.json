@@ -1,0 +1,64 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/users/synth-forks/repos",
+    "query": {
+      "direction": "desc",
+      "page": "1",
+      "per_page": "100",
+      "sort": "pushed",
+      "type": "owner"
+    }
+  },
+  "response": {
+    "body": [
+      {
+        "archived": false,
+        "default_branch": "main",
+        "disabled": false,
+        "fork": true,
+        "full_name": "synth-forks/f1",
+        "html_url": "https://github.com/synth-forks/f1",
+        "id": 11,
+        "language": "Go",
+        "name": "f1",
+        "owner": {
+          "id": 9100000,
+          "login": "synth-forks",
+          "type": "User"
+        },
+        "private": false,
+        "pushed_at": "2026-09-01T08:00:00Z",
+        "updated_at": "2026-09-01T08:00:00Z"
+      },
+      {
+        "archived": false,
+        "default_branch": "main",
+        "disabled": false,
+        "fork": true,
+        "full_name": "synth-forks/f2",
+        "html_url": "https://github.com/synth-forks/f2",
+        "id": 12,
+        "language": "Python",
+        "name": "f2",
+        "owner": {
+          "id": 9100000,
+          "login": "synth-forks",
+          "type": "User"
+        },
+        "private": false,
+        "pushed_at": "2026-08-01T08:00:00Z",
+        "updated_at": "2026-08-01T08:00:00Z"
+      }
+    ],
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5000",
+      "x-ratelimit-remaining": "4990",
+      "x-ratelimit-reset": "1760000000",
+      "x-ratelimit-resource": "core",
+      "x-ratelimit-used": "10"
+    },
+    "status": 200
+  }
+}

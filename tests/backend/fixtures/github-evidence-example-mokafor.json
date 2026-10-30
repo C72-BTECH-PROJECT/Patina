@@ -1,0 +1,336 @@
+{
+  "_source": "synthetic/active via tests/backend/fixtures/make-github-evidence-fixture.py; synthetic, not a real GitHub account",
+  "contract_version": "1",
+  "request_id": "t0014-fixture",
+  "username": "example-mokafor",
+  "status": "complete",
+  "fetched_at": "2026-10-15T12:00:00Z",
+  "profile": {
+    "public_repos": 5,
+    "html_url": "https://github.com/example-mokafor"
+  },
+  "repositories": {
+    "listed": 5,
+    "owned": 4,
+    "forked": 1,
+    "archived": 1,
+    "considered": 4,
+    "truncated": false,
+    "detailed": 4,
+    "with_authored_commits": 2,
+    "items": [
+      {
+        "name": "app-main",
+        "fork": false,
+        "archived": false,
+        "pushed_at": "2026-10-10T08:00:00Z",
+        "primary_language": "Python",
+        "authored_commits_window": 116,
+        "languages": {
+          "HTML": 2000,
+          "Python": 6000
+        }
+      },
+      {
+        "name": "fork-rust",
+        "fork": true,
+        "archived": false,
+        "pushed_at": "2026-09-01T08:00:00Z",
+        "primary_language": "Rust",
+        "authored_commits_window": null,
+        "languages": null
+      },
+      {
+        "name": "lib-core",
+        "fork": false,
+        "archived": false,
+        "pushed_at": "2026-06-01T08:00:00Z",
+        "primary_language": "Go",
+        "authored_commits_window": 4,
+        "languages": {
+          "Go": 4000
+        }
+      },
+      {
+        "name": "legacy-lib",
+        "fork": false,
+        "archived": true,
+        "pushed_at": "2024-01-01T08:00:00Z",
+        "primary_language": "Perl",
+        "authored_commits_window": 0,
+        "languages": {
+          "Perl": 500
+        }
+      },
+      {
+        "name": "old-tool",
+        "fork": false,
+        "archived": false,
+        "pushed_at": "2023-10-01T08:00:00Z",
+        "primary_language": "Ruby",
+        "authored_commits_window": 0,
+        "languages": {
+          "Ruby": 1000
+        }
+      }
+    ]
+  },
+  "languages": [
+    {
+      "name": "Python",
+      "bytes": 6000,
+      "share": 0.444444
+    },
+    {
+      "name": "Go",
+      "bytes": 4000,
+      "share": 0.296296
+    },
+    {
+      "name": "HTML",
+      "bytes": 2000,
+      "share": 0.148148
+    },
+    {
+      "name": "Ruby",
+      "bytes": 1000,
+      "share": 0.074074
+    },
+    {
+      "name": "Perl",
+      "bytes": 500,
+      "share": 0.037037
+    }
+  ],
+  "commit_activity": {
+    "available": true,
+    "window_days": 365,
+    "authored_commits": 120,
+    "active_weeks": 6,
+    "weeks": 52,
+    "weekly": [
+      5,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      10,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      30,
+      71
+    ]
+  },
+  "claims": [
+    {
+      "skill": "python",
+      "language": "Python",
+      "status": "evidenced",
+      "share": 0.444444,
+      "repos": [
+        "app-main"
+      ],
+      "last_activity": "2026-10-10T08:00:00Z"
+    },
+    {
+      "skill": "javascript",
+      "language": "JavaScript",
+      "status": "not_found",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "react",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "django",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "fastapi",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "postgresql",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "redis",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "aws",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "docker",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "git",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "github",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "sql",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "pytest",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "rest",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    },
+    {
+      "skill": "api",
+      "language": null,
+      "status": "not_checkable",
+      "share": null,
+      "repos": [],
+      "last_activity": null
+    }
+  ],
+  "sub_score": {
+    "available": true,
+    "value": 0.5137678694759089,
+    "reason_code": null,
+    "weights_source": "default",
+    "partial": false,
+    "components": [
+      {
+        "key": "activity",
+        "value": 0.904302247134405,
+        "weight": 0.25,
+        "available": true,
+        "reason": null
+      },
+      {
+        "key": "consistency",
+        "value": 0.23076923076923078,
+        "weight": 0.25,
+        "available": true,
+        "reason": null
+      },
+      {
+        "key": "ownership",
+        "value": 0.4,
+        "weight": 0.2,
+        "available": true,
+        "reason": null
+      },
+      {
+        "key": "corroboration",
+        "value": 0.5,
+        "weight": 0.3,
+        "available": true,
+        "reason": null
+      }
+    ]
+  },
+  "limitations": [
+    "public_repositories_only",
+    "default_branch_only",
+    "author_matched_by_login_or_email"
+  ],
+  "rate_limit": {
+    "remaining": 4990,
+    "reset_at": "2025-10-09T08:53:20Z"
+  }
+}

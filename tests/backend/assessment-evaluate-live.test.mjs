@@ -1,4 +1,4 @@
-// T-0017 live evaluate guards: authenticated input validation for
+// T-0025 live evaluate guards: authenticated input validation for
 // POST /api/assessment/evaluate. No LLM call and no writes — malformed or
 // unknown inputs are rejected before the assessment service is touched.
 //
