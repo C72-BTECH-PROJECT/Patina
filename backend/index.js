@@ -61,7 +61,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // assessmentRoutes defines:
-// POST /generate (T-0016: generate-only, no persistence)
+// POST /generate (T-0024: generate-only, no persistence)
 app.use('/api/assessment', assessmentRoutes);
 
 app.get('/api/health', (_req, res) => {

@@ -4,14 +4,14 @@ import fetch from 'node-fetch';
 import supabase from '../Config/supabase.js';
 import { rebuildScoreRecord } from '../Services/explainability.js';
 
-// Standalone generation service (T-0016/T-0017). The service holds the LLM
+// Standalone generation service (T-0024/T-0025). The service holds the LLM
 // key and mints the answer key; this proxy forwards the candidate/job
 // context, persists the assessment row, and returns candidate questions
 // only — the key never reaches the browser.
 const ASSESSMENT_SERVICE_URL =
   process.env.ASSESSMENT_SERVICE_URL || 'http://localhost:8002';
 
-// T-0018: the upload page stores the raw file without parsing it, so
+// T-0026: the upload page stores the raw file without parsing it, so
 // generate must be able to run the NLP parser on demand. Same endpoint and
 // form contract as /api/analyze (analysis.controller.js).
 const NLP_PARSE_URL = process.env.NLP_PARSE_URL || 'http://localhost:8000/parse';
@@ -154,7 +154,7 @@ const resolveResumeForAssessment = async (candidateId, job) => {
  * Builds the AssessmentInput from the stored job + the candidate's latest
  * resume, forwards it to the assessment service, and persists the result.
  *
- * One assessment per candidate per job (T-0017 scope):
+ * One assessment per candidate per job (T-0025 scope):
  * - a completed attempt answers with 409 + the stored score;
  * - an open ('generated') attempt is resumed: its stored questions are
  *   returned instead of burning a new LLM generation.
@@ -177,7 +177,7 @@ export const generateAssessment = async (req, res) => {
       return res.status(404).json({ message: 'Job not found' });
     }
 
-    // T-0019: up to 5 attempts per candidate per job. An open attempt is
+    // T-0027: up to 5 attempts per candidate per job. An open attempt is
     // always resumed; a new one may be generated while fewer than 5 are
     // completed. The credibility score folds in the LATEST attempt.
     const { data: openAttempt, error: openError } = await supabase
@@ -243,7 +243,7 @@ export const generateAssessment = async (req, res) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        // T-0019: free-tier LLM needs 2-4 min; the old 120 s abort cut slow
+        // T-0027: free-tier LLM needs 2-4 min; the old 120 s abort cut slow
         // generations with a misleading 502.
         signal: AbortSignal.timeout(300000),
       });
@@ -274,7 +274,7 @@ export const generateAssessment = async (req, res) => {
       return res.status(502).json({ message: 'Assessment service returned an unexpected payload. Please retry.' });
     }
 
-    // Persist so the answer key is available at submit time (T-0017). If the
+    // Persist so the answer key is available at submit time (T-0025). If the
     // insert races another attempt, fall back to the stored open row.
     const { data: inserted, error: insertError } = await supabase
       .from('assessments')

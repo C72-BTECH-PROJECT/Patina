@@ -1,6 +1,6 @@
-# T-0018 — assessment resume parse fallback (quiz from stored NLP result + JD)
+# T-0026 — assessment resume parse fallback (quiz from stored NLP result + JD)
 
-> Follow-up to T-0016/T-0017 (generate + evaluate). User report: the quiz
+> Follow-up to T-0024/T-0025 (generate + evaluate). User report: the quiz
 > "asks to add resume every time" even after a resume was uploaded. Root cause
 > (traced 2026-10-15): `/api/resume/upload` only writes the raw file to
 > Storage (`candidates/{id}/resume{ext}`), while `generateAssessment` reads
@@ -101,7 +101,7 @@ and jd and make quiz … not need of putting resume every time."
 ## Result
 
 1. PASS — fresh account, generate with no file and no row → 400 "Upload a resume first" (tests/.out/t0018-prefix.log).
-2. PASS — post-fix, same account with a file-only upload: resumes 0→1 (preview 300 chars, file_ref candidates/{id}/resume.pdf); owner UI run 04:01 parsed resume.pdf → row ba4a2c79. (200-with-questions captured in the T-0019 flow rerun.)
+2. PASS — post-fix, same account with a file-only upload: resumes 0→1 (preview 300 chars, file_ref candidates/{id}/resume.pdf); owner UI run 04:01 parsed resume.pdf → row ba4a2c79. (200-with-questions captured in the T-0027 flow rerun.)
 3. PASS — second generate with the file unchanged → still 1 row (no re-parse).
 4. PASS — re-upload bumped storage updated_at → next generate re-parsed → 2 rows, newest created_at ≥ upload time.
 5. PASS — node tests/backend/assessment-generate.smoke.mjs 2/2 after the restart.

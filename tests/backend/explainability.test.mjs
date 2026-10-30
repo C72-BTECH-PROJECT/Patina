@@ -14,7 +14,7 @@ delete process.env.CREDIBILITY_WEIGHTS;
 const X = await import(
   new URL(`file:///${join(REPO_DIR, 'backend', 'Services', 'explainability.js').replace(/\\/g, '/')}`)
 );
-const { buildScoreRecord, buildGithubSubScore, SUBSCORE_KEYS } = X;
+const { buildScoreRecord, buildGithubSubScore, rebuildScoreRecord, GITHUB_REASONS, SUBSCORE_KEYS } = X;
 
 const NLP = JSON.parse(readFileSync(join(TESTS_DIR, 'nlp', 'snapshots', 'current', 'f1_dev_github.json'), 'utf8'));
 const FIXTURE = JSON.parse(readFileSync(join(TESTS_DIR, 'backend', 'fixtures', 'github-evidence-example-mokafor.json'), 'utf8'));
@@ -169,6 +169,79 @@ test('does not claim there are no contradictions', () => {
   for (const r of [record, buildScoreRecord(NLP)]) {
     assert.doesNotMatch(JSON.stringify(r), /no contradictions/i);
   }
+});
+
+// T-0023: GitHub and assessment together. Shape of a completed assessment's
+// `assessments.evaluation` as assessment-service returns it (T-0025).
+const EVALUATION = {
+  score: 62.5,
+  points_earned: 2.5,
+  points_possible: 4,
+  short_answer_graded: true,
+  results: [
+    { question_type: 'mcq', points: 1, max_points: 1 },
+    { question_type: 'mcq', points: 0, max_points: 1 },
+    { question_type: 'mcq', points: 1, max_points: 1 },
+    { question_type: 'short_answer', points: 0.5, max_points: 1 },
+  ],
+};
+const weightSum = (record) => Object.values(record.weights).reduce((sum, w) => sum + w, 0);
+const weightedSum = (record) =>
+  Object.values(record.subscores).reduce((sum, s) => sum + (s.available ? s.value * s.weight : 0), 0);
+
+test('combines parsing, GitHub and assessment when each is available', () => {
+  const all = buildScoreRecord(NLP, { github: GITHUB_OK, assessmentEvaluation: EVALUATION });
+  for (const key of [P, G, A]) assert.equal(all.subscores[key].available, true, key);
+  near(all.weights[P], 0.40, 1e-4, 'parsing weight');
+  near(all.weights[G], 0.35, 1e-4, 'github weight');
+  near(all.weights[A], 0.25, 1e-4, 'assessment weight');
+  assert.equal(all.subscores[A].value, 62.5);
+  assert.equal(all.evidence_limited, false, 'all three sources present');
+  assert.equal(all.explanation.factors.length, 3);
+
+  const githubOnly = buildScoreRecord(NLP, { github: GITHUB_OK });
+  assert.equal(githubOnly.subscores[A].available, false);
+  assert.equal(githubOnly.weights[A], 0);
+
+  const assessmentOnly = buildScoreRecord(NLP, { github: { ok: false, reasonCode: 'timeout' }, assessmentEvaluation: EVALUATION });
+  assert.equal(assessmentOnly.subscores[G].available, false);
+  assert.equal(assessmentOnly.subscores[G].components.reason_code, 'timeout');
+  near(assessmentOnly.weights[P], 0.40 / 0.65, 1e-4, 'parsing weight');
+  near(assessmentOnly.weights[A], 0.25 / 0.65, 1e-4, 'assessment weight');
+
+  for (const [name, record] of Object.entries({ all, githubOnly, assessmentOnly })) {
+    near(weightSum(record), 1, 1e-3, `${name}: weights sum to 1`);
+    near(record.composite, weightedSum(record), 0.01, `${name}: composite is the weighted sum`);
+  }
+});
+
+test('rebuildScoreRecord keeps the stored GitHub sub-score', () => {
+  // As persisted: a JSON round trip of scores.subscores from an analyze with GitHub.
+  const stored = JSON.parse(JSON.stringify(buildScoreRecord(NLP, { github: GITHUB_OK }).subscores));
+  const rebuilt = rebuildScoreRecord(stored, EVALUATION);
+
+  const { weight: _w, ...githubAfter } = rebuilt.subscores[G];
+  const { weight: _s, ...githubBefore } = JSON.parse(JSON.stringify(stored[G]));
+  assert.deepEqual(githubAfter, githubBefore, 'value, components and evidence unchanged');
+  assert.equal(rebuilt.subscores[A].available, true);
+  near(rebuilt.weights[G], 0.35, 1e-4, 'github weight');
+  near(weightSum(rebuilt), 1, 1e-3, 'weights sum to 1');
+  near(rebuilt.composite, weightedSum(rebuilt), 0.01, 'composite is the weighted sum');
+});
+
+test('rebuildScoreRecord on a score stored without a GitHub entry', () => {
+  const stored = JSON.parse(JSON.stringify(buildScoreRecord(NLP).subscores));
+  delete stored[G];
+  const rebuilt = rebuildScoreRecord(stored, EVALUATION);
+  const sub = rebuilt.subscores[G];
+  assert.equal(sub.available, false);
+  assert.equal(sub.weight, 0);
+  assert.equal(sub.components.reason_code, 'not_collected_for_score');
+  assert.equal(sub.reason, GITHUB_REASONS.not_collected_for_score);
+  assert.match(sub.reason, /before GitHub evidence was collected/);
+  assert.match(sub.reason, /Re-analysing the resume would include it/);
+  assert.doesNotMatch(sub.reason, /not part of this deployment/);
+  near(weightSum(rebuilt), 1, 1e-3, 'weights sum to 1');
 });
 
 test('every factor has an evidence array', () => {

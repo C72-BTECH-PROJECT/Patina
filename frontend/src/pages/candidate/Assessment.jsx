@@ -13,7 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
-// T-0017: candidates answer a generated assessment and submit it for
+// T-0025: candidates answer a generated assessment and submit it for
 // server-side scoring. MCQs are graded against the answer key, short
 // answers by rubric; the result folds into their credibility score.
 function Assessment() {

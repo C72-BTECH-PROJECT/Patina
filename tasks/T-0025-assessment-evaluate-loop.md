@@ -1,6 +1,6 @@
-# T-0017 — assessment evaluate loop (persist + score)
+# T-0025 — assessment evaluate loop (persist + score)
 
-> Follow-up to T-0016 (generate-only). Adds evaluation, persistence and the
+> Follow-up to T-0024 (generate-only). Adds evaluation, persistence and the
 > assessment pillar in the composite score.
 
 ## Goal
@@ -81,7 +81,7 @@ eliminated — questions stay generated per attempt).
 
 1. PASS — live evaluate as Myuser (job a103c197): 200 with score 30.00 and per-question results (3 of 10 correct).
 2. PASS — assessments row persisted with status completed; scores row fd263c50 rebuilt with the evaluation.
-3. PASS — generate strips answer_key; the candidate payload is questions-only (stripKey in the controller; verified by T-0016 curl — no answer_key reaches the browser).
+3. PASS — generate strips answer_key; the candidate payload is questions-only (stripKey in the controller; verified by T-0024 curl — no answer_key reaches the browser).
 4. PASS — scores row shows assessment_results value 30 available:true, composite 51.34; candidate-analysis returns a non-null assessmentScore.
 5. PASS — owner UI-tested: took the quiz, submitted, saw the score % with per-question feedback.
 6. FAIL — recruiter-dashboard render not directly checked in this task (data path proven by 4; owner to confirm in the UI).

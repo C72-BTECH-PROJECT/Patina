@@ -1,4 +1,4 @@
-# T-0016 — assessment-generate-only
+# T-0024 — assessment-generate-only
 
 > Generate-only wiring: assessment-service → Express → candidate UI.
 > No persistence, no score integration, no DB writes of any kind.

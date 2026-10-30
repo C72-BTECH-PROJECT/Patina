@@ -1,6 +1,6 @@
-# T-0019 — five quiz attempts per candidate per job (latest score counts)
+# T-0027 — five quiz attempts per candidate per job (latest score counts)
 
-> Follow-up to T-0017 (evaluate loop), which shipped "one attempt per job".
+> Follow-up to T-0025 (evaluate loop), which shipped "one attempt per job".
 > User directive 2026-10-15: "give 5 attempts for quiz to 1 user per job" +
 > "dont take best score take latest score for credibility".
 
@@ -13,7 +13,7 @@ score always reflects their **latest** submitted attempt (not the best).
 
 CHECKLIST 5.3 (take assessment), 3.7 (sequence), 4.1 (composite uses latest
 assessment evidence). Direct user directive (2026-10-15) supersedes the
-T-0017 one-attempt scope note.
+T-0025 one-attempt scope note.
 
 ## Scope
 
@@ -46,18 +46,18 @@ T-0017 one-attempt scope note.
 3. One-open-attempt invariant holds (second generate while open resumes it)
    — checked by: regression — open attempt still resumes (script asserts
    same assessmentId when generate is called with an open attempt? —
-   covered by existing T-0017 behavior; re-checked by smoke + code path
+   covered by existing T-0025 behavior; re-checked by smoke + code path
    unchanged ordering).
 4. Latest score counts: after evaluate, score fold uses the just-submitted
    (latest) attempt — checked by: `assessments` row + log line
-   `score … rebuilt` after evaluate (mechanism unchanged from T-0017).
+   `score … rebuilt` after evaluate (mechanism unchanged from T-0025).
 5. `node --check backend/Controllers/assessment.controller.js` passes;
    smoke `node tests/backend/assessment-generate.smoke.mjs` 2/2.
 
 ## Test plan
 
 - `tests/.out/t0019-repro.mjs` (one-off, logs `tests/.out/t0019-*.log`):
-  fresh test account, upload fixture (T-0018 fallback parses on demand),
+  fresh test account, upload fixture (T-0026 fallback parses on demand),
   2 real generate+evaluate cycles (MCQ-only answers → deterministic fast
   evaluate), SQL-insert 3 completed rows, final generate → 409.
 - Frontend: user UI-tests retake button + limit message.
@@ -65,7 +65,7 @@ T-0017 one-attempt scope note.
 ## Regression
 
 - `node tests/backend/assessment-generate.smoke.mjs` (401 guards).
-- T-0018 parse fallback untouched (same resolve helper).
+- T-0026 parse fallback untouched (same resolve helper).
 
 ## Risks and rollback
 
@@ -81,6 +81,6 @@ T-0017 one-attempt scope note.
 
 1. PENDING — t0019 flow rerun in progress (generate → evaluate → regenerate → expect 200 + new assessmentId).
 2. PENDING — same run (5 completed rows → expect 409 with attempts 5/5 and the latest score).
-3. PASS — open-attempt resume path unchanged from T-0017; 401-guard smoke intact.
+3. PASS — open-attempt resume path unchanged from T-0025; 401-guard smoke intact.
 4. PASS — evaluate folds the just-submitted evaluation (= latest); analysis fold-in orders completed_at desc (code: assessment.controller.js evaluate block, analysis.controller.js assessment lookup).
 5. PASS — node --check clean; assessment-generate.smoke.mjs 2/2.

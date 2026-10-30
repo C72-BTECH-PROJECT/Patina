@@ -15,8 +15,9 @@
   current  = this repo, ports NLP 8000 / backend 5000 (HEAD hardcodes both).
   -Live adds tests\backend\live-analyze.test.mjs, which writes to the shared
   Supabase project (scoped to the t0001_ test accounts; see tests\README.md).
-  backend (current only, T-0014): explainability + github-evidence-client unit tests always;
-             -Live adds live-analyze-github.test.mjs, which binds a github-evidence stub on :8001.
+  backend (current only, T-0014): explainability + github-evidence-client unit tests and the
+             assessment route-guard smoke (T-0023) always; -Live adds live-analyze-github.test.mjs,
+             which binds a github-evidence stub on :8001, and assessment-evaluate-live.test.mjs.
   docs    = tests\docs\check-trackers.mjs (T-0008): CHECKLIST/AUDIT/CLAUDE.md drift check.
              Read-only, starts no services, always checks the current repo's files.
   github   = tests\github (T-0011): the github-evidence service against recorded and synthetic
@@ -110,13 +111,17 @@ try {
       foreach ($f in 'explainability', 'github-evidence-client') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
+      # T-0024/T-0025 route guards (T-0023): no session, no assessment service, no LLM. Baseline has no route.
+      $files += (Join-Path $tests 'backend\assessment-generate.smoke.mjs')
     }
     if ($Live) {
       $files += (Join-Path $tests 'backend\live-analyze.test.mjs')
       # T-0014: analyze with a github-evidence stub on :8001 (needs :8001 free). Not in baseline.
       if ($Target -eq 'current') { $files += (Join-Path $tests 'backend\live-analyze-github.test.mjs') }
+      # T-0025 evaluate input guards (no LLM call, no writes). Not in baseline.
+      if ($Target -eq 'current') { $files += (Join-Path $tests 'backend\assessment-evaluate-live.test.mjs') }
       # Cross-user authorization tests (T-0004..T-0007); they skip if the second accounts are not in tests\.env.
-      foreach ($f in 'live-shortlist-authz', 'live-notifications-authz', 'live-auth-failclosed', 'live-analysis-isolation', 'assessment-evaluate-live') {
+      foreach ($f in 'live-shortlist-authz', 'live-notifications-authz', 'live-auth-failclosed', 'live-analysis-isolation') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
     }

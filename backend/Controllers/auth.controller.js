@@ -282,35 +282,17 @@ export const login = async (req, res) => {
   const trimmedUsername = String(username).trim();
   console.log(`Login attempt for username: ${trimmedUsername}`);
 
-  let profile = null;
-  let profileError = null;
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, role, is_suspended')
+    .ilike('username', trimmedUsername)
+    .maybeSingle();
 
-  try {
-    const profileResult = await supabase
-      .from('profiles')
-      .select('id, role, is_suspended')
-      .ilike('username', trimmedUsername)
-      .maybeSingle();
-    profile = profileResult.data;
-    profileError = profileResult.error;
-  } catch (e) {
-    profileError = e;
-  }
-
-  if (!profile && !profileError) {
-    const { data: authUsersList } = await supabase.auth.admin.listUsers();
-    const matchedAuthUser = (authUsersList?.users || []).find((u) => {
-      const metaUsername = u.user_metadata?.username || u.raw_user_meta_data?.username;
-      return String(metaUsername || '').toLowerCase() === trimmedUsername.toLowerCase();
+  if (profileError) {
+    console.error('Login profile lookup failed:', profileError.message);
+    return res.status(503).json({
+      message: 'Authentication setup is incomplete. Apply the Supabase migrations and try again.',
     });
-
-    if (matchedAuthUser) {
-      profile = {
-        id: matchedAuthUser.id,
-        role: matchedAuthUser.user_metadata?.role || matchedAuthUser.raw_user_meta_data?.role || 'candidate',
-        is_suspended: false,
-      };
-    }
   }
 
   if (!profile) {
@@ -361,28 +343,7 @@ export const login = async (req, res) => {
     return res.status(401).json({ message: 'Invalid username or password. If you just signed up, confirm your email first.' });
   }
 
-  let fullProfile = null;
-  try {
-    fullProfile = await loadProfile(signInData.user.id);
-  } catch (e) {
-    console.error('Login profile load failed after sign-in:', e.message);
-  }
-
-  if (!fullProfile) {
-    const meta = authUser.user.user_metadata || authUser.user.raw_user_meta_data || {};
-    fullProfile = {
-      id: signInData.user.id,
-      username: meta.username || trimmedUsername,
-      first_name: meta.first_name || '',
-      last_name: meta.last_name || '',
-      role: profile.role || meta.role || 'candidate',
-      phone: '',
-      github_url: '',
-      company_name: meta.company_name || '',
-      verification_info: meta.verification_info || '',
-    };
-  }
-
+  const fullProfile = await loadProfile(signInData.user.id);
   req.session.userId = signInData.user.id;
   req.session.email = signInData.user.email;
   req.session.role = fullProfile.role.toUpperCase();
