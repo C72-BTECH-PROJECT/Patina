@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import supabase from '../Config/supabase.js';
 import { getSupabaseAuth } from '../Config/supabaseAuth.js';
+import { ensureProfileOrRollback } from '../Services/signupProfile.js';
 
 const ALLOWED_ROLES = new Set(['candidate', 'recruiter']);
 const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,30}$/;
@@ -254,18 +255,12 @@ export const signup = async (req, res) => {
   if (error) return res.status(400).json({ message: error.message });
   if (!data.user) return res.status(500).json({ message: 'Account creation did not return a user.' });
 
-  const { error: profileError } = await supabase.from('profiles').insert({
-    id: data.user.id,
-    username: normalizedUsername,
-    first_name: firstName,
-    last_name: lastName,
-    role: normalizedRole,
-    company_name: companyName || '',
-    verification_info: verificationInfo || '',
-  });
-
-  if (profileError) {
-    console.error('Signup profile insert failed:', profileError.message);
+  // T-0029 (I-0058, I-0017): the on_auth_user_created trigger is the only
+  // writer of the profiles row. Signup succeeds only if that row exists;
+  // otherwise the auth user is deleted, so no account can exist without a profile.
+  const profile = await ensureProfileOrRollback(supabase, data.user);
+  if (!profile.ok) {
+    return res.status(500).json({ message: 'Signup failed. Please try again.' });
   }
 
   return res.status(201).json({

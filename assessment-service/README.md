@@ -239,39 +239,42 @@ assessment-service\.venv\Scripts\python -m pip install -r assessment-service\req
 Create `assessment-service/.env` from `.env.example` and set
 `OPENROUTER_API_KEY` before starting the server.
 
-### 10.3 Start the FastAPI service with uvicorn
+### 10.3 Start the service
 
-Run from the **repo root**. `--app-dir assessment-service` puts the service on
-`sys.path` so `app.main:app` resolves.
+The service is **internal only** (T-0029, DEC-5): the backend calls it, the
+browser never does. It binds `127.0.0.1:8002`, the address the backend uses by
+default (`ASSESSMENT_SERVICE_URL` in `backend/.env.example`). `/docs`, `/redoc`
+and `/openapi.json` are off.
+
+Run from `assessment-service/`:
 
 ```powershell
-# With the venv activated:
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --app-dir assessment-service
-
-# Or without activating:
-assessment-service\.venv\Scripts\python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --app-dir assessment-service
+cd assessment-service
+.\.venv\Scripts\python -m app
 ```
 
-- `--reload` auto-restarts on code changes (development only; drop it for prod).
-- `--host 0.0.0.0` instead of `127.0.0.1` exposes the service on the LAN.
+`python -m app` runs `app/__main__.py`, which reads `ASSESSMENT_HOST` (default
+`127.0.0.1`) and `ASSESSMENT_PORT` (default `8002`) from `app/config.py`. Do not
+bind `0.0.0.0`: nothing outside this machine should reach the service directly.
+
+For development with auto-reload, from the repo root:
+
+```powershell
+assessment-service\.venv\Scripts\python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8002 --app-dir assessment-service
+```
 
 Once running:
 
-- Health check: `http://127.0.0.1:8000/`
-- Interactive docs: `http://127.0.0.1:8000/docs`
-- Assessment endpoint: `POST http://127.0.0.1:8000/generate-assessment`
+- Health check: `http://127.0.0.1:8002/`
+- Assessment endpoints (called by the backend only): `POST /generate-assessment`,
+  `POST /evaluate-assessment`
 
-### 10.4 Alternative: run from inside the folder
-
-If you prefer to `cd` into `assessment-service/`, the `--app-dir` flag is no
-longer needed:
+### 10.4 Tests
 
 ```powershell
-uvicorn app.main:app --reload --port 8000
+assessment-service\.venv\Scripts\python -m pip install -r assessment-serviceequirements-dev.txt
+powershell -File testsun-suite.ps1 -Target current -Suites assessment
 ```
-
-Then open `http://127.0.0.1:8000/` for the health check, or POST to
-`/generate-assessment`.
 
 ---
 

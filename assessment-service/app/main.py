@@ -14,6 +14,10 @@ app = FastAPI(
         "candidate questions and server-side answer keys."
     ),
     version="1.0.0",
+    # T-0029 (I-0061, DEC-5): internal service, no interactive docs or schema.
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 

@@ -23,11 +23,17 @@
   github   = tests\github (T-0011): the github-evidence service against recorded and synthetic
              GitHub responses only. Own venv (github-evidence\venv), own pytest call, no services
              started, and pytest-socket blocks every non-loopback connection. Skipped for baseline.
+  assessment = tests\assessment (T-0029): assessment-service in process (TestClient, no port, no LLM):
+             docs off, 127.0.0.1:8002 bind. Own venv (assessment-service\.venv), own pytest call.
+             Skipped for baseline.
+  backend (T-0029): migration-guards, signup-profile and grading-claim (offline) always; -Live adds
+             live-resume-authz, live-answer-key-access, live-evaluate-once (needs :8002),
+             live-evaluate-release (runs only with :8002 down) and live-signup-role (needs M1 applied).
   Logs go to tests\.out\ (git-ignored).
 #>
 param(
   [Parameter(Mandatory = $true)][ValidateSet('baseline', 'current')][string]$Target,
-  [ValidateSet('nlp', 'backend', 'frontend', 'docs', 'github')][string[]]$Suites = @('nlp', 'backend', 'frontend', 'docs', 'github'),
+  [ValidateSet('nlp', 'backend', 'frontend', 'docs', 'github', 'assessment')][string[]]$Suites = @('nlp', 'backend', 'frontend', 'docs', 'github', 'assessment'),
   [switch]$Live
 )
 
@@ -108,7 +114,7 @@ try {
     # Offline unit tests (T-0014): explainability layer and the github-evidence client against a
     # local stub. They import this repo's backend modules, so they mean nothing for baseline.
     if ($Target -eq 'current') {
-      foreach ($f in 'explainability', 'github-evidence-client') {
+      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
       # T-0024/T-0025 route guards (T-0023): no session, no assessment service, no LLM. Baseline has no route.
@@ -123,6 +129,12 @@ try {
       # Cross-user authorization tests (T-0004..T-0007); they skip if the second accounts are not in tests\.env.
       foreach ($f in 'live-shortlist-authz', 'live-notifications-authz', 'live-auth-failclosed', 'live-analysis-isolation') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
+      }
+      # T-0029 security batch (B1). Not in baseline. They skip without their accounts or services.
+      if ($Target -eq 'current') {
+        foreach ($f in 'live-resume-authz', 'live-answer-key-access', 'live-evaluate-once', 'live-evaluate-release', 'live-signup-role') {
+          $files += (Join-Path $tests "backend\$f.test.mjs")
+        }
       }
     }
     & node --test --test-concurrency=1 @files 2>&1 | Tee-Object (Join-Path $out "$Target-backend-tests.log")
@@ -151,6 +163,20 @@ try {
       $ghTests = Join-Path $tests 'github'
       & cmd.exe /c "`"$ghPython`" -m pytest `"$ghTests`" -v -p no:cacheprovider --allow-hosts=127.0.0.1,::1 2>&1" | Tee-Object (Join-Path $out "$Target-github.log")
       $results['github'] = $LASTEXITCODE
+    }
+  }
+
+  if ($Suites -contains 'assessment') {
+    Write-Host "== assessment suite (in process, no LLM)"
+    if (-not (Test-Path (Join-Path $tree 'assessment-service'))) {
+      Write-Host "skipped (no assessment-service in $Target)"
+      $results['assessment'] = 0
+    } else {
+      $asPython = Join-Path $repo 'assessment-service\.venv\Scripts\python.exe'
+      if (-not (Test-Path $asPython)) { throw "assessment-service venv missing: python -m venv assessment-service\.venv; assessment-service\.venv\Scripts\python -m pip install -r assessment-service\requirements-dev.txt" }
+      $asTests = Join-Path $tests 'assessment'
+      & cmd.exe /c "`"$asPython`" -m pytest `"$asTests`" -v -p no:cacheprovider 2>&1" | Tee-Object (Join-Path $out "$Target-assessment.log")
+      $results['assessment'] = $LASTEXITCODE
     }
   }
 

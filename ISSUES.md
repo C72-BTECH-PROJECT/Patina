@@ -28,7 +28,6 @@ diff you're already writing.
 | I-0010 | Supabase Preview check fails on `main`; fixing it naively turns on auto-apply of migrations to production — **decision needed** | `supabase/migrations/`, Supabase GitHub integration | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0012 | HEAD frontend reads `import.meta.env.VITE_*` under CRA; 5 pages hardcode `localhost:5000` | `frontend/src/**` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0016 | Signup rejects one-word "Full Name" with a misleading "all fields required" message | `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
-| I-0017 | Signup's explicit `profiles` insert duplicates the `on_auth_user_created` trigger and logs a pkey error on every signup | `backend/Controllers/auth.controller.js` | P3 | OPEN | 2026-10-12, T-0001 |
 | I-0025 | `multer.memoryStorage()` without `limits`: upload size is unbounded and buffered in memory | `backend/Controllers/analysis.controller.js` | P2 | OPEN | 2026-10-12, T-0002 |
 | I-0026 | Landing page's hardcoded demo score and "10000+ verified" stats read as real data | `frontend/src/pages/public/Landing.jsx` | P3 | OPEN | 2026-10-12, T-0002 |
 | I-0027 | 404 handler always says "Cannot GET", whatever the method | `backend/index.js` | P3 | OPEN | 2026-10-12, T-0003 |
@@ -56,21 +55,15 @@ diff you're already writing.
 | I-0052 | A résumé whose GitHub link is only a hyperlink annotation behind the text "GitHub" gets `no_github_link`: the NLP text extraction does not read PDF link annotations | `nlp-engine/app` (extraction), `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-10-15, T-0014 manual check |
 | I-0053 | Recruiter's per-job list drops a candidate whose latest score is for another job | `backend/Controllers/analysis.controller.js`, `frontend/src/pages/recruiter/JobDetails.jsx` | P2 | OPEN | 2026-10-15, T-0016 |
 | I-0054 | Recruiter Jobs page always shows "0 Applications Total" | `frontend/src/pages/recruiter/Jobs.jsx` | P3 | OPEN | 2026-10-15, T-0016 |
-| I-0055 | `handle_new_user()` copies the role from signup metadata into `profiles.role`: a direct GoTrue signup with the public anon key can create an `admin` profile — **HIGH** | `supabase/migrations/20260823_create_profiles.sql` | P0 | OPEN | 2026-10-31, T-0023 |
-| I-0056 | Any RECRUITER can fetch a signed URL for any candidate's résumé by id (no applied-to-my-job check, `candidateId` not validated) | `backend/Controllers/analysis.controller.js`, `backend/Routes/analysis.routes.js` | P0 | OPEN | 2026-10-31, T-0023 |
 | I-0057 | Duplicate migration version prefixes (`20260903_*` ×2, `20261015_*` ×2) can break or skip migrations on `db push` — high priority | `supabase/migrations/` | P1 | OPEN | 2026-10-31, T-0023 |
-| I-0058 | Auth users can exist with no `profiles` row: `signup()` returns 201 when the profile insert fails; main's `login()` workaround for it was dropped in T-0023 — medium, defence in depth | `backend/Controllers/auth.controller.js` | P1 | OPEN | 2026-10-31, T-0023 |
 | I-0059 | `ner.py` and `preprocessor.py` fall back to a hardcoded Windows `venv/Lib/site-packages/...` spaCy model path | `nlp-engine/app/ner.py`, `nlp-engine/app/preprocessor.py` | P2 | OPEN | 2026-10-31, T-0023 |
-| I-0060 | assessment-service README starts it on :8000 (NLP's port); backend default is :8002 and `ASSESSMENT_SERVICE_URL` is not in `backend/.env.example` | `assessment-service/README.md`, `backend/Controllers/assessment.controller.js` | P2 | OPEN | 2026-10-31, T-0023 |
-| I-0061 | assessment-service leaves FastAPI `/docs`, `/redoc`, `/openapi.json` on (DEC-5: internal services turn them off) | `assessment-service/app/main.py` | P2 | OPEN | 2026-10-31, T-0023 |
 | I-0062 | Backend calls assessment-service with raw `fetch`, not `Services/internalHttp.js` (no request-id propagation, own timeout/retry handling) | `backend/Controllers/assessment.controller.js` | P2 | OPEN | 2026-10-31, T-0023 |
 | I-0063 | `getAllApplications` selects `profiles.email`, which does not exist: every profile read errors silently and each applicant costs an Auth Admin `getUserById` call | `backend/Controllers/jobs.controller.js` | P2 | OPEN | 2026-10-31, T-0023 |
 | I-0064 | WORKLOG.md is past its ~400-line archive threshold (451 lines after T-0023) | `WORKLOG.md` | P3 | OPEN | 2026-10-31, T-0023 |
 | I-0065 | Score rows stored before T-0014 keep the stale `service_disabled` GitHub text ("not part of this deployment yet") when an assessment rebuilds them | `backend/Services/explainability.js` | P3 | OPEN | 2026-10-31, T-0023 |
-| I-0066 | `assessments` RLS lets a candidate SELECT their own row including `answer_key`; assessment-service hands `answer_key` to any unauthenticated caller | `supabase/migrations/20261015_create_assessments.sql`, `assessment-service/app/main.py` | P0 | OPEN | 2026-10-31, T-0023 |
 | I-0067 | Short-answer grading prompt embeds candidate text with no untrusted-input rule, and grading output is not schema-checked: a crafted answer can steer its own grade | `assessment-service/app/prompts.py`, `assessment-service/app/evaluator.py` | P1 | OPEN | 2026-10-31, T-0023 |
 | I-0068 | Frontend CI build fails on 4 more lint warnings from `main` (CandidateLayout, RecruiterLayout, AllCandidates ×2), on top of the 5 known; `AllCandidates.jsx` reads `import.meta.env` under CRA (I-0012 pattern) | `frontend/src/**` | P2 | OPEN | 2026-10-31, T-0023 |
-| I-0069 | Two concurrent submits of one attempt can both be graded; the second's result is returned and folded into the score but never saved | `backend/Controllers/assessment.controller.js` | P2 | OPEN | 2026-10-31, T-0023 |
+| I-0071 | `live-shortlist-authz` control test expects no notification on reject; `3f53f80` added a "rejected" notification, so the test fails (stale test or unintended behaviour) | `tests/backend/live-shortlist-authz.test.mjs`, `backend/Controllers/jobs.controller.js` | P2 | OPEN | 2026-11-04, T-0029 |
 
 ---
 
@@ -110,7 +103,7 @@ management API in a migration script).
 ---
 
 ### I-0004 — AI-cruft / hallucinated entries in `SKILL_KEYWORDS`
-**Status:** OPEN — partly fixed (re-verified T-0028 at `df98068`): the duplicate "typescript" is gone (`nlp-engine/app/ner.py:14`); "exponentjs" (`:59`), "r language" (`:16`) and "mern stack" (`:34`) remain. Planned in ROADMAP P0-3 (B3).
+**Status:** OPEN — partly fixed (re-verified T-0028 at `df98068`): the duplicate "typescript" is gone (`nlp-engine/app/ner.py:14`); "exponentjs" (`:59`), "r language" (`:16`) and "mern stack" (`:34`) remain. Planned in ROADMAP P3-2 (moved from B3 in T-0028).
 **Severity:** P3
 **Module:** `nlp-engine/app/ner.py` (lines 6-54, `SKILL_KEYWORDS`)
 **Spec ref:** n/a (data-quality cleanup, not a feature)
@@ -186,6 +179,10 @@ new, related gap was found in its place.
   20261015 migrations as "applied"). Not re-checked against the remote
   history table (needs dashboard/CLI access). Duplicate version prefixes are
   tracked separately in I-0057.
+- **Update 2026-11-04 (T-0029):** the reverse drift now exists too. The four
+  T-0029 migrations (`20261103120000`..`20261103120300`) are applied by hand in
+  the SQL editor and absent from `supabase_migrations.schema_migrations`. B2's
+  repair marks them applied; see I-0057. History not changed now (owner).
 **Impact:** Today the integration fails at statement 0, so nothing is
 applied. Once the migrations succeed (e.g. someone makes them idempotent),
 **every merge to `main` will auto-apply schema changes to the shared
@@ -289,25 +286,6 @@ required" with every visible field filled.
 **Proposed fix:** Either accept a single-word name (empty `last_name`), or split
 the form into First/Last fields with a specific validation message. Not
 fixed in T-0001.
-
----
-
-### I-0017 — Signup's explicit `profiles` insert duplicates the DB trigger
-**Status:** OPEN
-**Severity:** P3 (log noise; profile data correct)
-**Module:** `backend/Controllers/auth.controller.js`
-**Spec ref:** n/a
-**Evidence:** Creating `t0001_cand` / `t0001_recr` through the baseline API
-(2026-10-12) returned 201, and the backend logged
-`Signup profile insert failed: duplicate key value violates unique constraint "profiles_pkey"`
-twice (`tests/.out/signup-backend.err.log`). The trigger
-`on_auth_user_created` (`supabase/migrations/20260823_create_profiles.sql`,
-`after insert on auth.users` → `insert into public.profiles`) already creates
-the row from signup metadata. The controller then inserts the same `id` again
-(HEAD `auth.controller.js:168-180`, baseline `:255-268`), and that error is
-only logged. The resulting profiles had correct username, role and names.
-**Impact:** A misleading error on every signup. If the trigger and the insert ever diverge, the insert's values are silently dropped.
-**Proposed fix:** Remove the controller insert, or make it an `upsert` and handle the error.
 
 ---
 
@@ -608,7 +586,7 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Proposed fix:** Reword §1.6 to "`pytest-socket --allow-hosts=127.0.0.1,::1`".
 
 ### I-0045 — Later task specs point at ROADMAP §1.2 for content that moved
-**Status:** OPEN — partly fixed (re-verified T-0028 at `df98068`): T-0014 now names `github-evidence/README.md`; T-0015's cites are timeout cites that still resolve; `tasks/T-0012-github-evidence-metrics.md:22` still points at §1.2 for the contract. Planned in ROADMAP P0-6 (B6).
+**Status:** OPEN — partly fixed (re-verified T-0028 at `df98068`): T-0014 now names `github-evidence/README.md`; T-0015's cites are timeout cites that still resolve; `tasks/T-0012-github-evidence-metrics.md:22` still points at §1.2 for the contract. Planned in ROADMAP P0-6 (B6a).
 **Severity:** P3
 **Module:** `tasks/`
 **Evidence:** T-0011 moved the service contract, error table, service timeouts and service env vars from ROADMAP §1.2 to `github-evidence/README.md`. `tasks/T-0012-github-evidence-metrics.md:23` ("as in ROADMAP §1.2"), `tasks/T-0014-core-github-integration.md:34,189` and `tasks/T-0015-github-outage-probe.md:26,36,78` still cite §1.2. §1.2 keeps only the core-side timeouts and variables (`GITHUB_EVIDENCE_URL`, `GITHUB_EVIDENCE_TIMEOUT_MS`), so the timeout cites (`T-0014:189`, `T-0015`) still resolve; the contract cites (`T-0012:23`, `T-0014:34`) do not.
@@ -667,29 +645,6 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Impact:** the recruiter sees 0 applications for every job, even when candidates applied.
 **Proposed fix:** P2-5 (merged application-centric dashboard) shows the real count.
 
-### I-0055 — `handle_new_user()` trusts the role in signup metadata (HIGH)
-**Status:** OPEN — own spec right after the T-0023 merge (owner, 2026-10-31); not fixed in T-0023
-**Severity:** P0 (security: privilege escalation)
-**Module:** `supabase/migrations/20260823_create_profiles.sql`
-**Spec ref:** CHECKLIST 0.5 area (auth/roles); n/a for a numbered item
-**Evidence (read 2026-10-31, T-0023):**
-- The trigger inserts `(new.raw_user_meta_data ->> 'role')::public.patina_user_role` into `profiles.role` (`supabase/migrations/20260823_create_profiles.sql:58`), fired `after insert on auth.users` (`:68-70`). The enum has included `admin` since `20260831_add_single_admin_role.sql:5`.
-- The backend's `signup()` limits the role to `candidate`/`recruiter` (`backend/Controllers/auth.controller.js:6`, `:218`), but that only guards the backend path. GoTrue's `/auth/v1/signup` accepts arbitrary `options.data` from anyone holding the anon key.
-- The anon key is designed to be public in Supabase's model. Today it is only in `backend/.env` (no Supabase client in `frontend/src`), but this must not depend on the key staying secret.
-**Impact:** anyone with the anon key can sign up with `role: 'admin'` and get an admin profile while no admin exists (the unique index `profiles_single_admin_role` blocks a second one), or `recruiter` without going through the backend's checks. `requireRole('ADMIN')` then authorises them (`backend/Middlewares/auth.Middleware.js:41-46` reads the session role set from `profiles.role` at login).
-**Proposed fix:** `handle_new_user()` accepts only `'candidate'` and `'recruiter'` from metadata and rejects (raises on) anything else; `admin` is assigned only by the manual SQL path (`20260831_add_single_admin_role.sql:16`). New migration, idempotent, applied by hand per I-0010.
-
-### I-0056 — Any recruiter can fetch any candidate's résumé
-**Status:** OPEN (found in T-0023's delta-audit of `main`; not fixed — security fix needs owner approval)
-**Severity:** P0 (security: candidate PII exposure across recruiters)
-**Module:** `backend/Controllers/analysis.controller.js`, `backend/Routes/analysis.routes.js`
-**Spec ref:** CHECKLIST 5.x recruiter views; T-0004/T-0007 authorization pattern
-**Evidence (working tree after the T-0023 merge):**
-- `GET /api/resume/candidate/:candidateId` is `requireRole('RECRUITER')` only (`backend/Routes/analysis.routes.js:13`).
-- `getCandidateResume` (`backend/Controllers/analysis.controller.js:205-235`) lists `candidates/${candidateId}` and signs a 60 s URL (`:211`, `:224`) with no check that the candidate applied to one of the session recruiter's jobs, and `candidateId` from the URL is not validated as a UUID before it becomes a storage prefix.
-**Impact:** any recruiter account can download any candidate's résumé by id; candidate ids appear in other recruiter-facing responses.
-**Proposed fix:** require an `applications` row joining the candidate to a job with `recruiter_id = session.userId` (same shape as the shortlist check, `backend/Controllers/jobs.controller.js:271-279`); validate `candidateId` as a UUID; a live authz test like `live-analysis-isolation`.
-
 ### I-0057 — Duplicate migration version prefixes
 **Status:** OPEN — high priority
 **Severity:** P1
@@ -698,18 +653,7 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Evidence:** `supabase/migrations/` holds `20260903_create_notifications.sql` and `20260903_create_resumes_and_scores.sql`, and `20261015_allow_five_assessment_attempts.sql` and `20261015_create_assessments.sql`. The Supabase CLI takes the digits before the first `_` as the migration version, so each pair shares one version.
 **Impact:** `supabase db push` / branching can fail on a duplicate version in `schema_migrations`, or treat the second file of a pair as already applied and skip it. `20261015_allow_five_assessment_attempts` depends on `20261015_create_assessments`, so order inside a pair also matters.
 **Proposed fix:** rename to unique 14-digit timestamps preserving order (create before allow-five), then reconcile the remote history (`supabase migration repair`) by hand — touches applied migrations, so its own spec with the owner (I-0010 decision a).
-
-### I-0058 — Auth users with no `profiles` row; signup reports success anyway
-**Status:** OPEN — medium, defence in depth. The `login()` workaround `main` added for it was dropped in T-0023 (Anthony_V3's `login()` kept)
-**Severity:** P1
-**Module:** `backend/Controllers/auth.controller.js`
-**Spec ref:** n/a (auth robustness)
-**Evidence (read 2026-10-31, T-0023):**
-- Root cause: `signup()` inserts the profile (`backend/Controllers/auth.controller.js:257`) and on failure only logs (`:268`), then returns 201 (`:271`). A row is missing only when both the `handle_new_user` trigger and this insert failed, e.g. the trigger is not on the hosted DB (cf. I-0010's migration drift) and the insert hits the `lower(username)` unique index; users created in the dashboard also have none.
-- `main`'s workaround (`3f53f80`, dropped here): when no profile matched the username, `login()` called unpaginated `auth.admin.listUsers()` (first page only), matched `user_metadata.username` (plus `raw_user_meta_data`, which the JS user object never has), took the role from `user_metadata` and hard-coded `is_suspended: false`; it also turned the profile-lookup-error 503 into a 401.
-- Why it was not a live escalation: metadata is backend-written at signup with role ∈ {candidate, recruiter}; and a session for a user with no profile row is rejected on every request by `requireAuth` (`backend/Middlewares/auth.Middleware.js:11-28`), which also re-checks `is_suspended` by id. It becomes dangerous the moment `requireAuth` stops failing closed.
-**Impact:** such a user sees "Account created", then "Invalid username or password" at login, with no signal to anyone why.
-**Proposed fix:** `signup()` checks that a `profiles` row exists for `data.user.id` after the insert; if not, deletes the auth user (`auth.admin.deleteUser`) and returns 5xx with a clear message. No metadata fallback at login.
+**Update 2026-11-04 (T-0029):** the owner applied `20261103120000_restrict_signup_role`, `20261103120100_create_assessment_keys` and `20261103120200_assessment_grading_claim` in the SQL editor (2026-11-04), so `supabase_migrations.schema_migrations` does not record them: local files the remote history lacks, the opposite direction of I-0010's drift. `20261103120300_drop_assessments_answer_key` will follow the same way. B2's history repair must mark all four applied (`supabase migration repair --status applied 20261103120000 20261103120100 20261103120200 20261103120300`) and not re-run them. History left unchanged for now (owner decision).
 
 ### I-0059 — Hardcoded Windows venv model path in NLP
 **Status:** OPEN
@@ -718,21 +662,6 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Evidence:** `MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "venv", "Lib", "site-packages", "en_core_web_sm", "en_core_web_sm-3.8.0")` (`nlp-engine/app/ner.py:5`, `nlp-engine/app/preprocessor.py:7`), added on `main`.
 **Impact:** machine- and OS-specific (Windows `Lib/`, one venv name, one model version); a fallback like this hides a missing `en_core_web_sm` install instead of failing at boot.
 **Proposed fix:** load by package name (`spacy.load("en_core_web_sm")`) and fail loudly at startup if absent; install the model from `requirements.txt`.
-
-### I-0060 — assessment-service port mismatch
-**Status:** OPEN
-**Severity:** P2
-**Module:** `assessment-service/README.md`, `backend/Controllers/assessment.controller.js`, `backend/.env.example`
-**Evidence:** the README starts the service with `--port 8000` (`assessment-service/README.md:249`, `:252`, `:270`), which is the NLP port; the backend defaults `ASSESSMENT_SERVICE_URL` to `http://localhost:8002` (`backend/Controllers/assessment.controller.js:11-12`), and `backend/.env.example` does not name `ASSESSMENT_SERVICE_URL`.
-**Impact:** following the README either fails to bind (NLP running) or shadows NLP; the backend then gets connection errors on :8002.
-**Proposed fix:** README says :8002; add `ASSESSMENT_SERVICE_URL` to `backend/.env.example`; ARCHITECTURE port table.
-
-### I-0061 — assessment-service exposes FastAPI docs
-**Status:** OPEN
-**Severity:** P2
-**Module:** `assessment-service/app/main.py`
-**Evidence:** `FastAPI(title=..., description=..., version=...)` (`assessment-service/app/main.py:10-16`) leaves `docs_url`, `redoc_url`, `openapi_url` at their defaults; the README points at `/docs` (`assessment-service/README.md:261`). DEC-5 (ROADMAP) turns them off for internal services, as github-evidence does.
-**Proposed fix:** `docs_url=None, redoc_url=None, openapi_url=None`; drop the README line.
 
 ### I-0062 — assessment-service calls bypass `internalHttp.js`
 **Status:** OPEN
@@ -765,15 +694,6 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Impact:** after this merge, the recruiter can see "GitHub is not part of this deployment yet" on an old score that a new assessment just refreshed.
 **Proposed fix (owner decision):** also treat a stored GitHub entry that is unavailable and has no `components.reason_code` as `not_collected_for_score`.
 
-### I-0066 — The assessment answer key is readable outside the backend
-**Status:** OPEN (found in T-0023's delta-audit; not fixed — security fix needs owner approval; overlaps GR-1)
-**Severity:** P0 (security: lets a candidate cheat on their own assessment)
-**Module:** `supabase/migrations/20261015_create_assessments.sql`, `assessment-service/app/main.py`
-**Evidence (read 2026-10-31):**
-- RLS policy "Candidates can read their own assessments" is `for select to authenticated using ((select auth.uid()) = candidate_id)` (`supabase/migrations/20261015_create_assessments.sql:49-51`), with no column restriction, so it covers `answer_key`, which the open attempt stores at generation time (`backend/Controllers/assessment.controller.js:286`). A candidate who signs in to GoTrue directly with the public anon key (same reasoning as I-0055) can read the key for the attempt they are taking. The backend itself strips the key (`backend/Controllers/assessment.controller.js:21-24`, `:313`).
-- `POST /generate-assessment` returns `answer_key` to any caller (`assessment-service/app/main.py:33-38`, comment: "trusted development endpoint"), and the service has no authentication; it relies on binding to 127.0.0.1.
-**Proposed fix:** move `answer_key` to a table (or column privilege) with no `authenticated` SELECT grant, readable only by the service role; for the service, internal auth or network isolation per ARCHITECTURE §4 (gateway/containers).
-
 ### I-0067 — Grading can be steered by the answer being graded
 **Status:** OPEN (GR-1 / CHECKLIST 3.6; anti-cheat work is out of T-0023's scope)
 **Severity:** P1
@@ -789,15 +709,110 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Evidence:** `tests/.out/t0023-full-harness.log` frontend build (CI=true): the 5 known warnings (`CreateJob.jsx` ×2, `Jobs.jsx` ×3) plus `CandidateLayout.jsx:10` and `RecruiterLayout.jsx:8` (`navigate` unused) and `AllCandidates.jsx:4` (`Filter`, `ExternalLink` unused). `AllCandidates.jsx:8` sets `API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'` under Create React App, the pattern I-0012 describes.
 **Proposed fix:** remove the unused bindings; use `process.env.REACT_APP_API_BASE_URL` like the other pages (or the single API module from M2 / I-0012).
 
-### I-0069 — Concurrent submits of one assessment attempt
+### I-0071 — Shortlist control test disagrees with rejection notifications
 **Status:** OPEN
+**Severity:** P2
+**Module:** `tests/backend/live-shortlist-authz.test.mjs`, `backend/Controllers/jobs.controller.js`
+**Spec ref:** FR-14/FR-15 (recruiter decisions, candidate notification)
+**Evidence (2026-11-04, found in the T-0029 regression run, not caused by it):** the control test asserts that rejecting an application sends no notification (`tests/backend/live-shortlist-authz.test.mjs:106`). `3f53f80` (2026-10-15, T-0016..T-0019 from `main`) added `sendNotification(..., 'rejected', 'Your application has been rejected.')` (`backend/Controllers/jobs.controller.js:303-309`). The test was written in T-0004 (2026-10-12), before that. `tests/.out/t0029-after-full-backend.log` and the isolated rerun `tests/.out/t0029-shortlist-rerun.log`: `1 !== 0`, 10/11 pass. T-0029 changed neither file.
+**Impact:** the `-Live` backend suite is red for a reason unrelated to security; a real regression in shortlist ownership could hide behind a known failure.
+**Proposed fix:** owner decides whether candidates should be told about a rejection. If yes, update the control test to expect one `rejected` notification; if no, remove the call. Either way the I-0019 ownership checks in the same file stay as they are.
+
+## Resolved
+### I-0055 — `handle_new_user()` trusts the role in signup metadata (HIGH) (RESOLVED)
+**Status:** RESOLVED T-0029 (2026-11-04): signup role goes through `public.assert_signup_role()`; anything but candidate/recruiter raises 22023 and GoTrue rolls the user back
+**Severity:** P0 (security: privilege escalation)
+**Module:** `supabase/migrations/20260823_create_profiles.sql`
+**Spec ref:** CHECKLIST 0.5 area (auth/roles); n/a for a numbered item
+**Evidence (read 2026-10-31, T-0023):**
+- The trigger inserts `(new.raw_user_meta_data ->> 'role')::public.patina_user_role` into `profiles.role` (`supabase/migrations/20260823_create_profiles.sql:58`), fired `after insert on auth.users` (`:68-70`). The enum has included `admin` since `20260831_add_single_admin_role.sql:5`.
+- The backend's `signup()` limits the role to `candidate`/`recruiter` (`backend/Controllers/auth.controller.js:6`, `:218`), but that only guards the backend path. GoTrue's `/auth/v1/signup` accepts arbitrary `options.data` from anyone holding the anon key.
+- The anon key is designed to be public in Supabase's model. Today it is only in `backend/.env` (no Supabase client in `frontend/src`), but this must not depend on the key staying secret.
+**Impact:** anyone with the anon key can sign up with `role: 'admin'` and get an admin profile while no admin exists (the unique index `profiles_single_admin_role` blocks a second one), or `recruiter` without going through the backend's checks. `requireRole('ADMIN')` then authorises them (`backend/Middlewares/auth.Middleware.js:41-46` reads the session role set from `profiles.role` at login).
+**Proposed fix:** `handle_new_user()` accepts only `'candidate'` and `'recruiter'` from metadata and rejects (raises on) anything else; `admin` is assigned only by the manual SQL path (`20260831_add_single_admin_role.sql:16`). New migration, idempotent, applied by hand per I-0010.
+**Evidence of resolution** (2026-11-04, T-0029): `supabase/migrations/20261103120000_restrict_signup_role.sql` (owner applied 2026-11-04). Static gate `tests/backend/migration-guards.test.mjs` (failed on `df98068`, `tests/.out/t0029-before-offline.log`; passes, `tests/.out/t0029-after-offline.log`). Live `tests/backend/live-signup-role.test.mjs` 10/10 (`tests/.out/t0029-after-live-signup-role.log`): service-role RPC with 'admin', 'superuser' and null → `22023 invalid signup role`; anon RPC refused; `auth.admin.createUser` with role superuser, admin or none → error, no auth user, no profile; a candidate signup still gets `profiles.role = candidate`. The owner's check: anon and authenticated lack execute on the function.
+
+### I-0056 — Any recruiter can fetch any candidate's résumé (RESOLVED)
+**Status:** RESOLVED T-0029 (2026-11-04): `GET /api/resume/candidate/:id` needs a UUID (400) and an application by that candidate to one of the caller's jobs (404 otherwise)
+**Severity:** P0 (security: candidate PII exposure across recruiters)
+**Module:** `backend/Controllers/analysis.controller.js`, `backend/Routes/analysis.routes.js`
+**Spec ref:** CHECKLIST 5.x recruiter views; T-0004/T-0007 authorization pattern
+**Evidence (working tree after the T-0023 merge):**
+- `GET /api/resume/candidate/:candidateId` is `requireRole('RECRUITER')` only (`backend/Routes/analysis.routes.js:13`).
+- `getCandidateResume` (`backend/Controllers/analysis.controller.js:205-235`) lists `candidates/${candidateId}` and signs a 60 s URL (`:211`, `:224`) with no check that the candidate applied to one of the session recruiter's jobs, and `candidateId` from the URL is not validated as a UUID before it becomes a storage prefix.
+**Impact:** any recruiter account can download any candidate's résumé by id; candidate ids appear in other recruiter-facing responses.
+**Proposed fix:** require an `applications` row joining the candidate to a job with `recruiter_id = session.userId` (same shape as the shortlist check, `backend/Controllers/jobs.controller.js:271-279`); validate `candidateId` as a UUID; a live authz test like `live-analysis-isolation`.
+**Evidence of resolution** (2026-11-04, T-0029): `backend/Controllers/analysis.controller.js:203-239`. `tests/backend/live-resume-authz.test.mjs` 5/5 (`tests/.out/t0029-after-live-resume-authz.log`); before (`tests/.out/t0029-before-live.log`): R2 got 200 with a URL, `not-a-uuid` got 404.
+
+### I-0058 — Auth users with no `profiles` row; signup reports success anyway (RESOLVED)
+**Status:** RESOLVED T-0029 (2026-11-04): signup returns 201 only when the trigger-created `profiles` row exists; otherwise it deletes the auth user and returns 500
+**Severity:** P1
+**Module:** `backend/Controllers/auth.controller.js`
+**Spec ref:** n/a (auth robustness)
+**Evidence (read 2026-10-31, T-0023):**
+- Root cause: `signup()` inserts the profile (`backend/Controllers/auth.controller.js:257`) and on failure only logs (`:268`), then returns 201 (`:271`). A row is missing only when both the `handle_new_user` trigger and this insert failed, e.g. the trigger is not on the hosted DB (cf. I-0010's migration drift) and the insert hits the `lower(username)` unique index; users created in the dashboard also have none.
+- `main`'s workaround (`3f53f80`, dropped here): when no profile matched the username, `login()` called unpaginated `auth.admin.listUsers()` (first page only), matched `user_metadata.username` (plus `raw_user_meta_data`, which the JS user object never has), took the role from `user_metadata` and hard-coded `is_suspended: false`; it also turned the profile-lookup-error 503 into a 401.
+- Why it was not a live escalation: metadata is backend-written at signup with role ∈ {candidate, recruiter}; and a session for a user with no profile row is rejected on every request by `requireAuth` (`backend/Middlewares/auth.Middleware.js:11-28`), which also re-checks `is_suspended` by id. It becomes dangerous the moment `requireAuth` stops failing closed.
+**Impact:** such a user sees "Account created", then "Invalid username or password" at login, with no signal to anyone why.
+**Proposed fix:** `signup()` checks that a `profiles` row exists for `data.user.id` after the insert; if not, deletes the auth user (`auth.admin.deleteUser`) and returns 5xx with a clear message. No metadata fallback at login.
+**Evidence of resolution** (2026-11-04, T-0029): `backend/Services/signupProfile.js` (`ensureProfileOrRollback`; skips rollback for GoTrue's obfuscated existing-account answer, `identities: []`), called at `backend/Controllers/auth.controller.js:261`. `tests/backend/signup-profile.test.mjs` 6/6 offline (module absent on `df98068`). Not live: a backend signup sends a real email; T-0029 criterion 9 is the owner's manual check.
+
+### I-0017 — Signup's explicit `profiles` insert duplicates the DB trigger (RESOLVED)
+**Status:** RESOLVED T-0029 (2026-11-04): the explicit `profiles` insert is gone; the trigger is the only writer
+**Severity:** P3 (log noise; profile data correct)
+**Module:** `backend/Controllers/auth.controller.js`
+**Spec ref:** n/a
+**Evidence:** Creating `t0001_cand` / `t0001_recr` through the baseline API
+(2026-10-12) returned 201, and the backend logged
+`Signup profile insert failed: duplicate key value violates unique constraint "profiles_pkey"`
+twice (`tests/.out/signup-backend.err.log`). The trigger
+`on_auth_user_created` (`supabase/migrations/20260823_create_profiles.sql`,
+`after insert on auth.users` → `insert into public.profiles`) already creates
+the row from signup metadata. The controller then inserts the same `id` again
+(HEAD `auth.controller.js:168-180`, baseline `:255-268`), and that error is
+only logged. The resulting profiles had correct username, role and names.
+**Impact:** A misleading error on every signup. If the trigger and the insert ever diverge, the insert's values are silently dropped.
+**Proposed fix:** Remove the controller insert, or make it an `upsert` and handle the error.
+
+---
+**Evidence of resolution** (2026-11-04, T-0029): `backend/Controllers/auth.controller.js:258-264` (no insert); source guard in `tests/backend/signup-profile.test.mjs` ("auth.controller.js no longer inserts profiles"), which failed on `df98068` (`:257-265`).
+
+### I-0060 — assessment-service port mismatch (RESOLVED)
+**Status:** RESOLVED T-0029 (2026-11-04): the service binds 127.0.0.1:8002 by default (`ASSESSMENT_HOST`/`ASSESSMENT_PORT`), starts with `python -m app`, and the README and `backend/.env.example` say :8002
+**Severity:** P2
+**Module:** `assessment-service/README.md`, `backend/Controllers/assessment.controller.js`, `backend/.env.example`
+**Evidence:** the README starts the service with `--port 8000` (`assessment-service/README.md:249`, `:252`, `:270`), which is the NLP port; the backend defaults `ASSESSMENT_SERVICE_URL` to `http://localhost:8002` (`backend/Controllers/assessment.controller.js:11-12`), and `backend/.env.example` does not name `ASSESSMENT_SERVICE_URL`.
+**Impact:** following the README either fails to bind (NLP running) or shadows NLP; the backend then gets connection errors on :8002.
+**Proposed fix:** README says :8002; add `ASSESSMENT_SERVICE_URL` to `backend/.env.example`; ARCHITECTURE port table.
+**Evidence of resolution** (2026-11-04, T-0029): `assessment-service/app/config.py:31-32`, `assessment-service/app/__main__.py`, `assessment-service/README.md` §10.3, `backend/.env.example:15`. `tests/assessment/test_internal_only.py` 5/5 (`tests/.out/t0029-after-assessment.log`; before 4 fail, `tests/.out/t0029-before-assessment.log`).
+
+### I-0061 — assessment-service exposes FastAPI docs (RESOLVED)
+**Status:** RESOLVED T-0029 (2026-11-04): FastAPI docs, redoc and the OpenAPI schema are off
+**Severity:** P2
+**Module:** `assessment-service/app/main.py`
+**Evidence:** `FastAPI(title=..., description=..., version=...)` (`assessment-service/app/main.py:10-16`) leaves `docs_url`, `redoc_url`, `openapi_url` at their defaults; the README points at `/docs` (`assessment-service/README.md:261`). DEC-5 (ROADMAP) turns them off for internal services, as github-evidence does.
+**Proposed fix:** `docs_url=None, redoc_url=None, openapi_url=None`; drop the README line.
+**Evidence of resolution** (2026-11-04, T-0029): `assessment-service/app/main.py:18-20`. `tests/assessment/test_internal_only.py::test_docs_are_off` (before: 200 on all three).
+
+### I-0066 — The assessment answer key is readable outside the backend (RESOLVED)
+**Status:** RESOLVED T-0029 (2026-11-04): keys live in `public.assessment_keys` (RLS on, no policy, no anon/authenticated grant); `assessments.answer_key` is dropped
+**Severity:** P0 (security: lets a candidate cheat on their own assessment)
+**Module:** `supabase/migrations/20261015_create_assessments.sql`, `assessment-service/app/main.py`
+**Evidence (read 2026-10-31):**
+- RLS policy "Candidates can read their own assessments" is `for select to authenticated using ((select auth.uid()) = candidate_id)` (`supabase/migrations/20261015_create_assessments.sql:49-51`), with no column restriction, so it covers `answer_key`, which the open attempt stores at generation time (`backend/Controllers/assessment.controller.js:286`). A candidate who signs in to GoTrue directly with the public anon key (same reasoning as I-0055) can read the key for the attempt they are taking. The backend itself strips the key (`backend/Controllers/assessment.controller.js:21-24`, `:313`).
+- `POST /generate-assessment` returns `answer_key` to any caller (`assessment-service/app/main.py:33-38`, comment: "trusted development endpoint"), and the service has no authentication; it relies on binding to 127.0.0.1.
+**Proposed fix:** move `answer_key` to a table (or column privilege) with no `authenticated` SELECT grant, readable only by the service role; for the service, internal auth or network isolation per ARCHITECTURE §4 (gateway/containers).
+**Evidence of resolution** (2026-11-04, T-0029): M2 `supabase/migrations/20261103120100_create_assessment_keys.sql` and M4 `20261103120300_drop_assessments_answer_key.sql`, applied by the owner 2026-11-04 after the copy check (0 attempts without a key, 0 mismatches) and a locked-down backup (`assessments_answer_key_backup`, anon/authenticated read false). Backend writes keys only to the key table (`backend/Controllers/assessment.controller.js:330-337`) and reads them only inside grading (`:403-418`). `tests/backend/live-answer-key-access.test.mjs` 5/5 after M4 (`tests/.out/t0029-after-live-answer-key-access.log`): the candidate's and the recruiter's own PostgREST reads return no `answer_key`, and the key table is refused to both. Service half: I-0061, I-0060.
+
+### I-0069 — Concurrent submits of one assessment attempt (RESOLVED)
+**Status:** RESOLVED T-0029 (2026-11-04): evaluate claims the attempt atomically (`claim_assessment_for_grading`), grades, completes only under its claim, and releases on failure; a claim older than 10 minutes can be retaken
 **Severity:** P2
 **Module:** `backend/Controllers/assessment.controller.js`
 **Evidence:** evaluate checks `status === 'completed'` on the row it read (`backend/Controllers/assessment.controller.js:357-359`), grades, then updates with `.eq('id', …).eq('status', 'generated')` (`:396-406`) without checking how many rows changed. Two submits that both read `generated` both grade; the second update matches 0 rows, yet its result is returned and folded into the score (`:415-442`).
 **Impact:** the stored attempt and the credibility score can disagree; one candidate can spend two LLM gradings per attempt.
 **Proposed fix:** `.select()` the update and treat 0 rows as 409, before the score rebuild.
+**Evidence of resolution** (2026-11-04, T-0029): M3 `supabase/migrations/20261103120200_assessment_grading_claim.sql` (owner applied 2026-11-04); `backend/Services/gradingClaim.js`; `backend/Controllers/assessment.controller.js:391-469`. `tests/backend/grading-claim.test.mjs` 7/7 offline. `tests/backend/live-evaluate-once.test.mjs` 3/3: 5 concurrent submits → one 200, four 409, score folded once (before: 200 ×5); a fresh claim → 409 for evaluate and `grading_in_progress` for generate; an 11-minute-old claim is reclaimed. `tests/backend/live-evaluate-release.test.mjs` 1/1 with :8002 stopped: 502, row back to `generated`, a retry claims again.
 
-## Resolved
 ### I-0070 — Supabase project host does not resolve (RESOLVED)
 **Status:** RESOLVED T-0028 (2026-11-03): the owner restored the Supabase project on 2026-11-03; no code or `.env` change
 **Severity:** P0 (blocks the demo and every live test)

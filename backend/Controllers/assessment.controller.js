@@ -3,13 +3,23 @@ import fetch from 'node-fetch';
 
 import supabase from '../Config/supabase.js';
 import { rebuildScoreRecord } from '../Services/explainability.js';
+import { GradeError, gradeOnce } from '../Services/gradingClaim.js';
 
 // Standalone generation service (T-0024/T-0025). The service holds the LLM
 // key and mints the answer key; this proxy forwards the candidate/job
 // context, persists the assessment row, and returns candidate questions
 // only — the key never reaches the browser.
+// T-0029 (I-0066): keys live in public.assessment_keys (RLS on, no policy, no
+// anon/authenticated grant), never in public.assessments, which candidates can
+// read through PostgREST.
 const ASSESSMENT_SERVICE_URL =
   process.env.ASSESSMENT_SERVICE_URL || 'http://localhost:8002';
+
+// T-0029 (I-0069): a 'grading' claim older than this may be taken over, so a
+// crashed grader never leaves an attempt stuck. Far above the 120 s evaluate
+// abort below, so a live grader is never treated as stale.
+const GRADING_STALE_AFTER = '10 minutes';
+const EVALUATE_TIMEOUT_MS = 120000;
 
 // T-0026: the upload page stores the raw file without parsing it, so
 // generate must be able to run the NLP parser on demand. Same endpoint and
@@ -180,15 +190,22 @@ export const generateAssessment = async (req, res) => {
     // T-0027: up to 5 attempts per candidate per job. An open attempt is
     // always resumed; a new one may be generated while fewer than 5 are
     // completed. The credibility score folds in the LATEST attempt.
+    // T-0029: an attempt being graded is still open; it is not handed out again.
     const { data: openAttempt, error: openError } = await supabase
       .from('assessments')
-      .select('id, questions')
+      .select('id, questions, status')
       .eq('candidate_id', candidateId)
       .eq('job_id', job.id)
-      .eq('status', 'generated')
+      .in('status', ['generated', 'grading'])
       .maybeSingle();
     if (openError) {
       return res.status(500).json({ message: 'Failed to load your assessment attempt', error: openError.message });
+    }
+    if (openAttempt?.status === 'grading') {
+      return res.status(409).json({
+        error: 'grading_in_progress',
+        message: 'Your last submission for this assessment is still being graded. Try again in a moment.',
+      });
     }
     if (openAttempt) {
       // Resume the open attempt rather than regenerating.
@@ -274,8 +291,8 @@ export const generateAssessment = async (req, res) => {
       return res.status(502).json({ message: 'Assessment service returned an unexpected payload. Please retry.' });
     }
 
-    // Persist so the answer key is available at submit time (T-0025). If the
-    // insert races another attempt, fall back to the stored open row.
+    // Persist the attempt, then its key in the separate key table (T-0029).
+    // If the insert races another attempt, fall back to the stored open row.
     const { data: inserted, error: insertError } = await supabase
       .from('assessments')
       .insert({
@@ -283,7 +300,6 @@ export const generateAssessment = async (req, res) => {
         candidate_id: candidateId,
         job_id: job.id,
         questions: questionBundle,
-        answer_key: answerBundle,
         model_used: questionBundle.model_used ?? null,
         prompt_version: questionBundle.prompt_version ?? null,
         status: 'generated',
@@ -307,6 +323,18 @@ export const generateAssessment = async (req, res) => {
         message: 'Assessment generated but could not be saved. Please retry.',
         error: insertError.message,
       });
+    }
+
+    // No attempt may exist without its key: if the key cannot be stored, remove
+    // the attempt and let the candidate generate again.
+    const { error: keyError } = await supabase
+      .from('assessment_keys')
+      .insert({ assessment_id: inserted.id, answer_key: answerBundle });
+    if (keyError) {
+      console.error('[assessment] answer key insert failed:', keyError.message);
+      const { error: cleanupError } = await supabase.from('assessments').delete().eq('id', inserted.id);
+      if (cleanupError) console.error('[assessment] could not remove the keyless attempt:', cleanupError.message);
+      return res.status(502).json({ message: 'Assessment generated but could not be saved. Please retry.' });
     }
 
     console.log(`[assessment] generated ${inserted.id} model=${questionBundle.model_used ?? 'unknown'}`);
@@ -345,7 +373,7 @@ export const evaluateAssessment = async (req, res) => {
 
     const { data: assessment, error: loadError } = await supabase
       .from('assessments')
-      .select('id, candidate_id, job_id, questions, answer_key, status, score')
+      .select('id, candidate_id, job_id, status, score')
       .eq('id', assessmentId)
       .maybeSingle();
     if (loadError) {
@@ -358,55 +386,87 @@ export const evaluateAssessment = async (req, res) => {
       return res.status(409).json({ message: 'This assessment is already submitted.', score: Number(assessment.score) });
     }
 
-    const questions = assessment.questions?.questions ?? [];
-    const answerKey = assessment.answer_key?.answers ?? [];
-    if (!questions.length || !answerKey.length) {
-      return res.status(500).json({ message: 'Stored assessment is incomplete' });
-    }
+    // T-0029 (I-0069): claim ('generated' -> 'grading', atomic in the database),
+    // grade, then complete only while this claim still holds; release on failure.
+    const outcome = await gradeOnce({
+      claim: async () => {
+        const { data, error } = await supabase.rpc('claim_assessment_for_grading', {
+          p_assessment_id: assessment.id,
+          p_candidate_id: candidateId,
+          p_stale_after: GRADING_STALE_AFTER,
+        });
+        if (error) throw new Error(`grading claim failed: ${error.message}`);
+        return Array.isArray(data) && data.length ? data[0] : null;
+      },
+      grade: async (claimed) => {
+        const questions = claimed.questions?.questions ?? [];
+        const { data: keyRow, error: keyError } = await supabase
+          .from('assessment_keys')
+          .select('answer_key')
+          .eq('assessment_id', claimed.id)
+          .maybeSingle();
+        if (keyError) throw new GradeError(500, { message: 'Failed to load the assessment' });
+        const answerKey = keyRow?.answer_key?.answers ?? [];
+        if (!keyRow) {
+          throw new GradeError(409, {
+            error: 'key_unavailable',
+            message: 'This assessment cannot be graded right now. Please try again shortly.',
+          });
+        }
+        if (!questions.length || !answerKey.length) {
+          throw new GradeError(500, { message: 'Stored assessment is incomplete' });
+        }
 
-    let response;
-    try {
-      response = await fetch(`${ASSESSMENT_SERVICE_URL}/evaluate-assessment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assessment_id: assessment.id,
-          questions,
-          answer_key: answerKey,
-          answers,
-        }),
-        signal: AbortSignal.timeout(120000),
-      });
-    } catch {
-      return res.status(502).json({
-        message: 'Assessment service is unavailable, so your answers were not graded. Start it (assessment-service) and try again.',
-      });
+        let response;
+        try {
+          response = await fetch(`${ASSESSMENT_SERVICE_URL}/evaluate-assessment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assessment_id: claimed.id, questions, answer_key: answerKey, answers }),
+            signal: AbortSignal.timeout(EVALUATE_TIMEOUT_MS),
+          });
+        } catch {
+          throw new GradeError(502, {
+            message: 'Assessment service is unavailable, so your answers were not graded. Start it (assessment-service) and try again.',
+          });
+        }
+        if (!response.ok) {
+          const detail = await response.text().catch(() => '');
+          throw new GradeError(502, { message: 'Assessment evaluation failed', error: detail.slice(0, 500) });
+        }
+        return response.json();
+      },
+      complete: async (claimedAt, evaluation) => {
+        const { data, error } = await supabase
+          .from('assessments')
+          .update({
+            answers,
+            score: evaluation.score,
+            evaluation,
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', assessment.id)
+          .eq('status', 'grading')
+          .eq('grading_started_at', claimedAt)
+          .select('id');
+        if (error) throw new Error(error.message);
+        return Array.isArray(data) && data.length === 1;
+      },
+      release: async (claimedAt) => {
+        const { error } = await supabase
+          .from('assessments')
+          .update({ status: 'generated', grading_started_at: null })
+          .eq('id', assessment.id)
+          .eq('status', 'grading')
+          .eq('grading_started_at', claimedAt);
+        if (error) throw new Error(error.message);
+      },
+    });
+    if (outcome.status !== 200) {
+      return res.status(outcome.status).json(outcome.body);
     }
-
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      return res.status(502).json({
-        message: 'Assessment evaluation failed',
-        error: detail.slice(0, 500),
-      });
-    }
-
-    const evaluation = await response.json();
-
-    const { error: updateError } = await supabase
-      .from('assessments')
-      .update({
-        answers,
-        score: evaluation.score,
-        evaluation,
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', assessment.id)
-      .eq('status', 'generated');
-    if (updateError) {
-      return res.status(500).json({ message: 'Graded but could not save the result. Please retry.', error: updateError.message });
-    }
+    const { evaluation } = outcome;
     console.log(`[assessment] completed ${assessment.id} score=${evaluation.score} short_answer_graded=${evaluation.short_answer_graded}`);
 
     // Fold the assessment into the latest credibility score for this

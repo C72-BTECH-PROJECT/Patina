@@ -25,5 +25,11 @@ MAX_RETRIES_PER_MODEL = int(
     os.getenv("ASSESSMENT_MAX_RETRIES_PER_MODEL", "2")
 )
 
+# T-0029 (I-0061, DEC-5): internal only. Core calls this service; the browser
+# never does. Bind loopback on :8002 (the backend default, ASSESSMENT_SERVICE_URL)
+# unless overridden; started with `python -m app` (app/__main__.py).
+HOST = os.getenv("ASSESSMENT_HOST", "127.0.0.1").strip() or "127.0.0.1"
+PORT = int(os.getenv("ASSESSMENT_PORT", "8002"))
+
 PROMPT_VERSION = "assessment-v1"
 SERVICE_NAME = "Patina AI Assessment Service"

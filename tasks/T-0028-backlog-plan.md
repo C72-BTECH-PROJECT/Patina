@@ -100,28 +100,54 @@ Docs only. Revert the files. The checker change only widens the accepted ids.
    | I-0046 | `github-evidence/requirements-dev.txt:5` (warning not re-run) |
    | I-0050 | `tests/arch/nlp-outage-probe.mjs:393` |
    | I-0064 | WORKLOG.md 451 lines before this entry |
-2. **PASS.** All 49 open issues map to exactly one batch:
-   - P0-1: 7 issues
-   - P0-2: 4
-   - P0-3: 12
-   - P0-4: 6
-   - P0-5: 1
-   - P0-6: 11
-   - B4: 8, through their owning rows (P2-1, P2-2, P2-3, P2-4, P2-6, P2-7, P1-10, P3-12).
-     I-0034, I-0035 and I-0036 are split across their owning specs on purpose.
+2. **PASS.** All 49 open issues map to exactly one batch. This is the final mapping, after
+   the owner's review (2026-11-03): all nine proposed batch moves are applied, and B6 is
+   split into B6a (P0-6) and B6b (P0-7).
+   - The table below was generated from the ROADMAP item rows by the T-0028 mapping
+     script.
+   - The B4 rows are issues owned by an existing item. I-0034, I-0035 and I-0036 are split
+     across their owning items on purpose, one part each.
 
-   3.2 and 3.10 → P3-1. P3-13..P3-17 are retired, and their issues are re-mapped. The
-   proposed batch changes (9) are listed in ROADMAP and **not applied**.
-3. **PASS, with a flagged conflict.**
-   - The line is written as the owner gave it.
-   - The dependency check against "Depends on" finds one violation: P2-3 (T-0020)
-     depends on P2-1 (T-0018), which the line runs after it. The proposed order is
-     `B3 → T-0019 → T-0018 → T-0020 → T-0021`. The owner decides.
-   - Every other step comes after its dependencies.
+   | Item | Batch | Issues |
+   |---|---|---|
+   | P0-1 | B1 security (T-0029) | I-0017, I-0055, I-0056, I-0058, I-0060, I-0061, I-0066, I-0069 |
+   | P0-2 | B2 database/migrations | I-0001, I-0010, I-0041, I-0057 |
+   | P0-3 | B3 backend correctness | I-0016, I-0025, I-0027, I-0028, I-0029, I-0039, I-0059, I-0062, I-0063, I-0065 |
+   | P0-4 | B5 redesign (incl. backend count for I-0054) | I-0006, I-0026, I-0040, I-0054, I-0068 |
+   | P0-5 | GR-1 anti-cheat design | I-0067 |
+   | P0-6 | B6a docs and checker | I-0032, I-0033, I-0042, I-0043, I-0044, I-0045, I-0046, I-0050, I-0064 |
+   | P0-7 | B6b, after the gateway | I-0030, I-0031 |
+   | P2-1 (T-0018) | B4 | I-0037; I-0036 (with P2-4) |
+   | P2-2 (T-0021) | B4 | I-0012 |
+   | P2-3 (T-0020) | B4 | I-0053; I-0034 (with P2-4, P2-6) |
+   | P2-4 (T-0022) | B4 | I-0034, I-0035, I-0036 (their gateway parts) |
+   | P2-6 | B4 | I-0038; I-0034 (internal only) |
+   | P2-7 | B4 | I-0035 (sessions) |
+   | P1-10 (T-0017) | B4 | I-0052 |
+   | P3-2 | B4 | I-0004 |
+   | P3-12 | B4 | I-0048 |
+
+   - Count: 8 + 4 + 10 + 5 + 1 + 9 + 2 = 39 in Phase 0, plus 10 in B4, for 49.
+   - AUDIT rows 3.2 and 3.10 → P3-1.
+   - P3-13..P3-17 are retired.
+   - **Differences from the owner's prompt, all approved:**
+     - I-0053 → P2-3.
+     - I-0004 → P3-2.
+     - I-0016 → B3.
+     - I-0060 → B1 as a whole. The proposal had kept `backend/.env.example` in B3; it moved
+       too, as one line, so the issue maps to one item.
+     - I-0030 and I-0031 → B6b.
+     - I-0051 and I-0070 are resolved.
+3. **PASS.** The line is B1 → B2 → B3 → T-0019 → T-0018 → T-0020 → T-0021 → B5 → GR-1
+   design → B6a, then P1-10, P2-4, B6b, P1-6, P1-7, P1-9, P2-5..P2-9.
+   - This is the owner's 2026-11-03 decision, and the conflict flag is removed.
+   - Dependency check: a script walked the 21 steps in order, against each row's "Depends
+     on", with P1-1..P1-5 counted as done. It found **0 violations**.
+   - The first version of the line ran T-0020 before T-0018. That is what led to the fix.
 4. **PASS.** T-0029 covers (a)–(e), and each criterion names a test that fails before the
    fix, plus the "before" signal.
    - The fail-before of the live I-0055 test depends on whether the project already has
      an admin. That is stated, and the static migration test is the guaranteed one.
 5. **PASS.** `check-trackers: ids 91/91 matched, 91 rows OK, verified at 2e87d44;
-   ARCHITECTURE.md 261 cites OK; ROADMAP.md 37 items OK, 0 warning(s)`. The run before
-   T-0028 had 18 warnings.
+   ARCHITECTURE.md 261 cites OK; ROADMAP.md 38 items OK, 0 warning(s)`. That is the run
+   after the owner's review changes. The run before T-0028 had 18 warnings.

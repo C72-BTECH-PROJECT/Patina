@@ -456,6 +456,17 @@ rollup per archived month at the top of this file.
 - Done: I-0070 (Supabase restored; smoke 7/7) and I-0051 resolved; I-0004/12/39/45 noted partly fixed. ROADMAP Phase 0 = P0-1..P0-6 (B1, B2, B3 at top; B5, GR-1 design, B6 after Phase 2 for dependency order) + B4 owned-by-spec table; P3-13..17 retired; 3.2/3.10 → P3-1; 9 proposed batch changes listed, not applied. T-0029 drafted (5 fixes, a fail-before test each).
 - Checker: `P[1-9]` → `P[0-9]` ids (owner-approved deviation from docs-only).
 - Verification: check-trackers 0 warnings (was 18); mapping script: 49 open issues, each in one batch.
-- Flag: execution order runs T-0020 before its dependency T-0018 (P2-1); owner to decide.
+- Owner review applied: order B3 → T-0019 → T-0018 → T-0020 (0 dependency violations); all 9 batch moves; B6 split into B6a (P0-6) and B6b (P0-7, after P2-4); final mapping in T-0028 Result.
+- T-0029 updated: 4 migrations with 14-digit prefixes; answer keys in two steps (copy+verify, then the drop after the owner's backup); grading claim with release and stale reclaim; I-0055 asserts errcode 22023 via `assert_signup_role`. Finding: the owner's backup table needs RLS on and a revoke, or it leaks the keys.
 - Files changed: ROADMAP.md, ISSUES.md, WORKLOG.md, tests/docs/check-trackers.mjs (mod); tasks/T-0028-backlog-plan.md, tasks/T-0029-security-batch.md (new).
-- Next: owner reviews T-0029 (design choices in (b) and (e)), then the B1 implementation.
+- Next: owner commits T-0028, then approves T-0029 for execution.
+
+## L-0040 · 2026-11-04 · T-0029 B1 security batch (I-0055/56/58/17/60/61/66/69)
+- Prompt: execute approved T-0029; plus revoke execute on `assert_signup_role` from public/anon/authenticated and a live anon-refused case; stop at each owner step.
+- Task: T-0029 (criteria 1–7 and 10 PASS, 3(vi) not run, 8–9 owner-pending; see Result).
+- Done: M1 role allow-list (`assert_signup_role`, 22023); M2/M4 answer keys to `assessment_keys` (RLS, no policy) then column dropped; M3 grading claim (`claim_assessment_for_grading`, 10-min stale reclaim); signup verifies the trigger's profile or rolls back; résumé URL owner-scoped (400/404); assessment-service 127.0.0.1:8002, docs off, `python -m app`.
+- Owner steps: M1–M3 applied (SQL editor), copy check, locked-down backup, M4. Versions not in `schema_migrations` (noted in I-0057/I-0010 for B2).
+- Verification: offline 56/56 (+1 todo); assessment 5/5; live signup-role 10/10, resume-authz 5/5, answer-key 5/5, evaluate-once 3/3, release 1/1; full backend 112/115 (1 todo, 1 skip, 1 pre-existing fail → I-0071); NLP 12/12; github 0; check-trackers 0 warnings.
+- Issues: 8 resolved; I-0071 new (reject notification vs T-0004 test, mapped to P0-3). ARCHITECTURE/AUDIT cites re-pointed for shifted lines.
+- Files changed: backend/Controllers/{auth,analysis,assessment}.controller.js, backend/.env.example, assessment-service/app/{main,config}.py, assessment-service/README.md, tests/run-suite.ps1, tests/README.md, tests/backend/lib/testdb.mjs, ARCHITECTURE/AUDIT/ISSUES/ROADMAP/WORKLOG, tasks/T-0029 (mod); 4 migrations, backend/Services/{signupProfile,gradingClaim}.js, assessment-service/app/__main__.py, requirements-dev.txt, tests/assessment/, 8 backend test files + lib/assessment.mjs (new).
+- Next: owner runs criteria 8–9 in the UI, drops the backup table, commits.

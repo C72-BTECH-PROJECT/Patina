@@ -1,0 +1,6 @@
+# Test-only dependencies for the `assessment` suite (T-0029). Install into this
+# service's own venv:
+#   assessment-service\.venv\Scripts\python -m pip install -r assessment-service\requirements-dev.txt
+# FastAPI's TestClient uses the httpx2 package that fastapi already installs.
+-r requirements.txt
+pytest==9.1.1

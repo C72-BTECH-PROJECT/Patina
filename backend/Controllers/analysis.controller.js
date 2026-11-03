@@ -200,11 +200,32 @@ export const getMyResumeStatus = async (req, res) => {
   });
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Generates a signed URL for a candidate's resume. Intended for recruiters
 // reviewing applicants; the frontend opens this URL in a new tab.
+// T-0029 (I-0056): only for a candidate who applied to one of this recruiter's
+// jobs. "Not yours" and "no résumé" give the same 404, so ids cannot be probed.
 export const getCandidateResume = async (req, res) => {
   try {
     const { candidateId } = req.params;
+    if (!UUID_RE.test(String(candidateId || ''))) {
+      return res.status(400).json({ error: 'invalid_candidate_id', message: 'candidateId must be a UUID.' });
+    }
+
+    const { data: applied, error: appliedError } = await supabase
+      .from('applications')
+      .select('id, job:jobs!inner(recruiter_id)')
+      .eq('candidate_id', candidateId)
+      .eq('job.recruiter_id', req.session.userId)
+      .limit(1);
+    if (appliedError) {
+      console.error('[resume] application lookup failed:', appliedError.message);
+      return res.status(500).json({ message: 'Failed to load resume' });
+    }
+    if (!Array.isArray(applied) || applied.length === 0) {
+      return res.status(404).json({ error: 'not_found', message: 'No resume found for this candidate.' });
+    }
 
     const { data: files } = await supabase.storage
       .from('resumes')
@@ -215,7 +236,7 @@ export const getCandidateResume = async (req, res) => {
       : null;
 
     if (!resumeFile) {
-      return res.status(404).json({ message: 'No resume found for this candidate.' });
+      return res.status(404).json({ error: 'not_found', message: 'No resume found for this candidate.' });
     }
 
     const storagePath = `candidates/${candidateId}/${resumeFile.name}`;

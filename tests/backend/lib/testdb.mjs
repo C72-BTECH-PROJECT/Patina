@@ -111,6 +111,8 @@ const allIds = (ids) => [...candidateIds(ids), ...recruiterIds(ids)];
 // Order respects FKs (scores -> resumes; applications -> jobs).
 const TABLE_FILTERS = (ids) => [
   { table: 'notifications', apply: (q) => q.in('user_id', allIds(ids)) },
+  // T-0029: assessment attempts (their assessment_keys rows go with them, on delete cascade).
+  { table: 'assessments', apply: (q) => q.in('candidate_id', candidateIds(ids)) },
   { table: 'scores', apply: (q) => q.in('candidate_id', candidateIds(ids)) },
   { table: 'resumes', apply: (q) => q.in('candidate_id', candidateIds(ids)) },
   { table: 'applications', apply: (q) => q.in('candidate_id', candidateIds(ids)) },
