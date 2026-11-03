@@ -53,7 +53,6 @@ diff you're already writing.
 | I-0046 | Starlette's `TestClient` warns that using it with `httpx` is deprecated ("install `httpx2` instead") | `github-evidence/requirements-dev.txt` | P3 | OPEN | 2026-10-15, T-0011 |
 | I-0048 | An inactive account with corroborated claims scores 0.30 from corroboration alone; commit counts trust author-set dates | `github-evidence/app/scoring.py` | P2 | OPEN | 2026-10-15, T-0012 |
 | I-0050 | Probe labels its login row "P-1 NLP down" even when phase 1 is not selected | `tests/arch/nlp-outage-probe.mjs` | P3 | OPEN | 2026-10-15, T-0015 |
-| I-0051 | AUDIT rows 0.1 and GR-2 still say "1 of the 3 services exists" and that `githubAggregator.js` is the only other code | `AUDIT.md` | P3 | OPEN | 2026-10-15, T-0015 |
 | I-0052 | A résumé whose GitHub link is only a hyperlink annotation behind the text "GitHub" gets `no_github_link`: the NLP text extraction does not read PDF link annotations | `nlp-engine/app` (extraction), `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-10-15, T-0014 manual check |
 | I-0053 | Recruiter's per-job list drops a candidate whose latest score is for another job | `backend/Controllers/analysis.controller.js`, `frontend/src/pages/recruiter/JobDetails.jsx` | P2 | OPEN | 2026-10-15, T-0016 |
 | I-0054 | Recruiter Jobs page always shows "0 Applications Total" | `frontend/src/pages/recruiter/Jobs.jsx` | P3 | OPEN | 2026-10-15, T-0016 |
@@ -72,7 +71,6 @@ diff you're already writing.
 | I-0067 | Short-answer grading prompt embeds candidate text with no untrusted-input rule, and grading output is not schema-checked: a crafted answer can steer its own grade | `assessment-service/app/prompts.py`, `assessment-service/app/evaluator.py` | P1 | OPEN | 2026-10-31, T-0023 |
 | I-0068 | Frontend CI build fails on 4 more lint warnings from `main` (CandidateLayout, RecruiterLayout, AllCandidates ×2), on top of the 5 known; `AllCandidates.jsx` reads `import.meta.env` under CRA (I-0012 pattern) | `frontend/src/**` | P2 | OPEN | 2026-10-31, T-0023 |
 | I-0069 | Two concurrent submits of one attempt can both be graded; the second's result is returned and folded into the score but never saved | `backend/Controllers/assessment.controller.js` | P2 | OPEN | 2026-10-31, T-0023 |
-| I-0070 | The Supabase project host in `backend/.env` does not resolve in DNS (2026-10-31): every DB-backed path fails, so login answers 503 and the backend smoke test "unknown username -> 401" fails | Supabase project (infra) | P0 | OPEN | 2026-10-31, T-0023 |
 
 ---
 
@@ -112,7 +110,7 @@ management API in a migration script).
 ---
 
 ### I-0004 — AI-cruft / hallucinated entries in `SKILL_KEYWORDS`
-**Status:** OPEN
+**Status:** OPEN — partly fixed (re-verified T-0028 at `df98068`): the duplicate "typescript" is gone (`nlp-engine/app/ner.py:14`); "exponentjs" (`:59`), "r language" (`:16`) and "mern stack" (`:34`) remain. Planned in ROADMAP P0-3 (B3).
 **Severity:** P3
 **Module:** `nlp-engine/app/ner.py` (lines 6-54, `SKILL_KEYWORDS`)
 **Spec ref:** n/a (data-quality cleanup, not a feature)
@@ -224,7 +222,7 @@ T-0003 kept them verbatim. R19 and R33 put their idempotency in this batch.
 ---
 
 ### I-0012 — HEAD frontend reads `import.meta.env` under CRA; hardcoded API URLs
-**Status:** OPEN
+**Status:** OPEN — partly fixed (re-verified T-0028 at `df98068`): `Assessment.jsx` now uses the env variable; `ResetPassword.jsx:6` and `CreateJob.jsx:211` still hardcode the URL; 16 files declare `API_BASE_URL`; the new `import.meta.env` in `AllCandidates.jsx` is I-0068. Owned by T-0021 (P2-2).
 **Severity:** P1
 **Module:** `frontend/src/**`
 **Spec ref:** n/a (config)
@@ -533,7 +531,7 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 ---
 
 ### I-0039 — Backend cruft found during the architecture audit
-**Status:** OPEN
+**Status:** OPEN — partly fixed (re-verified T-0028 at `df98068`): `githubAggregator.js` deleted in T-0014; unused `bcrypt` (`backend/package.json:17`), the two empty middleware files, tracked `dev/null`, `backend/uploads/` and the OAuth env vars remain. Planned in ROADMAP P0-3 (B3); the OAuth env vars wait for P2-7.
 **Severity:** P3
 **Module:** `backend/`, `dev/`
 **Spec ref:** n/a (cleanup)
@@ -610,7 +608,7 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Proposed fix:** Reword §1.6 to "`pytest-socket --allow-hosts=127.0.0.1,::1`".
 
 ### I-0045 — Later task specs point at ROADMAP §1.2 for content that moved
-**Status:** OPEN
+**Status:** OPEN — partly fixed (re-verified T-0028 at `df98068`): T-0014 now names `github-evidence/README.md`; T-0015's cites are timeout cites that still resolve; `tasks/T-0012-github-evidence-metrics.md:22` still points at §1.2 for the contract. Planned in ROADMAP P0-6 (B6).
 **Severity:** P3
 **Module:** `tasks/`
 **Evidence:** T-0011 moved the service contract, error table, service timeouts and service env vars from ROADMAP §1.2 to `github-evidence/README.md`. `tasks/T-0012-github-evidence-metrics.md:23` ("as in ROADMAP §1.2"), `tasks/T-0014-core-github-integration.md:34,189` and `tasks/T-0015-github-outage-probe.md:26,36,78` still cite §1.2. §1.2 keeps only the core-side timeouts and variables (`GITHUB_EVIDENCE_URL`, `GITHUB_EVIDENCE_TIMEOUT_MS`), so the timeout cites (`T-0014:189`, `T-0015`) still resolve; the contract cites (`T-0012:23`, `T-0014:34`) do not.
@@ -642,13 +640,6 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Impact:** cosmetic; the T-0015 spec keeps P-1..P-3 unchanged, so it was not touched.
 **Proposed fix:** label it `setup` when P-1 is not selected (with P2-1, which rewrites P-1..P-3).
 
-### I-0051 — AUDIT rows 0.1 and GR-2 predate github-evidence
-**Status:** OPEN
-**Severity:** P3
-**Module:** `AUDIT.md`
-**Evidence (T-0015):** row 0.1 says "1 of the 3 Python services exists" and "`backend/Controllers/githubAggregator.js` is unused"; the GR-2 row says "1 of the 3 SRS services exists". Since T-0011..T-0014 github-evidence runs on :8001 and `githubAggregator.js` is deleted. ARCHITECTURE.md now says 2 of 3. T-0015 added probe evidence to GR-2 but kept its scope to evidence and did not rewrite these sentences.
-**Impact:** AUDIT and ARCHITECTURE disagree on the service count.
-**Proposed fix:** re-verify rows 0.1 and GR-2 in the next AUDIT pass (the statuses should stay `STUBBED_OR_PARTIAL`).
 ### I-0052 — GitHub link hidden in a PDF hyperlink annotation is not extracted
 **Status:** OPEN
 **Severity:** P1
@@ -806,15 +797,25 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Impact:** the stored attempt and the credibility score can disagree; one candidate can spend two LLM gradings per attempt.
 **Proposed fix:** `.select()` the update and treat 0 rows as 409, before the score rebuild.
 
-### I-0070 — Supabase project host does not resolve
-**Status:** OPEN — cause not verified (needs the Supabase dashboard)
+## Resolved
+### I-0070 — Supabase project host does not resolve (RESOLVED)
+**Status:** RESOLVED T-0028 (2026-11-03): the owner restored the Supabase project on 2026-11-03; no code or `.env` change
 **Severity:** P0 (blocks the demo and every live test)
 **Module:** Supabase project (infra); `backend/.env` `SUPABASE_URL`
 **Evidence (2026-10-31, T-0023):** the backend suite failed one test, "POST /api/auth/login with unknown username -> 401, no session cookie": 503 after ~7 s (`tests/.out/t0023-backend.log`), and the backend logged `Login profile lookup failed: TypeError: fetch failed`. A direct `dns.lookup` of the project host from `backend/.env` gives `ENOTFOUND`, while `github.com`, `supabase.co` and `api.supabase.com` resolve from the same machine, with and without the sandbox. The 503 is `login()`'s designed answer when the profile lookup errors, so this is not a code regression.
 **Likely cause (unverified):** the project is paused (free-tier inactivity) or was removed or renamed; `backend/.env` may point at an old ref.
 **Proposed fix:** owner checks the project in the Supabase dashboard (restore/unpause, or update `SUPABASE_URL`/keys), then re-runs `tests\run-suite.ps1 -Target current -Suites backend`.
+**Evidence of resolution** (2026-11-03, T-0028, backend running from `df98068` on :5000): `nslookup` of the project host in `backend/.env` resolves (Cloudflare address); `node --test tests/backend/smoke.test.mjs` → 7/7 pass, including "POST /api/auth/login with unknown username -> 401, no session cookie" (2.5 s), the test that failed with 503 in T-0023. Cause (paused vs renamed) not recorded; the owner restored it from the dashboard.
 
-## Resolved
+### I-0051 — AUDIT rows 0.1 and GR-2 predate github-evidence (RESOLVED)
+**Status:** RESOLVED T-0028 (2026-11-03), re-verified against `df98068`; fixed during the T-0023 AUDIT refresh, no code change
+**Severity:** P3
+**Module:** `AUDIT.md`
+**Evidence (T-0015):** row 0.1 says "1 of the 3 Python services exists" and "`backend/Controllers/githubAggregator.js` is unused"; the GR-2 row says "1 of the 3 SRS services exists". Since T-0011..T-0014 github-evidence runs on :8001 and `githubAggregator.js` is deleted. ARCHITECTURE.md now says 2 of 3. T-0015 added probe evidence to GR-2 but kept its scope to evidence and did not rewrite these sentences.
+**Impact:** AUDIT and ARCHITECTURE disagree on the service count.
+**Proposed fix:** re-verify rows 0.1 and GR-2 in the next AUDIT pass (the statuses should stay `STUBBED_OR_PARTIAL`).
+**Evidence of resolution** (`df98068`): AUDIT row 0.1 (`AUDIT.md:77`) now says all 3 Python services exist as separate processes (T-0023) and no longer names `githubAggregator.js`; the GR-2 row (`AUDIT.md:212`) says "All 3 SRS services exist since the T-0023 merge". Both stay `STUBBED_OR_PARTIAL`, as the proposed fix said. Re-checked by a T-0028 subagent read and `sed -n 77p` / `212p`.
+
 
 ### I-0005 — `Assessment.jsx` unrouted, no backend, silently serves mock data (RESOLVED)
 **Status:** RESOLVED by `main`'s assessment work (T-0024..T-0027, merged in T-0023); re-verified at file level, not by a UI run.

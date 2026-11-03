@@ -1,14 +1,16 @@
 # ROADMAP.md: what we build next, and in what order
 
 Written in T-0010 (2026-10-14), from AUDIT.md (verified at `2e87d44`),
-ARCHITECTURE.md (DEC-1..DEC-6) and the open entries in ISSUES.md.
+ARCHITECTURE.md (DEC-1..DEC-6) and the open entries in ISSUES.md. Phase 0 (backlog
+burn-down) added in T-0028 (2026-11-03), after every open issue was re-verified at `df98068`.
 
 ## How to read this
 
 - **This is a plan, never a status report.** What exists, and in what condition, is
   in `AUDIT.md`. A "Moves" cell says which CHECKLIST ids an item is expected to
   change. The task that builds the item sets the real status, with evidence.
-- **Item ids.** `P1-n`, `P2-n` and `P3-n` belong to this file. CHECKLIST ids (`2.12`,
+- **Item ids.** `P0-n`, `P1-n`, `P2-n` and `P3-n` belong to this file. Ids are never reused:
+  P3-13..P3-17 were retired when T-0028 folded them into Phase 0. CHECKLIST ids (`2.12`,
   `GR-2`) and issue ids (`I-0015`) are defined in their own files.
 - **Order.** Items are listed in a dependency-correct order. "Depends on" names only
   earlier items. Items with no dependency between them can run in parallel, on
@@ -34,11 +36,17 @@ ARCHITECTURE.md (DEC-1..DEC-6) and the open entries in ISSUES.md.
 
   It warns, without failing, when an open issue or a CODE_REVIEWED_UNTESTED row is
   not mapped to any item.
-- **Execution order** (owner, 2026-10-15, T-0016): P1-10 → P2-1 → P1-8 → P2-3 → P2-2 →
-  P2-4, then the rest of Phase 1 (P1-6, P1-7, P1-9), then the remaining Phase 2 items
-  (P2-5, P2-6, P2-7, P2-8, P2-9). Each item comes after everything in its "Depends on"; the
-  checker does not read this line, so T-0016's Result holds the dependency check. Standing
-  rule: the frontend test runner (P1-8) lands before any task that changes frontend pages.
+- **Execution order** (owner, 2026-11-03, T-0028; replaces T-0016's line): B1 (P0-1) →
+  B2 (P0-2) → B3 (P0-3) → T-0019 (P1-8) → T-0020 (P2-3) → T-0021 (P2-2) → B5 (P0-4) →
+  GR-1 design (P0-5) → B6 (P0-6), then the remaining Phase 1/2 items (P1-10, P2-1, P2-4,
+  P1-6, P1-7, P1-9, P2-5, P2-6, P2-7, P2-8, P2-9), then Phase 3.
+  - **Dependency conflict, owner to decide:** P2-3 (T-0020) depends on P2-1 (T-0018), and
+    T-0018 is still a draft. As written, the line runs T-0020 before its prerequisite.
+    Proposed fix: B3 → T-0019 → **T-0018** → T-0020 → T-0021. The other option is to drop
+    the dependency in T-0020's review. Until the owner picks one, "Depends on" wins.
+  - The checker does not read this line. T-0028's Result holds the dependency check.
+  - Standing rule: the frontend test runner (P1-8) lands before any task that changes
+    frontend pages.
 
 ## Decisions this roadmap rests on
 
@@ -73,6 +81,83 @@ the task that applies it:
 - **Reachability.** GitHub evidence is scored through `POST /api/analyze`, which the
   UI does not reach (AUDIT 5.14). It becomes visible in the app once score-on-apply
   (P2-3) lands.
+
+## Phase 0: backlog burn-down
+
+Written in T-0028 (2026-11-03). Every open issue was re-verified against `df98068` first.
+Two were already fixed and moved to Resolved with evidence:
+- **I-0070:** the Supabase host resolves again, and the backend smoke test passes 7/7.
+- **I-0051:** AUDIT rows 0.1 and GR-2 already say all three services exist.
+
+Each issue that is still open belongs to exactly one of the groups below:
+- a Phase 0 item (B1, B2, B3, B5, the GR-1 design, B6);
+- "B4", an existing spec that already owns the fix (table below);
+- for AUDIT rows 3.2 and 3.10, P3-1.
+
+The batch assignment is the owner's (T-0028 prompt). Where T-0028 disagrees, the
+disagreement is listed under "Proposed batch changes" and has **not** been applied.
+
+The table is split in two, because the checker requires dependency order:
+- B1–B3 depend on nothing and sit here.
+- B5, the GR-1 design and B6 depend on P1-8, P2-2 and P2-3, so they sit after the Phase 2
+  table under "Phase 0, second half".
+
+The execution order line at the top says when each one runs.
+
+| Id | Item | Depends on | Size | Files | Moves | Issues | Task |
+|---|---|---|---|---|---|---|---|
+| P0-1 | **B1 security.** (a) A new migration lets signup set only `candidate` or `recruiter` as the role and raises on any other value (I-0055). (b) Candidates cannot read the answer key by any path; assessment-service binds 127.0.0.1 with `/docs`, `/redoc` and `/openapi.json` off (I-0066, I-0061). (c) A recruiter gets a résumé URL only if the candidate applied to one of the recruiter's jobs, and `candidateId` must be a UUID (I-0056). (d) Signup fails, and deletes the auth user, when no `profiles` row exists afterwards; the duplicate insert goes (I-0058, I-0017). (e) Each attempt is graded once, via an atomic status claim (I-0069). Every fix comes with a test that fails before it | — | M | `supabase/migrations/<date>_*.sql` (new; applied migrations are never edited), `backend/Controllers/{auth,analysis,assessment}.controller.js`, `backend/Services/signupProfile.js` (new), `assessment-service/app/{main,config}.py`, `assessment-service/{README.md,requirements-dev.txt}`, `tests/assessment/` (new), `tests/backend/` (new tests), `tests/run-suite.ps1`, `tests/README.md` | 0.4 BROKEN (role allow-list; OAuth still missing); 3.7 PART (one grade per attempt) | I-0055, I-0056, I-0066, I-0061, I-0058, I-0017, I-0069 | T-0029 |
+| P0-2 | **B2 database and migrations.** The owner runs every remote step (migration repair, the Supabase GitHub-integration setting). (a) Version prefixes become unique: the two duplicate pairs are renamed, with the `supabase migration repair` commands written down for the remote history. (b) Every migration becomes idempotent, so the Preview check goes green, and the I-0010 auto-apply decision is recorded. (c) The `resumes` bucket's MIME allow-list and 10 MB cap move into a migration. (d) The stale `scores.subscores` description is fixed with `comment on column` in a new migration. Editing applied files is allowed here only to add guards that are no-ops on a migrated database, shown by running every file twice on a scratch database | — | M | `supabase/migrations/*.sql`, `tests/backend/migration-guards.test.mjs` (new: unique prefixes, guarded `create` statements), a runbook for the remote steps under `Docs/` | 0.2 PART | I-0057, I-0010, I-0001, I-0041 | later |
+| P0-3 | **B3 backend correctness.** (a) Fix the `profiles.email` read and pick one email source for applicants (I-0063, I-0028: one root cause). (b) Return 400 for a malformed application id (I-0029). (c) The 404 message names the method (I-0027). (d) Cap upload size and answer 413 above it (I-0025). (e) The per-job list keeps the candidate's score for that job (I-0053). (f) Rebuild the stale pre-T-0014 GitHub text, after an owner decision (I-0065). (g) Call assessment-service over `internalHttp` with a request id (I-0062). (h) Document the assessment port and `ASSESSMENT_SERVICE_URL` (I-0060). (i) Load the spaCy model by package name (I-0059). (j) Remove the cruft, except the OAuth env vars, which wait for P2-7 (I-0039). (k) Remove invented NLP keywords (I-0004). Split the item if it grows past M | — | M | `backend/Controllers/{jobs,analysis,assessment}.controller.js`, `backend/index.js`, `backend/Services/{explainability,internalHttp}.js`, `backend/.env.example`, `backend/package.json`, `backend/Middlewares/{authCand,authRec}.Middleware.js` (deleted), `dev/null` (deleted), `assessment-service/README.md`, `nlp-engine/app/{ner,preprocessor}.py`, `tests/backend/`, `tests/nlp/snapshots/current/` | 0.7 PART (assessment calls over `internalHttp`) | I-0063, I-0028, I-0029, I-0027, I-0025, I-0053, I-0065, I-0062, I-0060, I-0059, I-0039, I-0004 | later |
+
+**B4: owned by an existing spec (no separate work).** This is not an item table. Each issue
+here is mapped through the row that owns it.
+
+| Issue | Owned by (row, task) |
+|---|---|
+| I-0034 | P2-3 (the analyze file-type half; it goes when T-0020 removes `/api/analyze`), P2-4 / T-0022 (NLP CORS), P2-6 (NLP internal only, `/docs` off) |
+| I-0035 | P2-4 / T-0022 (rate limiter), P2-7 (sessions) |
+| I-0036 | P2-1 / T-0018, P2-4 / T-0022 (health half) |
+| I-0037 | P2-1 / T-0018 |
+| I-0038 | P2-6 (pinned requirements, one venv). Not in T-0018, T-0022 or P2-7, as the T-0028 prompt assumed |
+| I-0012 | P2-2 / T-0021 (the `import.meta.env` regression in `AllCandidates.jsx` is I-0068, B5) |
+| I-0052 | P1-10 / T-0017 |
+| I-0048 | P3-12 (a calibration decision, not a bug fix) |
+
+AUDIT rows 3.2 and 3.10 (CODE_REVIEWED_UNTESTED) are promoted by P3-1. Their promoting
+tests are listed in the "Test backlog" table.
+
+**Proposed batch changes.** These are T-0028's view, for the owner to decide; none has been
+applied.
+1. **I-0053: B3 → B4 (T-0020).**
+   - The fix needs a frontend change in `JobDetails.jsx`. B3 runs before T-0019, so making
+     it there breaks the standing rule.
+   - T-0020 already rebuilds the per-job list as one row per application, which removes
+     the bug.
+   - If it stays in B3, B3 fixes only the backend query.
+2. **I-0004: B3 → B4 (P3-2).**
+   - It is NLP keyword data, not backend.
+   - P3-2 rewrites the same list and regenerates the same snapshots.
+3. **I-0016: B5 → B3, optional.**
+   - A backend-only fix exists: accept an empty last name (`profiles.last_name` allows
+     `''`).
+   - Splitting the form into two fields is the B5 part.
+4. **I-0060: README half → T-0029.**
+   - T-0029 already rewrites the assessment-service start commands for I-0066.
+   - `backend/.env.example` stays in B3.
+5. **I-0039 stays open after B3.** The OAuth env vars wait for P2-7. That is why the retired
+   P3-16 depended on P2-7.
+6. **I-0067 stays open after the GR-1 design.**
+   - The design specifies the fix: an untrusted-input rule, and a schema-checked grading
+     output.
+   - The code lands in a later task.
+7. **I-0054 is not frontend-only.** `Jobs.jsx` has no count source, so B5 needs a backend
+   count as well.
+8. **B6 runs before P2-4 and P2-6.** README's run section and ARCHITECTURE will change again
+   when the gateway and compose land. B6 is a refresh at that point, not the final one, as
+   the retired P3-17 was.
+9. **I-0046 and I-0050 are small code changes, not docs** (a test dependency, a probe
+   label). They ride with B6 as cleanup.
 
 ## Phase 1: GitHub validation module as a microservice
 
@@ -227,15 +312,15 @@ never silently counted as missing (CHECKLIST 2.10).
 
 | Id | Item | Depends on | Size | Files | Moves | Issues | Task |
 |---|---|---|---|---|---|---|---|
-| P1-1 | Service skeleton: contract v1 (§1.2), GitHub client (token, pagination, rate limits §1.5, retry, deadline), username validation, request ID, recorded-response harness, `github` suite | — | M | `github-evidence/app/{main,config,contract,github_client}.py`, `github-evidence/{requirements.txt,requirements-dev.txt,README.md,.env.example}`, `github-evidence/tools/record_github.py`, `tests/github/{conftest.py,test_service.py,test_client.py,recordings/}`, `tests/run-suite.ps1`, `tests/README.md` | 2.3 PART (service half; DONE once P1-4 feeds the score); 2.13 BROKEN (service half) | I-0044, I-0046 | T-0011 |
-| P1-2 | Metrics and sub-score: 52-week authored-commit activity, language breakdown, owned vs forked, consistency, claim cross-reference against the parsed skills, documented formula and weights, partial labelling, call budget | P1-1 | M | `github-evidence/app/{metrics,claims,scoring,skill_languages}.py`, `github-evidence/README.md`, `tests/github/{test_metrics.py,test_scoring.py,snapshots/}`, `tests/github/recordings/` | 2.4 MIS (all but quality); 2.5 MIS; 2.7 MIS (all DONE once P1-4 feeds the score) | I-0045, I-0047, I-0048 | T-0012 |
-| P1-3 | Deterministic contact fields in the parser: document order instead of `set()`; GitHub link prefers a bare profile URL; full path captured; trailing punctuation stripped. The `entities.github` output shape is unchanged | — | S | `nlp-engine/app/ner.py`, `tests/nlp/test_contact_determinism.py`, `tests/nlp/snapshots/current/` | 2.1 PART (resume path deterministic); 4.11 CRU (deterministic input) | I-0015, I-0043 | T-0013 |
-| P1-4 | Core integration: `backend/Services/internalHttp.js` (timeout, one retry on connect errors, request ID, safe errors) and `githubEvidence.js` (login normalisation, reason codes §1.3); `buildScoreRecord(nlpJson, { github })` and `buildGithubSubScore`; per-skill `sources.github`; flags stay "not available" (no false "no contradictions"); "public repositories only" in the explanation; `githubAggregator.js` deleted | P1-2, P1-3 | L | `backend/Services/{internalHttp,githubEvidence,explainability}.js`, `backend/Controllers/analysis.controller.js`, `backend/.env.example`, `backend/Controllers/githubAggregator.js` (deleted), `tests/backend/{explainability.test.mjs,github-evidence-client.test.mjs,live-analyze-github.test.mjs,lib/stub-server.mjs}`, `tests/run-suite.ps1`, `AUDIT.md` | 2.3 PART→DONE; 2.4 MIS→PART; 2.5 MIS→DONE; 2.7 MIS→DONE; 2.8 PART (now exercised with two sources; assessment-only needs Module 3); 2.10 MIS→DONE; 2.11 MIS→PART; 2.12 MIS→DONE; 2.13 BROKEN→DONE; 4.1 BROKEN (2 of 3 sources); 4.2 PART→DONE; 4.5 PART; 4.7 CRU→DONE; 0.3 PART; 0.5 CRU (GitHub key server-side); 0.7 MIS→PART (GitHub path) | I-0039 (githubAggregator part) | T-0014 |
+| P1-1 | Service skeleton: contract v1 (§1.2), GitHub client (token, pagination, rate limits §1.5, retry, deadline), username validation, request ID, recorded-response harness, `github` suite | — | M | `github-evidence/app/{main,config,contract,github_client}.py`, `github-evidence/{requirements.txt,requirements-dev.txt,README.md,.env.example}`, `github-evidence/tools/record_github.py`, `tests/github/{conftest.py,test_service.py,test_client.py,recordings/}`, `tests/run-suite.ps1`, `tests/README.md` | 2.3 PART (service half; DONE once P1-4 feeds the score); 2.13 BROKEN (service half) | — (its two docs issues moved to P0-6, T-0028) | T-0011 |
+| P1-2 | Metrics and sub-score: 52-week authored-commit activity, language breakdown, owned vs forked, consistency, claim cross-reference against the parsed skills, documented formula and weights, partial labelling, call budget | P1-1 | M | `github-evidence/app/{metrics,claims,scoring,skill_languages}.py`, `github-evidence/README.md`, `tests/github/{test_metrics.py,test_scoring.py,snapshots/}`, `tests/github/recordings/` | 2.4 MIS (all but quality); 2.5 MIS; 2.7 MIS (all DONE once P1-4 feeds the score) | I-0047 (its docs issue moved to P0-6 and its calibration issue to P3-12, T-0028) | T-0012 |
+| P1-3 | Deterministic contact fields in the parser: document order instead of `set()`; GitHub link prefers a bare profile URL; full path captured; trailing punctuation stripped. The `entities.github` output shape is unchanged | — | S | `nlp-engine/app/ner.py`, `tests/nlp/test_contact_determinism.py`, `tests/nlp/snapshots/current/` | 2.1 PART (resume path deterministic); 4.11 CRU (deterministic input) | I-0015 (its wording issue moved to P0-6, T-0028) | T-0013 |
+| P1-4 | Core integration: `backend/Services/internalHttp.js` (timeout, one retry on connect errors, request ID, safe errors) and `githubEvidence.js` (login normalisation, reason codes §1.3); `buildScoreRecord(nlpJson, { github })` and `buildGithubSubScore`; per-skill `sources.github`; flags stay "not available" (no false "no contradictions"); "public repositories only" in the explanation; `githubAggregator.js` deleted | P1-2, P1-3 | L | `backend/Services/{internalHttp,githubEvidence,explainability}.js`, `backend/Controllers/analysis.controller.js`, `backend/.env.example`, `backend/Controllers/githubAggregator.js` (deleted), `tests/backend/{explainability.test.mjs,github-evidence-client.test.mjs,live-analyze-github.test.mjs,lib/stub-server.mjs}`, `tests/run-suite.ps1`, `AUDIT.md` | 2.3 PART→DONE; 2.4 MIS→PART; 2.5 MIS→DONE; 2.7 MIS→DONE; 2.8 PART (now exercised with two sources; assessment-only needs Module 3); 2.10 MIS→DONE; 2.11 MIS→PART; 2.12 MIS→DONE; 2.13 BROKEN→DONE; 4.1 BROKEN (2 of 3 sources); 4.2 PART→DONE; 4.5 PART; 4.7 CRU→DONE; 0.3 PART; 0.5 CRU (GitHub key server-side); 0.7 MIS→PART (GitHub path) | — (the `githubAggregator.js` part of the backend-cruft issue was done here; the rest is P0-3) | T-0014 |
 | P1-5 | Outage probe P-4 service down, P-5 service hung, P-6 GitHub rate-limited, as asserting rows; timings feed the §1.2 timeout values | P1-4 | S | `tests/arch/nlp-outage-probe.mjs`, `tests/README.md`, `ARCHITECTURE.md` (as-is refresh of the GitHub path) | 0.7 PART (evidence); 2.8 PART (evidence); 2.13 DONE (evidence); GR-2 PART (evidence) | I-0049 | T-0015 |
 | P1-6 | 8DFS (FR-7): up to 8 core logic files per analysed repo (top repos by authored commits); skips vendor, config, lock, generated, minified and test files; `lizard` for cyclomatic complexity, function length and parameter counts; smell flags; a quality component in the sub-score | P1-2 | L | `github-evidence/app/{dfs8,quality}.py`, `github-evidence/app/scoring.py`, `github-evidence/requirements.txt`, `tests/github/test_dfs8.py`, recordings of git trees and blobs | 2.6 MIS→DONE; 2.4 PART→DONE; 2.12 DONE | — | later |
 | P1-7 | `github` schema and `github_svc` role (DEC-6): Repository entity, SHA-keyed analysis cache, ETags, cross-schema denial test, idempotent migration | P1-6 | M | `supabase/migrations/<date>_github_schema.sql`, `github-evidence/app/store.py`, `github-evidence/requirements.txt`, `tests/github/test_store.py` | 2.11 PART→DONE; 0.2 PART; 0.3 PART→DONE | — | later |
 | P1-8 | Frontend test runner (`react-scripts test --watchAll=false --ci` as its own `frontend-test` run-suite step, so the build's known lint failure cannot mask it) plus characterisation tests of today's recruiter pages, so every later frontend change runs under them; the docs checker accepts `frontend/src/__tests__/` as test evidence (owner, 2026-10-15) | — | S | `frontend/src/setupTests.js`, `frontend/src/__tests__/{jobdetails-filters,evidence-limited,skill-evidence}.test.jsx` (CRA's Jest only looks under `src/`), `frontend/package.json` (only if Jest overrides are needed), `tests/run-suite.ps1`, `tests/README.md`, `tests/docs/check-trackers.mjs`, `AUDIT.md` | 5.6 CRU→DONE; 5.10 CRU→DONE; 5.11 CRU→DONE | — | T-0019 |
-| P1-9 | Recruiter view of GitHub evidence: a GitHub column in the per-skill table, a repo drill-down (which repo, which metric), GitHub contradiction flags such as "claimed language absent from all repos" | P1-4, P1-8 | M | `backend/Services/explainability.js` (`buildFlags`), `frontend/src/components/recruiter/{ScoreBreakdown,CandidateModal}.jsx`, `tests/frontend/`, `tests/backend/explainability.test.mjs` | 4.6 MIS→PART; 5.7 PART; 5.8 PART; 5.9 PART | I-0040 | later |
+| P1-9 | Recruiter view of GitHub evidence: a GitHub column in the per-skill table, a repo drill-down (which repo, which metric), GitHub contradiction flags such as "claimed language absent from all repos" | P1-4, P1-8 | M | `backend/Services/explainability.js` (`buildFlags`), `frontend/src/components/recruiter/{ScoreBreakdown,CandidateModal}.jsx`, `tests/frontend/`, `tests/backend/explainability.test.mjs` | 4.6 MIS→PART; 5.7 PART; 5.8 PART; 5.9 PART | — (the relative-link issue moved to P0-4, T-0028; P1-9 builds the URL from P1-4's login) | later |
 | P1-10 | Link targets read from the résumé file: PDF URI annotations and DOCX hyperlink targets feed the contact parser (GitHub and LinkedIn) after the text matches, under T-0013's rule; the URLs are never added to the text, so skills, `raw_text_preview` and the semantic score do not change; an annotation-only PDF fixture and a hyperlink-only DOCX fixture | — | S | `nlp-engine/app/{extractor,ner,main}.py`, `nlp-engine/requirements.txt` (lower bounds only), `tests/fixtures/{make_fixtures.py,manifest.json}`, `tests/nlp/test_link_annotations.py`, `tests/nlp/snapshots/current/`, `tests/backend/live-analyze-github.test.mjs`, `AUDIT.md` | 2.1 PART (resume path: links behind labels); 1.16 PART (LinkedIn from annotations); 1.9 PART | I-0052 | T-0017 |
 
 ### 1.8 FR-4..FR-7 coverage
@@ -251,15 +336,26 @@ never silently counted as missing (CHECKLIST 2.10).
 
 | Id | Item | Depends on | Size | Files | Moves | Issues | Task |
 |---|---|---|---|---|---|---|---|
-| P2-1 | M1 NLP failure isolation: core → NLP over `internalHttp` (new `postForm`; 5 s from measured parse times, T-0018; one retry on connect errors), `503 {"error":"nlp_unavailable"}` with `Retry-After`, no raw text on any path; `/parse` becomes a plain `def`; probe P-1/P-2/P-3 assert | P1-4 | S | `backend/Services/{internalHttp,nlpClient}.js` (`nlpClient` new), `backend/Controllers/analysis.controller.js`, `backend/.env.example`, `nlp-engine/app/main.py`, `tests/backend/nlp-client.test.mjs`, `tests/nlp/test_parse_concurrency.py`, `tests/arch/nlp-outage-probe.mjs`, `tests/run-suite.ps1`, `tests/README.md`, `ARCHITECTURE.md` | 0.7 PART→DONE; GR-2 PART (evidence) | I-0036, I-0037, I-0050 | T-0018 |
+| P2-1 | M1 NLP failure isolation: core → NLP over `internalHttp` (new `postForm`; 5 s from measured parse times, T-0018; one retry on connect errors), `503 {"error":"nlp_unavailable"}` with `Retry-After`, no raw text on any path; `/parse` becomes a plain `def`; probe P-1/P-2/P-3 assert | P1-4 | S | `backend/Services/{internalHttp,nlpClient}.js` (`nlpClient` new), `backend/Controllers/analysis.controller.js`, `backend/.env.example`, `nlp-engine/app/main.py`, `tests/backend/nlp-client.test.mjs`, `tests/nlp/test_parse_concurrency.py`, `tests/arch/nlp-outage-probe.mjs`, `tests/run-suite.ps1`, `tests/README.md`, `ARCHITECTURE.md` | 0.7 PART→DONE; GR-2 PART (evidence) | I-0036, I-0037 (the probe-label issue moved to P0-6, T-0028) | T-0018 |
 | P2-2 | M2 one API base: `src/config/api.js` (relative base), the CRA `proxy` in dev, the `window.fetch` patch removed, the 5 hardcoded calls fixed | P1-8 | S | `frontend/src/config/api.js` (new), the files that declare `API_BASE_URL` (13 once P2-3 deletes `Processing.jsx`; e.g. `frontend/src/context/AuthContext.jsx`, `frontend/src/pages/recruiter/CreateJob.jsx`, `frontend/src/pages/public/ResetPassword.jsx`), `frontend/package.json`, `frontend/src/__tests__/api-config.test.js` | GR-2 PART (evidence) | I-0012 | T-0021 |
-| P2-3 | Score-on-apply (5.14, R9): `scores.application_id`, status, reason and lease columns (idempotent migration, I-0010's rules); a trigger creates the pending row with the application, and existing applications are backfilled as pending (owner, 2026-10-15); scoring extracted from `analyzeResume` into `backend/Services/scoring.js` (stored resume → NLP → GitHub → `buildScoreRecord`); apply returns 201 with the score "pending" and never waits for NLP (ARCHITECTURE §4.4); retries by a periodic re-score job in each core process (first tick at boot) claiming rows with `FOR UPDATE SKIP LOCKED` and a lease, safe with two core replicas; the candidate sees pending, scored or failed with a reason; the recruiter's per-job view lists one row per application; `Processing.jsx` deleted; `/api/analyze` removed (T-0020) | P2-1, P1-8 | L | `supabase/migrations/<date>_score_on_apply.sql`, `backend/Services/scoring.js` (new), `backend/Controllers/{jobs,analysis}.controller.js`, `backend/Routes/analysis.routes.js`, `backend/index.js`, `frontend/src/pages/candidate/{JobDetail,Results}.jsx`, `frontend/src/pages/candidate/Processing.jsx` (deleted), `frontend/src/App.jsx`, `frontend/src/pages/recruiter/JobDetails.jsx`, `frontend/src/__tests__/`, `tests/backend/{scoring,migration-guards,live-score-on-apply}.test.mjs`, `tests/backend/lib/score.mjs`, the live tests that call analyze, `tests/arch/nlp-outage-probe.mjs` | 5.14 MIS→DONE; 5.4 PART→DONE; 0.8 MIS→PART; 0.7 DONE (evidence); 5.5 PART (evidence) | I-0034 (the analyze file-type half), I-0053 | T-0020 |
+| P2-3 | Score-on-apply (5.14, R9): `scores.application_id`, status, reason and lease columns (idempotent migration, P0-2's rules); a trigger creates the pending row with the application, and existing applications are backfilled as pending (owner, 2026-10-15); scoring extracted from `analyzeResume` into `backend/Services/scoring.js` (stored resume → NLP → GitHub → `buildScoreRecord`); apply returns 201 with the score "pending" and never waits for NLP (ARCHITECTURE §4.4); retries by a periodic re-score job in each core process (first tick at boot) claiming rows with `FOR UPDATE SKIP LOCKED` and a lease, safe with two core replicas; the candidate sees pending, scored or failed with a reason; the recruiter's per-job view lists one row per application; `Processing.jsx` deleted; `/api/analyze` removed (T-0020) | P2-1, P1-8 | L | `supabase/migrations/<date>_score_on_apply.sql`, `backend/Services/scoring.js` (new), `backend/Controllers/{jobs,analysis}.controller.js`, `backend/Routes/analysis.routes.js`, `backend/index.js`, `frontend/src/pages/candidate/{JobDetail,Results}.jsx`, `frontend/src/pages/candidate/Processing.jsx` (deleted), `frontend/src/App.jsx`, `frontend/src/pages/recruiter/JobDetails.jsx`, `frontend/src/__tests__/`, `tests/backend/{scoring,migration-guards,live-score-on-apply}.test.mjs`, `tests/backend/lib/score.mjs`, the live tests that call analyze, `tests/arch/nlp-outage-probe.mjs` | 5.14 MIS→DONE; 5.4 PART→DONE; 0.8 MIS→PART; 0.7 DONE (evidence); 5.5 PART (evidence) | I-0034 (the analyze file-type half; the per-job score issue is in P0-3, see proposed change 1) | T-0020 |
 | P2-4 | M3 API gateway (DEC-1, DEC-2): `gateway/` on :5000, core on :5001 with `trust proxy`; routing, forward-auth to `/api/auth/me` under the five constraints, rate limits and CORS moved out of core, `X-Request-ID` logged by gateway, core, NLP and github-evidence, aggregated `/health` over core, NLP and github-evidence (`degraded` when a dependency is down); no route to github-evidence (DEC-5) | P2-2 | L | `gateway/{index.js,public-routes.js,forwardAuth.js,requestId.js,health.js,package.json}` (new), `backend/index.js`, `backend/Routes/auth.routes.js`, `backend/Middlewares/requestId.js` (new), `nlp-engine/app/main.py`, `tests/gateway/*.test.mjs` (new), `tests/run-suite.ps1`, `tests/backend/lib/env.mjs`, `tests/arch/nlp-outage-probe.mjs`, `ARCHITECTURE.md` | GR-2 PART; 0.1 PART | I-0034 (NLP CORS half), I-0035 (rate-limiter half), I-0036 (health half) | T-0022 |
-| P2-5 | Merged application-centric recruiter dashboard (5.15, R38): one view per application with score or "pending", status, shortlist and reject, and the explanation drill-down; applicants appear whether scored or not; email source decided once (I-0028); the Jobs page shows the real application count | P2-3, P1-8 | L | `frontend/src/pages/recruiter/{Dashboard,JobDetails,Jobs}.jsx`, `frontend/src/components/recruiter/{CandidateModal,ScoreBreakdown}.jsx`, `backend/Controllers/analysis.controller.js` (`getAllApplicants`), `backend/Routes/analysis.routes.js`, `frontend/src/__tests__/`, `tests/backend/live-applicants.test.mjs` | 5.15 PART→DONE; 5.5 PART→DONE; 5.7 PART; 5.8 PART | I-0028, I-0054 | later |
-| P2-6 | M4 containers and one-command start: Dockerfiles for gateway (with the frontend build), core, nlp and github-evidence; `docker-compose.yml` and `docker-compose.test.yml` (ARCHITECTURE §4.7); pinned NLP requirements and one venv; the checker learns `.yml` cites | P2-4, P1-4 | M | `gateway/Dockerfile`, `backend/Dockerfile`, `nlp-engine/Dockerfile`, `github-evidence/Dockerfile`, `docker-compose.yml`, `docker-compose.test.yml`, `nlp-engine/requirements.txt`, `tests/run-suite.ps1`, `tests/docs/check-trackers.mjs`, `README.md` (run section) | GR-2 PART→DONE (AUDIT's promote rule); 0.1 PART | I-0038, I-0034 (NLP internal only), I-0042, I-0032 (run section) | later |
+| P2-5 | Merged application-centric recruiter dashboard (5.15, R38): one view per application with score or "pending", status, shortlist and reject, and the explanation drill-down; applicants appear whether scored or not; the email source and the Jobs page count are settled earlier, in P0-3 and P0-4 | P2-3, P1-8 | L | `frontend/src/pages/recruiter/{Dashboard,JobDetails,Jobs}.jsx`, `frontend/src/components/recruiter/{CandidateModal,ScoreBreakdown}.jsx`, `backend/Controllers/analysis.controller.js` (`getAllApplicants`), `backend/Routes/analysis.routes.js`, `frontend/src/__tests__/`, `tests/backend/live-applicants.test.mjs` | 5.15 PART→DONE; 5.5 PART→DONE; 5.7 PART; 5.8 PART | — (its two issues moved to P0-3 and P0-4, T-0028) | later |
+| P2-6 | M4 containers and one-command start: Dockerfiles for gateway (with the frontend build), core, nlp and github-evidence; `docker-compose.yml` and `docker-compose.test.yml` (ARCHITECTURE §4.7); pinned NLP requirements and one venv; the checker can cite `.yml` files by then (P0-6) | P2-4, P1-4 | M | `gateway/Dockerfile`, `backend/Dockerfile`, `nlp-engine/Dockerfile`, `github-evidence/Dockerfile`, `docker-compose.yml`, `docker-compose.test.yml`, `nlp-engine/requirements.txt`, `tests/run-suite.ps1`, `README.md` (run section) | GR-2 PART→DONE (AUDIT's promote rule); 0.1 PART | I-0038, I-0034 (NLP internal only) | later |
 | P2-7 | M5 stateless auth (DEC-3): Supabase access and refresh tokens in httpOnly cookies; `express-session` removed; single-flight refresh in the frontend; logout revokes. **Timing: after M4, before M6 and M7** | P2-6 | L | `backend/Controllers/auth.controller.js`, `backend/Middlewares/auth.Middleware.js`, `backend/index.js`, `backend/Routes/auth.routes.js`, `frontend/src/context/AuthContext.jsx`, `tests/backend/lib/session.mjs`, `tests/backend/live-auth-failclosed.test.mjs` | 0.4 BROKEN (stateless; OAuth now possible) | I-0035 | later |
 | P2-8 | M6 the gateway verifies tokens locally (`jose`, JWKS or HS256), strips client `X-User-*`, and replaces DEC-2's forward-auth | P2-4, P2-7 | M | `gateway/auth.js` (new), `gateway/index.js`, `tests/gateway/` | 0.4 BROKEN; GR-2 DONE (evidence) | — | later |
 | P2-9 | M7 scaling and load evidence: `--scale core=2 --scale nlp=2` passes the harness; autocannon at 100 connections through the gateway; the P2-3 claim holds with two replicas | P2-6, P2-7, P2-3 | M | `tests/load/` (new), `docker-compose.yml`, `tests/README.md` | 6.6 MIS→DONE; 0.8 PART; 0.1 PART (2 of 3 Python services) | I-0051 | later |
+
+### Phase 0, second half: after T-0019, T-0020 and T-0021
+
+These rows belong to Phase 0 (see its intro). They sit here because they depend on P1-8,
+P2-2 and P2-3, and the checker needs each row below its dependencies.
+
+| Id | Item | Depends on | Size | Files | Moves | Issues | Task |
+|---|---|---|---|---|---|---|---|
+| P0-4 | **B5 redesign**, under P1-8's tests. (a) Validate the file type on selection (I-0006). (b) Accept one-word names at signup (I-0016). (c) Label the Landing demo score "Example" and drop the invented stats; the team decides the wording (I-0026). (d) Build the GitHub link from the normalised login (I-0040). (e) Show the real application count on the Jobs page; this needs a backend count (I-0054). (f) Make the frontend build lint-clean with no `import.meta.env` (I-0068) | P1-8, P2-2, P2-3 | M | `frontend/src/pages/candidate/Upload.jsx`, `frontend/src/pages/public/{Login,Landing}.jsx`, `frontend/src/components/recruiter/CandidateModal.jsx`, `frontend/src/pages/recruiter/{Jobs,AllCandidates}.jsx`, `frontend/src/components/layouts/{CandidateLayout,RecruiterLayout}.jsx`, `backend/Controllers/{auth,jobs}.controller.js`, `frontend/src/__tests__/` | 5.1 PART | I-0006, I-0016, I-0026, I-0040, I-0054, I-0068 | later |
+| P0-5 | **GR-1 anti-cheating design**, written before more Module 3 work. It covers: (a) the threat model: answer-key exposure (closed by P0-1), prompt injection into grading (I-0067), pasted or LLM-written answers, retakes, impersonation; (b) which controls the system enforces and which it only records for the recruiter; (c) what the candidate sees after grading; (d) the test for each control. Design only: the I-0067 fix and the other controls are built in a later task | P0-1 | S | `Docs/GR-1-anti-cheat-design.md` (new), `AUDIT.md` | GR-1 MIS→PART | I-0067 | later |
+| P0-6 | **B6 docs refresh.** (a) Rewrite CODE_MAP, REVIEW_BRIEF and README from AUDIT and ARCHITECTURE (I-0030, I-0031, I-0032). (b) The owner decides on the SRS's MongoDB line (I-0033). (c) The checker learns `.yml`, `.yaml`, `.toml`, `.ts` and paths with spaces (I-0042). (d) Fix ROADMAP wording (I-0043, I-0044) and a stale task cite (I-0045). (e) Clear the httpx test-client warning (I-0046). (f) Fix the probe's login label (I-0050). (g) Archive WORKLOG (I-0064) | P0-4, P0-5 | M | `CODE_MAP.md`, `README.md`, `REVIEW_BRIEF.md`, `PROJECT_SOURCE_DOCS.md` (only if the owner decides), `tests/docs/check-trackers.mjs`, `ROADMAP.md`, `tasks/T-0012-github-evidence-metrics.md`, `github-evidence/requirements-dev.txt`, `tests/arch/nlp-outage-probe.mjs`, `WORKLOG.md`, `Docs/worklog-archive/` (new) | — | I-0030, I-0031, I-0032, I-0033, I-0042, I-0043, I-0044, I-0045, I-0046, I-0050, I-0064 | later |
 
 ### Order, tracks and DEC-3
 
@@ -291,8 +387,8 @@ Why this order:
 
 | Id | Item | Depends on | Size | Files | Moves | Issues | Task |
 |---|---|---|---|---|---|---|---|
-| P3-1 | The remaining promoting tests (see "Test backlog"): secrets hygiene, scope guard, explainability weights and determinism, bias-free candidate keys on the apply-scoring path | P1-4, P2-3 | S | `tests/backend/secrets-hygiene.test.mjs`, `tests/docs/scope-guard.test.mjs`, `tests/backend/explainability.test.mjs`, `tests/backend/live-score-on-apply.test.mjs`, `tests/run-suite.ps1`, `AUDIT.md` | 0.5 CRU→DONE; 0.9 CRU→DONE; 4.3 CRU→DONE; 4.11 CRU→DONE; 5.12 CRU→DONE | — | later |
-| P3-2 | Support and maintenance vocabulary (ITSM, ticketing, monitoring, directory services, shell, PL/SQL…); remove invented and duplicate keywords; drop the "github"-as-a-skill false positive | — | S | `nlp-engine/app/ner.py`, `tests/nlp/snapshots/current/` | 1.17 MIS→DONE | I-0004 | later |
+| P3-1 | The remaining promoting tests (see "Test backlog"): secrets hygiene, scope guard, explainability weights and determinism, bias-free candidate keys on the apply-scoring path; assessment generation never serves a static bank, and a hung LLM call does not block a second generate (AUDIT 3.2, 3.10, mapped by T-0028; they reuse T-0029's `tests/assessment/` suite) | P1-4, P2-3 | M | `tests/backend/secrets-hygiene.test.mjs`, `tests/docs/scope-guard.test.mjs`, `tests/backend/explainability.test.mjs`, `tests/backend/live-score-on-apply.test.mjs`, `tests/assessment/test_generator.py` (new), `tests/arch/assessment-concurrency-probe.mjs` (new), `tests/run-suite.ps1`, `AUDIT.md` | 0.5 CRU→DONE; 0.9 CRU→DONE; 4.3 CRU→DONE; 4.11 CRU→DONE; 5.12 CRU→DONE; 3.2 CRU→DONE; 3.10 CRU→DONE | — | later |
+| P3-2 | Support and maintenance vocabulary (ITSM, ticketing, monitoring, directory services, shell, PL/SQL…); remove invented and duplicate keywords; drop the "github"-as-a-skill false positive | — | S | `nlp-engine/app/ner.py`, `tests/nlp/snapshots/current/` | 1.17 MIS→DONE | — (the keyword-cruft issue is in P0-3, see proposed change 2) | later |
 | P3-3 | GF-3 fairness measure: paired fixtures (a support candidate on a support JD vs a developer on a dev JD); a test that fails when the support pair scores lower beyond a stated tolerance; the result recorded | P3-2 | M | `tests/fixtures/{make_fixtures.py,manifest.json,jds/}`, `tests/nlp/test_fairness.py` (new), `tests/FAIRNESS.md` (new) | 4.12 MIS→DONE; 4.8 MIS→PART | — | later |
 | P3-4 | GitHub maintenance signals (2.9): commits to forks and others' repos, merged PRs, reviews and issues, as a sub-score component, so maintainers are not scored only on greenfield authorship | P1-2, P3-3 | M | `github-evidence/app/{metrics,scoring}.py`, `tests/github/`, recordings | 2.9 MIS→DONE; 4.8 PART→DONE | — | later |
 | P3-5 | Unreadable input is signalled: no text layer or empty text → status `unreadable`, and the parsing sub-score is unavailable with a reason, not 0.0 | — | S | `nlp-engine/app/{main,extractor}.py`, `backend/Services/explainability.js`, `tests/nlp/test_parse.py` | 1.15 MIS→DONE | — | later |
@@ -302,14 +398,9 @@ Why this order:
 | P3-9 | Certificates and LinkedIn as structured entities: name, issuer, credential id and URL; persisted with the resume | — | M | `nlp-engine/app/{ner,main}.py`, `supabase/migrations/<date>_resume_certificates.sql`, `backend/Services/scoring.js`, `tests/nlp/` | 1.16 PART→DONE | — | later |
 | P3-10 | LinkedIn and certificate validation: a spike (S) re-checks provider terms first, then builds the feasible part (see the feasibility section) | P3-9, P2-7 | L | spike note under `Docs/`, then per-issuer verifiers (location set by the spike), `backend/Services/explainability.js`, `frontend/src/components/recruiter/ScoreBreakdown.jsx` | 4.10 MIS→PART; 5.13 MIS→PART | — | later |
 | P3-11 | Parser accuracy measured on a labelled sample (extraction accuracy, skill F1) | P3-7, P3-8 | L | `tests/eval/` (new), labelled data (real CVs under `tests/private/`, gitignored) | 1.11 MIS→DONE; 1.12 MIS→DONE; 6.1 MIS→DONE; 6.2 MIS→DONE | — | later |
-| P3-12 | GitHub evidence vs human judgement: correlation on rated profiles (target ≥ 0.7, framed as correlation, not accuracy); calibrates the P1-2 weights | P1-6 | M | `tests/eval/github/` (new), `github-evidence/README.md` | 6.4 MIS→DONE | — | later |
-| P3-13 | Backend small fixes: one-word names at signup, the duplicate profile insert, upload size limit with 413, the 404 message method, 400 for a malformed application id | P1-8 | S | `backend/Controllers/{auth,analysis,jobs}.controller.js`, `backend/index.js`, `frontend/src/pages/public/Login.jsx`, `tests/backend/` | — | I-0016, I-0017, I-0025, I-0027, I-0029 | later |
-| P3-14 | Frontend small fixes: validate the file type on selection, label the Landing demo score "Example" and drop the fake stats, delete the unrouted `Assessment.jsx` shell (Module 3 builds its own UI after GR-1) | P1-8 | S | `frontend/src/pages/candidate/Upload.jsx`, `frontend/src/pages/public/Landing.jsx`, `frontend/src/pages/candidate/Assessment.jsx` (deleted), `tests/frontend/` | 5.1 PART | I-0005, I-0006, I-0026 | later |
-| P3-15 | Migrations hygiene: every migration idempotent so the Supabase Preview check goes green; the bucket MIME allow-list and 10 MB cap in a migration; the stale `scores.subscores` comment | — | M | `supabase/migrations/*.sql` | 0.2 PART | I-0001, I-0010, I-0041 | later |
-| P3-16 | Cleanup: unused `bcrypt`, empty middleware files, tracked `dev/null`, the empty `backend/uploads/`; the OAuth env vars are kept or removed once P2-7 settles OAuth | P2-7 | S | `backend/package.json`, `backend/Middlewares/{authCand,authRec}.Middleware.js`, `dev/null` | — | I-0039 | later |
-| P3-17 | Stale docs, rewritten once, at the end, from AUDIT.md and ARCHITECTURE.md: CODE_MAP, README, REVIEW_BRIEF, and the owner's call on the SRS excerpt | P2-3, P2-6 | M | `CODE_MAP.md`, `README.md`, `REVIEW_BRIEF.md`, `PROJECT_SOURCE_DOCS.md` (only if the owner decides) | — | I-0030, I-0031, I-0032, I-0033 | later |
+| P3-12 | GitHub evidence vs human judgement: correlation on rated profiles (target ≥ 0.7, framed as correlation, not accuracy); calibrates the P1-2 weights | P1-6 | M | `tests/eval/github/` (new), `github-evidence/README.md` | 6.4 MIS→DONE | I-0048 | later |
 
-### Test backlog: the 9 CODE_REVIEWED_UNTESTED rows
+### Test backlog: the 11 CODE_REVIEWED_UNTESTED rows
 
 The runner comes first, at P1-8, just before the first task that changes frontend
 pages (owner, T-0010). Each test is the one AUDIT names in that row's "Promote with".
@@ -325,6 +416,8 @@ pages (owner, T-0010). Each test is the one AUDIT names in that row's "Promote w
 | 4.3 weights | `tests/backend/explainability.test.mjs` (defaults, `CREDIBILITY_WEIGHTS` override, fallbacks) | P3-1 |
 | 4.11 determinism | `tests/backend/explainability.test.mjs` (same input → same record apart from `generated_at`) | P3-1 |
 | 5.12 bias-free keys | live test on the scoring path; it is written against the apply path, because T-0020 (P2-3) removes `/api/analyze` | P3-1 |
+| 3.2 static banks eliminated | `tests/assessment/test_generator.py` (LLM stubbed to fail → 502 and no questions; two generations → different `assessment_id`s) | P3-1 (T-0028) |
+| 3.10 parallel execution | `tests/arch/assessment-concurrency-probe.mjs` (a second generate completes while one LLM call is hung) | P3-1 (T-0028) |
 
 ### LinkedIn and certificates (GF-1): an honest feasibility assessment
 
@@ -357,7 +450,7 @@ These are not in the three phases. Each is listed with what it waits for.
 
 | What | CHECKLIST ids | Waits for |
 |---|---|---|
-| Assessment module (PFQS, rubrics, LLM service with its own schema, M9) | 3.1–3.13, GR-1, 5.3, 6.5 | GR-1: the anti-cheat design must be written before Module 3 is built. Owners per DEC-4. P2-4 gives it a gateway route |
+| Assessment module (PFQS, rubrics, LLM service with its own schema, M9) | 3.1–3.13, GR-1, 5.3, 6.5 | GR-1: the anti-cheat design (P0-5) must be written before more of Module 3 is built. Owners per DEC-4. P2-4 gives it a gateway route |
 | GitHub OAuth connect and explicit username input | 2.1 (input path), 2.2, 5.2 | P2-7 (Supabase's GitHub provider needs token auth); it reuses P1-4 |
 | Trained NER model, preprocessing that feeds NER, true hybrid layering | 1.4, 1.5, 1.7, 6.8 | P3-11's measurement, to show where model work pays off |
 | TLS | 0.6 | P2-6 (Caddy or the gateway, ARCHITECTURE §5 "later") |
@@ -377,7 +470,7 @@ These are not in the three phases. Each is listed with what it waits for.
 5. **GF-1 scope.** Does the guide accept "ownership plus issuer-verified
    certificates" (see the feasibility section)?
 6. **I-0033.** Keep the SRS excerpt verbatim (AD-1 records the deviation), or edit it.
-   Decided in P3-17.
+   Decided in P0-6 (B6).
 
 ## Dependency graph
 
@@ -385,6 +478,13 @@ Arrows point from a prerequisite to the item that needs it.
 
 ```mermaid
 flowchart LR
+  subgraph P0 [Phase 0: backlog burn-down]
+    P0_1["P0-1 B1 security"] --> P0_5["P0-5 GR-1 design"]
+    P0_2["P0-2 B2 migrations"]
+    P0_3["P0-3 B3 backend"]
+    P0_4["P0-4 B5 redesign"] --> P0_6["P0-6 B6 docs"]
+    P0_5 --> P0_6
+  end
   subgraph P1 [Phase 1: GitHub service]
     P1_1["P1-1 skeleton"] --> P1_2["P1-2 metrics + sub-score"]
     P1_3["P1-3 deterministic handle"]
@@ -428,21 +528,14 @@ flowchart LR
     P3_8["P3-8 layout"] --> P3_11
     P3_9["P3-9 certificates"] --> P3_10["P3-10 LinkedIn/cert validation"]
     P3_12["P3-12 GitHub correlation"]
-    P3_13["P3-13 backend fixes"]
-    P3_14["P3-14 frontend fixes"]
-    P3_15["P3-15 migrations"]
-    P3_16["P3-16 cleanup"]
-    P3_17["P3-17 stale docs"]
   end
   P1_4 --> P3_1
   P2_3 --> P3_1
   P1_2 --> P3_4
   P2_6 --> P3_6
+  P1_8 --> P0_4
+  P2_2 --> P0_4
+  P2_3 --> P0_4
   P2_7 --> P3_10
   P1_6 --> P3_12
-  P1_8 --> P3_13
-  P1_8 --> P3_14
-  P2_7 --> P3_16
-  P2_3 --> P3_17
-  P2_6 --> P3_17
 ```

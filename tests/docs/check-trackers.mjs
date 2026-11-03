@@ -19,6 +19,7 @@
 //    This proves the cites exist, not that they still say what the doc claims.
 //  - ROADMAP.md (T-0010), hard failures: every item table has the columns Id, Item,
 //    Depends on, Size, Files, Moves, Issues, Task; ids are unique; Size is S/M/L;
+//    n is 0-9 (Phase 0 = backlog burn-down, T-0028);
 //    every Pn-m in "Depends on" is an item defined in an earlier row (dependency
 //    order); every CHECKLIST id in Moves, every I-NNNN anywhere in the file and every
 //    T-NNNN in Task exists; every file:line cite resolves.
@@ -197,11 +198,11 @@ else {
     if (missingCols.length) { fail(`ROADMAP.md: item table "${t.header.join(' | ')}" lacks column(s): ${missingCols.join(', ')}`); continue; }
     for (const r of t.rows) {
       const id = plain(r[idx.id]);
-      if (!/^P[1-9]-\d+$/.test(id)) { fail(`ROADMAP.md: item id "${id}" is not of the form Pn-m`); continue; }
+      if (!/^P[0-9]-\d+$/.test(id)) { fail(`ROADMAP.md: item id "${id}" is not of the form Pn-m`); continue; }
       if (defined.has(id)) fail(`ROADMAP.md: duplicate item id ${id}`);
       const size = plain(r[idx.size]);
       if (!/^(S|M|L)$/.test(size)) fail(`ROADMAP.md: ${id} has size "${size}" (want S, M or L)`);
-      for (const [dep] of plain(r[idx['depends on']]).matchAll(/\bP[1-9]-\d+\b/g)) {
+      for (const [dep] of plain(r[idx['depends on']]).matchAll(/\bP[0-9]-\d+\b/g)) {
         if (!defined.has(dep)) fail(`ROADMAP.md: ${id} depends on ${dep}, which is not defined in an earlier row`);
       }
       for (const c of ROADMAP_COLS) if (!plain(r[idx[c]])) fail(`ROADMAP.md: ${id} has an empty "${c}" cell`);

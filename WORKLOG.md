@@ -449,3 +449,13 @@ rollup per archived month at the top of this file.
 - Verification: `t0023-full-harness.log` nlp 0 (12), docs 0 (18 warnings), github 0 (80), backend 45/46, frontend 1 (5 known + 4 new lint); explainability 9/9; Supabase project host does not resolve (DNS ENOTFOUND).
 - Issues logged: I-0055..I-0070 (P0: I-0055, I-0056, I-0066, I-0070); I-0010 updated; I-0005 resolved.
 - Next: owner fixes I-0070, `git add` + commit; then I-0055 spec; decide I-0056/I-0066 fixes and I-0065.
+
+## L-0039 · 2026-11-03 · T-0028 backlog plan (Phase 0) + T-0029 security spec draft
+- Prompt: re-verify open issues at df98068, add ROADMAP Phase 0 (B1–B6) mapping every open issue once, new execution order, draft T-0029 for B1.
+- Task: T-0028 (criteria 1–5 PASS; see Result).
+- Done: I-0070 (Supabase restored; smoke 7/7) and I-0051 resolved; I-0004/12/39/45 noted partly fixed. ROADMAP Phase 0 = P0-1..P0-6 (B1, B2, B3 at top; B5, GR-1 design, B6 after Phase 2 for dependency order) + B4 owned-by-spec table; P3-13..17 retired; 3.2/3.10 → P3-1; 9 proposed batch changes listed, not applied. T-0029 drafted (5 fixes, a fail-before test each).
+- Checker: `P[1-9]` → `P[0-9]` ids (owner-approved deviation from docs-only).
+- Verification: check-trackers 0 warnings (was 18); mapping script: 49 open issues, each in one batch.
+- Flag: execution order runs T-0020 before its dependency T-0018 (P2-1); owner to decide.
+- Files changed: ROADMAP.md, ISSUES.md, WORKLOG.md, tests/docs/check-trackers.mjs (mod); tasks/T-0028-backlog-plan.md, tasks/T-0029-security-batch.md (new).
+- Next: owner reviews T-0029 (design choices in (b) and (e)), then the B1 implementation.
