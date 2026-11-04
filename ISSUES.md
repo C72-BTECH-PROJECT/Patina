@@ -61,11 +61,13 @@ diff you're already writing.
 | I-0068 | Frontend CI build fails on 4 more lint warnings from `main` (CandidateLayout, RecruiterLayout, AllCandidates ×2), on top of the 5 known; `AllCandidates.jsx` reads `import.meta.env` under CRA (I-0012 pattern) | `frontend/src/**` | P2 | OPEN | 2026-10-31, T-0023 |
 | I-0071 | `live-shortlist-authz` control test expects no notification on reject; `3f53f80` added a "rejected" notification (intended, owner 2026-11-04), so the test is stale | `tests/backend/live-shortlist-authz.test.mjs`, `backend/Controllers/jobs.controller.js` | P2 | OPEN | 2026-11-04, T-0029 |
 | I-0072 | nlp-engine extracts `.txt`, but the `resumes` bucket and the backend accept only PDF/DOCX; confirm that no upload path accepts `.txt` | `nlp-engine/app/extractor.py`, `backend/Controllers/analysis.controller.js` | P3 | OPEN | 2026-11-04, T-0030 |
+| I-0073 | `evaluateAssessment` returns 500 and echoes the database error for a malformed `assessmentId` | `backend/Controllers/assessment.controller.js` | P3 | OPEN | 2026-11-04, T-0031 |
+| I-0074 | Repeating a shortlist or reject decision sends the candidate a duplicate notification | `backend/Controllers/jobs.controller.js` | P3 | OPEN | 2026-11-04, T-0031 |
 
 ---
 
 ### I-0004 — AI-cruft / hallucinated entries in `SKILL_KEYWORDS`
-**Status:** OPEN — partly fixed (re-verified T-0028 at `df98068`): the duplicate "typescript" is gone (`nlp-engine/app/ner.py:14`); "exponentjs" (`:59`), "r language" (`:16`) and "mern stack" (`:34`) remain. Planned in ROADMAP P3-2 (moved from B3 in T-0028).
+**Status:** OPEN — partly fixed (re-verified T-0028 at `df98068`): the duplicate "typescript" is gone (`nlp-engine/app/ner.py:14`); "exponentjs" (`:59`), "r language" (`:16`) and "mern stack" (`:34`) remain. Planned in ROADMAP P3-2 (moved from B3 in T-0028), spec T-0032.
 **Severity:** P3
 **Module:** `nlp-engine/app/ner.py` (lines 6-54, `SKILL_KEYWORDS`)
 **Spec ref:** n/a (data-quality cleanup, not a feature)
@@ -596,6 +598,24 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Spec ref:** n/a (consistency)
 **Evidence (2026-11-04, T-0030 B4):** the live `resumes` bucket allows only `application/pdf` and the DOCX type. `extract_text()` also handles `.txt` (`nlp-engine/app/extractor.py:33-34`, from `main` via `7b6dd3d`). A first look: the backend maps only `.pdf`/`.docx` to content types (`backend/Controllers/analysis.controller.js:28-31`), and the upload input has `accept=".pdf,.docx"` (`frontend/src/pages/candidate/Upload.jsx:299`). Not yet checked: every upload route's extension gate, and whether anything calls `/parse` with a `.txt` file.
 **Proposed fix (owner, 2026-11-04; in B3, ROADMAP P0-3 (k)):** check every upload path. If none accepts `.txt`, record the NLP branch as unused (test-only), and do **not** widen the bucket. If one does, close that path rather than widening the bucket.
+
+### I-0073 — `evaluateAssessment` 500s on a malformed `assessmentId`
+**Status:** OPEN
+**Severity:** P3
+**Module:** `backend/Controllers/assessment.controller.js`
+**Spec ref:** n/a
+**Evidence (2026-11-04, T-0031, from reading the code at `f5069a3`):** `:360` checks only that `assessmentId` is a string. A non-UUID reaches `.eq('id', assessmentId)` (`:377`), which should raise Postgres 22P02, and `:379-381` returns 500 with `loadError.message`. Same class as I-0029. Not run live.
+**Impact:** a client error is reported as a server error, and raw database text reaches the client. No data is touched.
+**Proposed fix:** validate with the shared `isUuid` from T-0031 and return 400. T-0031 D5 asks the owner whether it joins B3.
+
+### I-0074 — Repeated shortlist or reject sends a duplicate notification
+**Status:** OPEN
+**Severity:** P3
+**Module:** `backend/Controllers/jobs.controller.js`
+**Spec ref:** FR-14, FR-15
+**Evidence (2026-11-04, T-0031, from reading the code at `f5069a3`):** `shortlistCandidate` has no status-transition check. `:283-288` updates whatever the current status is, and `:294-310` notifies every time, so rejecting an already rejected application notifies again, and a rejected application can be shortlisted. The frontend has no shortlist or reject caller today, so only the API can trigger it.
+**Impact:** none in the UI today. It would appear once P2-5 adds the shortlist and reject buttons.
+**Proposed fix:** notify only when the status actually changes, and decide which transitions are allowed, in P2-5.
 
 ## Resolved
 ### I-0057 — Duplicate migration version prefixes (RESOLVED)

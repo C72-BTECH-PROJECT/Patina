@@ -495,3 +495,35 @@ rollup per archived month at the top of this file.
 - Issues: I-0057, I-0010, I-0001, I-0041 resolved; I-0072 new (B3); 4 stale AUDIT comma-list cites from T-0029 re-pointed.
 - Files changed (uncommitted): tasks/T-0030, ISSUES, AUDIT, ARCHITECTURE, ROADMAP, README, WORKLOG, tests/README.md, tests/MANUAL_SMOKE.md, backend/Controllers/analysis.controller.js (comment), Docs/SUPABASE_MIGRATIONS_RUNBOOK.md (new), .claude/settings.local.json (hook timeout).
 - Next: owner commits the trackers/runbook; then B3 (P0-3).
+
+## L-0044 · 2026-11-04 · T-0031 (B3) spec draft
+- Prompt: write the B3 spec: re-verify each P0-3 issue at HEAD, with fix direction and a fail-before test; I-0071, I-0025, I-0072 decided; flag migrations; stop for approval.
+- Task: T-0031 (draft; no code written).
+- Findings: I-0028 email is blank for every applicant, and the endpoint has a caller (`AllCandidates.jsx:20`). `/api/analyze` accepts `.txt` (I-0072). Multer without a wrapper gives 500 HTML, and its limit refuses a file of exactly the limit (scratch probe). All 4 live score rows carry the I-0065 text; a rebuild fix alone does not change them. assessment-service ignores `X-Request-ID`. `GET /api/jobs/applications` has no caller.
+- Migration: one at most (`applicant_emails` RPC, D1), under the runbook; the bucket does not change.
+- Open for the owner: D1 email source, D2 delete the route, D3 I-0065, D4 rejection wording, D5 include I-0073.
+- Live access: read-only aggregate counts through the service-role test client (scores, resumes, applications, profiles, notifications, bucket); nothing written. The stored `rejected` row's wording is in no commit.
+- Verification: check-trackers 0 warnings; no test suite run, no code changed.
+- Issues: I-0073 (mapped to P0-3, proposed, D5), I-0074 (P2-5) new. ROADMAP: P0-3 task cell, both item rows, B4 rows.
+- Files changed: tasks/T-0031-b3-backend-correctness.md (new); ISSUES.md, ROADMAP.md, WORKLOG.md (mod).
+- Next: owner decides D1–D5 and approves the criteria.
+
+## L-0045 · 2026-11-04 · Team assignments recorded (T-0022 split, P3-2, B5)
+- Prompt: record the team assignments in ROADMAP and the specs; docs only; run the checker; stop.
+- Task: ad-hoc (docs).
+- Done: T-0022 split. Part 1 (`gateway/` only, offline, branch `gateway/part1`): Aaron and Aditya. Part 2: project owner with both, after T-0021 and B3. `gateway.test.mjs` replaced by `auth-routing.test.mjs` and `edge.test.mjs`. P3-2 pulled forward to Anurag; B3 must not touch the keyword lists. B5 owner Anthony, after T-0021.
+- Recorded in T-0022: criteria 6, 9, 10, 11 and 13 have parts that cannot be done in Part 1, so those parts go to Part 2. `requestId.js` and `cors.js` have no Part 1 test. After B3, `resolveRequestId` moves from `internalHttp.js`, not `analysis.controller.js`.
+- Assumed: `package-lock.json` goes with Aaron; P3-2 can run alongside B3.
+- Open: T-0022 has no recorded approval; `gateway/part1` does not exist yet; P3-2 and B5 have no spec; T-0031 D1-D5 still unanswered.
+- Verification: check-trackers 0 warnings.
+- Files changed: ROADMAP.md, WORKLOG.md, tasks/T-0022-api-gateway.md, tasks/T-0031-b3-backend-correctness.md (mod). No code.
+
+## L-0046 · 2026-11-04 · T-0022 Part 1 approved, shared boundary, T-0032 spec
+- Prompt: approve Part 1; add three tests; write the shared boundary; fix the assessment-service Out line; confirm assumptions; write T-0032; give the commands for docs/team-assignments; run the checker.
+- Task: ad-hoc (docs); T-0032 written, approved by the owner.
+- Done: T-0022 Part 1 approved, Part 2 draft. Criteria 15, 16 and the offline half of 5 added. `createApp` config table (11 keys), `mountX` exports and the 7-step middleware order written in. assessment-service: no route, checked by `/health`, `degraded` when down. `package-lock.json` to Aaron; P3-2 alongside B3.
+- Findings: a string `origin` makes `cors` answer every caller, so `cors.js` must pass a function. Simulating T-0032 in memory on all 6 fixtures: score fields computed from skills change too, so its criterion names allowed and forbidden snapshot fields. f3 goes Weak to Moderate; f4 stays Weak; "not on GitHub" stays a false positive.
+- Chosen by me, owner to confirm: the four rate-limit defaults.
+- ROADMAP: P0-3 Task cell back to `later` so main passes the checker without T-0031; it returns on the B3 branch after the merge.
+- Verification: check-trackers 0 warnings; the branch steps replayed in a throwaway clone without commits.
+- Files changed: tasks/T-0032-skill-vocabulary.md (new); tasks/T-0022-api-gateway.md, ROADMAP.md, ISSUES.md, WORKLOG.md (mod). No code.
