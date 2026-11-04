@@ -565,6 +565,7 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Evidence:** `rebuildScoreRecord` keeps the stored GitHub entry and only falls back to `not_collected_for_score` when the entry is missing (`backend/Services/explainability.js`, `rebuildScoreRecord`; test "rebuildScoreRecord on a score stored without a GitHub entry"). Every row ever written has all three keys, so a row scored before T-0014 carries `GITHUB_REASONS.service_disabled` ("…not part of this deployment yet"), and a later assessment rebuild keeps that text.
 **Impact:** after this merge, the recruiter can see "GitHub is not part of this deployment yet" on an old score that a new assessment just refreshed.
 **Proposed fix (owner decision):** also treat a stored GitHub entry that is unavailable and has no `components.reason_code` as `not_collected_for_score`.
+**Decision (owner, 2026-11-04, T-0031 D3):** the rebuild fix only. The stored text was true when it was written, because GitHub evidence was not deployed then, so stored rows are not rewritten.
 
 ### I-0067 — Grading can be steered by the answer being graded
 **Status:** OPEN (GR-1 / CHECKLIST 3.6; anti-cheat work is out of T-0023's scope)
@@ -590,6 +591,7 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Impact:** the `-Live` backend suite is red for a reason unrelated to security; a real regression in shortlist ownership could hide behind a known failure.
 **Decision (owner, 2026-11-04):** candidates **should** be notified of a rejection; the controller's behaviour is intended.
 **Fix (in B3, ROADMAP P0-3 (j), not before):** update the control test to expect exactly one `rejected` notification for the rejected application, and check that its text is neutral and that its payload carries no recruiter-only data (only `applicationId` and `jobId` today, `backend/Controllers/jobs.controller.js:303-309`; no score, notes or recruiter identity). The I-0019 ownership checks in the same file stay as they are.
+**Wording (owner, 2026-11-04, T-0031 D4):** a candidate with several applications cannot tell which one was rejected, so the text becomes `The recruiter has decided not to move forward with your application for <job title>.` This extends the fix above to the controller. The title is not recruiter-only data, because the candidate saw it when applying. It comes from the same query, not a second round trip, and the test pins the exact string. The payload stays `applicationId` and `jobId` only.
 
 ### I-0072 — nlp-engine `.txt` extraction vs a PDF/DOCX-only bucket
 **Status:** OPEN
@@ -606,7 +608,7 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Spec ref:** n/a
 **Evidence (2026-11-04, T-0031, from reading the code at `f5069a3`):** `:360` checks only that `assessmentId` is a string. A non-UUID reaches `.eq('id', assessmentId)` (`:377`), which should raise Postgres 22P02, and `:379-381` returns 500 with `loadError.message`. Same class as I-0029. Not run live.
 **Impact:** a client error is reported as a server error, and raw database text reaches the client. No data is touched.
-**Proposed fix:** validate with the shared `isUuid` from T-0031 and return 400. T-0031 D5 asks the owner whether it joins B3.
+**Fix (in B3, ROADMAP P0-3 (l); owner included it, T-0031 D5):** validate with the shared `isUuid` from T-0031 and return 400, with a test.
 
 ### I-0074 — Repeated shortlist or reject sends a duplicate notification
 **Status:** OPEN
@@ -1252,3 +1254,11 @@ the bug in tests; production remains nondeterministic.**
 - `backend/Services/explainability.js:75` (`GITHUB_REASONS.insufficient_evidence`, the draft text above).
 - `ROADMAP.md` §1.3 has the row.
 - `tests/backend/github-evidence-client.test.mjs` "maps every service outcome" › "200 sub_score unavailable: insufficient_evidence (D1)", and `tests/backend/explainability.test.mjs` "every GitHub reason is unavailable, never zero" (10 codes), both pass (`tests/.out/t0014-green.log`).
+
+### I-0075 — Live notification text of unknown origin (WONTFIX)
+**Status:** WONTFIX: the row is not modified (owner, 2026-11-04, T-0031 D4). Nothing in the repo writes this text, so there is no code to fix.
+**Severity:** P3
+**Module:** `public.notifications` (live data)
+**Spec ref:** n/a
+**Evidence (2026-11-04, T-0031):** the owner reported a live row reading `Your application for a job has been updated.` The string is not in the tree at `88d03eb`, and `git log --all -S` finds no commit that ever added it. The backend's only writers are `backend/Controllers/jobs.controller.js:295` and `:304`, with other text. Origin unknown. Not explained by this search: `supabase/migrations/20260903000000_create_notifications.sql:26` created a policy letting recruiters insert notifications directly, so the row may not have come through the backend.
+**Impact:** one old row. It does not affect the I-0071 wording.
