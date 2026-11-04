@@ -1,7 +1,8 @@
 # T-0031 — b3-backend-correctness (B3: ROADMAP P0-3)
 
-**Status:** DRAFT 2026-11-04, on branch `b3-backend-correctness`. No code written. D1–D5 decided
-(owner, 2026-11-04). Tracker edits made. Not started: the owner will say when B3 begins.
+**Status:** DONE 2026-11-04 on branch `b3-backend-correctness`, uncommitted. All 16 criteria PASS.
+The D1 migration is pushed. D1–D5 decided (owner, 2026-11-04). The clean run is in the Result.
+I-0079, found in review, is resolved here. I-0078 stays open: file content is not checked.
 
 All line numbers are at `f5069a3`. Several in ISSUES.md have shifted; the ones here replace
 them.
@@ -161,7 +162,7 @@ array form reaches the update. The existing valid-but-missing case stays 404.
 **Tests:**
 | Test | Tier | At HEAD | After |
 |---|---|---|---|
-| New `live-upload-gates.test.mjs`: 10 MB + 1 byte to `/api/resume/upload` and `/api/analyze` gives 413 JSON | live | Fails (500 / 400) | Passes |
+| New `live-upload-gates.test.mjs`: 10 MB + 1 byte to `/api/resume/upload` and `/api/analyze` gives 413 JSON | live | Fails (400 / 400) | Passes |
 | New `upload-limits.test.mjs`, small Express app: exactly 10485760 bytes accepted; 10485761 gives 413 JSON; wrong field name gives 400 JSON, never HTML | offline | Fails (no module) | Passes |
 | Same file: the constant equals `file_size_limit` in the bucket migration | offline | Fails | Passes |
 | `/api/resume/status` returns `maxResumeBytes` | live | Fails | Passes |
@@ -432,4 +433,147 @@ a new migration that drops the function.
 ---
 
 ## Result
-<Filled at the end. One line per acceptance criterion.>
+
+Filled 2026-11-04 and updated after the owner's migration push. All 16 criteria PASS. Nothing is
+committed. Every `--linked` command was the owner's.
+
+Logs are in `tests/.out/`: before: `t0031-before-{offline,live,nlp,assessment}.log`; after:
+`t0031-after-{backend-prepush,nlp,github,assessment,release}.log`; `t0031-j-mutation.log`;
+`t0031-local-{start,reset,roles}.log`.
+
+| # | Verdict | Evidence |
+|---|---|---|
+| 1 | **PASS** | `live-applicants` 5/5 against the shared project after the push (`t0031-final-current-backend-tests.log`): the applicants endpoint returns the Auth email; anon gets 42501 and a signed-in candidate 403 with 42501; the service role gets only `(id, email)` for the existing requested id. `applicant-identity` 5/5 (one RPC, zero `getUserById`, RPC error logged, blank email, no throw); `migration-guards` new test. Before the push these failed with `PGRST202`. Local replay: `proacl` = `{postgres=X/postgres,service_role=X/postgres}` (`t0031-local-roles.log`) |
+| 2 | **PASS** | `live-applicants` "D2" 404 (red at HEAD: 200). Grep below |
+| 3 | **PASS** | `live-shortlist-authz` "I-0029" ×4. At HEAD: 500, 500, 500, and the array form **changed the row and sent a notification** (`{"http":200,"row":"shortlisted","notifications":1}`). Valid missing id stays 404 |
+| 4 | **PASS** | `smoke` "I-0027" (red at HEAD: `Cannot GET …`) |
+| 5 | **PASS** | `upload-limits` 4/4 with real 10485760 and 10485761 byte bodies; `live-upload-gates` 413 JSON on both routes; constant equals the migration. See deviation 2 |
+| 6 | **PASS** | `explainability` "I-0065" (red at HEAD), control passes both ways |
+| 7 | **PASS** | `assessment-service-client` 10/10, `test_request_id.py` 7/7. In the logs: `[assessment] evaluate failed: request_id=… kind=unreachable`, and `assessment_service request request_id=…` on the service side. Stopped service: `live-evaluate-release` 1/1 on the new client |
+| 8 | **PASS** | `test_model_load.py` 2/2 (red at HEAD: two calls, the second with the venv path). A fresh parse of every fixture is byte-identical to `tests/nlp/snapshots/current/` (written to a temporary label, diffed, deleted; `current` untouched) |
+| 9 | **PASS** | `backend-cruft` 4/4. All three files were 0 bytes before deletion; `backend/uploads/` was empty. The lockfile lost only `bcrypt`, `node-addon-api` and `node-gyp-build`. I-0039 stays OPEN for the OAuth vars |
+| 10 | **PASS** | `smoke` "I-0016" reaches the password rule (red at HEAD); `live-signup-role` "an empty last name" passes (control, both ways) |
+| 11 | **PASS** | `live-shortlist-authz` control test. Mutation: `score: 99` in the payload gives `actual: [ 'applicationId', 'jobId', 'score' ]`, 1 fail (`t0031-j-mutation.log`), reverted. Diff: the title is added to the select at `backend/Controllers/jobs.controller.js:198`, no new query |
+| 12 | **PASS** | `live-upload-gates`: `.txt` 400 on both routes, plain and declared as PDF, no new `resumes` row. At HEAD both analyze cases gave 200 and a row. `git status`: no bucket migration |
+| 13 | **PASS** | Owner's runbook output, 2026-11-04: dry run listed only `20261104120300_applicant_emails.sql`; `Applying migration 20261104120300_applicant_emails.sql...`, `Finished supabase db push.`; `migration list --linked` 17 of 17 in sync; final `db diff --linked`: `No schema changes found`. The pre-push diff printed `DROP FUNCTION "public"."applicant_emails"(uuid[])`, not the create I predicted: it named only this object, in the opposite direction, and the post-push diff settles it |
+| 14 | **PASS** | `check-trackers` 0 warnings. 168 cites re-pointed by a line map from the diff, because the checker only catches cites past end of file. 21 cites on deleted code rewritten by hand. AUDIT 5.15 and `tests/MANUAL_SMOKE.md:64` corrected, ROADMAP (k) reworded |
+| 15 | **PASS** | Checked by me in headless Chrome, not by the owner's own eye: signed in through the real login form as `t0001_recr`, opened `/recruiter/candidates` with one seeded application (`t0031-final-page.json`, screenshot reviewed). The page shows `T0001 Candidate`, the Auth email, the tagged job, and no "No contact info". `/api/recruiter/applicants` answered 200 then 304. The console had two 401s; neither was that call. Data swept afterwards |
+| 16 | **PASS** | `live-evaluate-once` "I-0073" (red at HEAD: 500); valid missing id 404 |
+
+**D2 grep.** At HEAD (`git grep -nE "getAllApplications|/api/jobs/applications([^/]|$)" HEAD -- frontend/src frontend/public backend tests`):
+```
+backend/Controllers/jobs.controller.js:178:export const getAllApplications = async (req, res) => {
+backend/Routes/jobs.routes.js:10:  getAllApplications,
+backend/Routes/jobs.routes.js:19:router.get('/applications', requireRole('RECRUITER'), getAllApplications);
+tests/MANUAL_SMOKE.md:64:| B6 | ... `/api/jobs/applications`). No applicant ...
+```
+The definition, its route and one manual-smoke note: no caller. Now (`grep -rnE` over the same paths):
+```
+tests/backend/live-applicants.test.mjs:101:test('D2: recruiter GET /api/jobs/applications is 404', ...
+tests/backend/live-applicants.test.mjs:102:  const r = await api(cookieR, 'GET', '/api/jobs/applications');
+```
+
+**Regression, before the push (superseded by Final verification).**
+
+| Suite | Result |
+|---|---|
+| Backend, offline + live | 171 tests: 166 pass, 1 skip (release test, service up), **4 fail**, all `applicant_emails` (criterion 1). I-0071, the known T-0030 failure, passes |
+| `live-evaluate-release` | 1/1 with the assessment service stopped |
+| NLP | 14/14 |
+| github | 80/80 |
+| assessment | 12/12 |
+| docs | 0 problems, 0 warnings |
+| `tests/arch/nlp-outage-probe.mjs` | Not run at this point; see Final verification |
+
+**Clean run, after the push (these numbers replace every earlier run).** Preflight by real
+connects: 5000, 8000, 8001, 8002 and 3000 all closed. `tests/run-suite.ps1` started its own backend,
+shown by the process that owned :5000:
+
+| Pass | Backend on :5000 | Parent (`run-suite.ps1`) | Port errors |
+|---|---|---|---|
+| 1: full suite, :8002 down | PID 21120, `node.exe index.js`, started 20:24:56 | PID 22144 | 0 |
+| 2: backend suite, :8002 up (current code, started and stopped by me) | PID 17248, `node.exe index.js`, started 20:29:54 | PID 20544 | 0 |
+
+| Suite | Pass 1, :8002 down | Pass 2, :8002 up |
+|---|---|---|
+| backend, 171 tests, before the I-0079 test | 166 pass, 0 fail, 5 skip | 170 pass, 0 fail, 1 skip |
+| **backend, 172 tests, final (below)** | **167 pass, 0 fail, 5 skip** | **171 pass, 0 fail, 1 skip** |
+| nlp | 14/14 | not in this pass |
+| github | 80/80 | not in this pass |
+| assessment | 12/12 | not in this pass |
+| docs | 0 warnings | not in this pass |
+| frontend | **exit 1:** the 9 lint warnings of I-0068, CI warnings as errors; `frontend/` unchanged | not in this pass |
+| `node tests/arch/nlp-outage-probe.mjs`, the real script | exit 0, every P-4..P-6 assertion PASS | not in this pass |
+
+Each skip is covered by the other pass: the 5 in pass 1 need :8002 up, and the 1 in pass 2 needs it
+down. So all 171 backend tests passed on a backend the suite started. P-1..P-3 are descriptive and show
+the known I-0036 behaviour. `git status` is clean on `tests/nlp/snapshots`, `tests/arch` and
+`frontend`. Logs: `t0031-clean-*.log`, `t0031-clean2-*.log`.
+
+The monitor reported no :5000 owner from 20:25:33 in pass 1. That was a gap in
+`Get-NetTCPConnection`, not an outage: the backend's own log has 88 `[API]` lines, the last at
+20:26:38, and it logged no port error.
+
+**Final backend run, after the I-0079 test (`-Suites backend -Live`).** Only that test file changed
+since the run above, so the other suites and the probe were not rerun. Preflight closed on 5000,
+8000, 8001 and 8002 both times, and there were 0 port errors.
+
+| Pass | Backend on :5000 | Parent (`run-suite.ps1`) | Result |
+|---|---|---|---|
+| :8002 down | PID 7200, started 21:24:13 | PID 21600 | 172 tests: 167 pass, 0 fail, 5 skip |
+| :8002 up | PID 21300, started 21:30:42, listener confirmed with `netstat -ano` | PID 20796 | 172 tests: 171 pass, 0 fail, 1 skip |
+
+The skips are the same as before, each covered by the other pass, so all 172 passed on a backend the
+suite started. The :8002-up pass ran twice with the same counts: the first time my monitor caught
+only `pid=0`, which proves nothing, so I reran it and matched the backend by its parent process.
+Logs: `t0031-third-*`.
+
+**I-0079 proof:** the test passed 6/6 on real code. With the recruiter filter removed at
+`analysis.controller.js:538`, it failed: R got 8 rows, 7 of them someone else's. Restored, the
+sha256 is identical (`432e63fc…`) and it passes 6/6. Log: `t0031-i0079-mutation.log`, which has no
+email in it. Two earlier attempts stopped on my script's anchor before changing the file.
+
+**Superseded:** the first post-push run went through the owner's `npm start`, not the suite's backend,
+and the first probe run used a scratchpad copy. Both are replaced by the table above. Their
+logs (`t0031-final-*`) stay for the record. That collision is why I-0077 exists.
+
+**Review answers, 2026-11-04:**
+- **Applicants scoping:** by session, not by a 403. It had no real test; it does now (I-0079, resolved).
+- **Over-limit tests:** the red came from `assert413`, which expects status 413. The test table now
+  says `Fails (400 / 400)`, changed at the owner's request after review. Criterion 5 never changed.
+- **`.txt` declared as PDF:** fixed by the filename extension alone, not the declared Content-Type and
+  not magic bytes (I-0078).
+- **Storage `contentType`:** set on the server, so nothing changed. Both uploads
+  (`analysis.controller.js:162`, `:343`) use `resolveContentType`, which returns `MIME_BY_EXT[ext]` at
+  `:35`. The gate requires that same lookup with the same lowercasing (`:31`, `:34`), so the
+  client-mimetype fallback at `:36` cannot be reached. No test asserts the stored type.
+
+**Deviations from the spec:**
+1. **Migration version set by hand: `20261104120300`,** not from `npx supabase migration new`. The
+   clock was 11:0x UTC, so the CLI would have produced a version older than the applied
+   `20261104120200`, and `db push` would then ask for `--include-all`, which the runbook forbids.
+2. **The live over-limit tests go red at HEAD with 400/400, not the 500/400 this spec first said.**
+   The explanation for that 500, a 10 MB body refused by the production bucket at HEAD, is inferred
+   from the code, not observed: sending one is what the owner ruled out. So each case stops before
+   storage even if the cap regresses: the upload case is named `.txt` and the analyze case has no
+   `jobId`. Both still assert 413 after the fix. The test table was corrected to 400/400.
+3. **The pre-push regression ran on my own ports (5050/8050/8052),** because two orphaned T-0030
+   listeners held :5000 and :8002. The owner stopped them; the clean run above is on default ports.
+4. **Added beyond the spec:** `assessmentFailure` in `assessmentService.js`, so the "no upstream
+   body" rule has a direct offline test; and `backend/Services/validation.js` as the home of `isUuid`.
+
+**Found:**
+- **Confirmed by running it:** a `.txt` declared as PDF got through the bucket's allow-list at HEAD.
+  The spec had this from reading the code. Only the plain `.txt` logged `InvalidMimeType`.
+- **I-0076 (new, P3, P2-1):** a multipart body busboy cannot parse gives 500 HTML. As the spec says,
+  it goes to `next(err)`, so I logged it instead of changing that.
+- **I-0077 (new, P2, P2-6):** `run-suite.ps1` silently tests whatever already answers on :5000.
+- **I-0078 (new, P2, P2-3):** the upload gate reads the extension only.
+- **I-0079 (new, resolved here):** no real test of cross-recruiter applicants isolation.
+- **Local stack:** the first `supabase start` failed with `supabase_storage_Patina container is not
+  ready: unhealthy` while NLP and the backend were running, and worked once they were stopped.
+
+**Suggested commit groups:** as in Risks, (c)(i)(j), (b)(k), (d), (a) + migration, (e), (f), (g), (h),
+then trackers. `isUuid` belongs with (b), and (l) goes with (b) because it needs `isUuid`. The I-0079
+test is in `tests/backend/live-applicants.test.mjs`, so it goes with (a) + migration. I-0079's entry in
+`ISSUES.md` and this file go in trackers. No code changed for I-0079 or `contentType`.

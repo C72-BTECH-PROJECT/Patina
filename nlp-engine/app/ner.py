@@ -2,12 +2,7 @@ import spacy
 import re
 import os
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "venv", "Lib", "site-packages", "en_core_web_sm", "en_core_web_sm-3.8.0")
-
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    nlp = spacy.load(MODEL_PATH)
+nlp = spacy.load("en_core_web_sm")
 
 SKILL_KEYWORDS = [
     # programming languages

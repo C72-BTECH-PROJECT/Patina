@@ -5,6 +5,7 @@
 //   BACKEND_BASE_URL=http://localhost:5000 node --test tests/backend/live-evaluate-once.test.mjs
 import { before, after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { api, login } from './lib/session.mjs';
 import {
   client, counts, insertTestJob, isZero, liveConfig, resolveAccounts, snapshotProfiles, sweep,
@@ -85,4 +86,18 @@ test('I-0069: a stale grading claim (older than 10 minutes) is reclaimed and gra
   const e = await evaluate(a.id, a.responses);
   assert.equal(e.status, 200, e.text.slice(0, 200));
   assert.equal((await row(a.id)).status, 'completed');
+});
+
+// T-0031 (l): I-0073.
+test('I-0073: a malformed assessmentId -> 400 with no database text', { skip }, async () => {
+  const r = await evaluate('not-a-uuid', [{ question_id: 'q1', response: 'B' }]);
+  assert.equal(r.status, 400, r.text.slice(0, 200));
+  assert.equal(r.body.error, 'invalid_assessment_id');
+  assert.ok(r.body.message, 'expected a message');
+  assert.doesNotMatch(r.text, /invalid input syntax|22P02/);
+});
+
+test('I-0073: a valid assessmentId that does not exist stays 404', { skip }, async () => {
+  const r = await evaluate(randomUUID(), [{ question_id: 'q1', response: 'B' }]);
+  assert.equal(r.status, 404, r.text.slice(0, 200));
 });

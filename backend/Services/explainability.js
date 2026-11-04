@@ -87,7 +87,8 @@ export const GITHUB_REASONS = {
   service_error: 'The GitHub evidence check failed, so repository activity was not checked.',
   service_disabled:
     'No GitHub evidence was collected for this candidate. The GitHub Aggregator service is not part of this deployment yet, so repository activity has not been checked.',
-  // Only from rebuildScoreRecord(), for a stored score that has no GitHub entry.
+  // Only from rebuildScoreRecord(), for a stored score with no GitHub entry or one
+  // written before T-0014 (see storedGithubSubScore).
   not_collected_for_score:
     'This score was computed before GitHub evidence was collected, so repository activity was not checked. Re-analysing the resume would include it.',
 };
@@ -759,6 +760,19 @@ export const buildScoreRecord = (nlpJson, { github, assessmentEvaluation } = {})
 };
 
 /**
+ * A stored GitHub entry for a rebuild. An unavailable entry with no reason code
+ * dates from before T-0014, and its "not part of this deployment" text is no
+ * longer true, so it is replaced in the rebuild. The stored row itself stays as
+ * written (I-0065, D3).
+ */
+const storedGithubSubScore = (entry) => {
+  if (!entry || (entry.available === false && !entry.components?.reason_code)) {
+    return githubUnavailable('not_collected_for_score');
+  }
+  return entry;
+};
+
+/**
  * Rebuild a stored score once new evidence arrives (T-0025: a candidate
  * completes their assessment after the résumé was already analysed).
  *
@@ -772,8 +786,7 @@ export const rebuildScoreRecord = (storedSubscores, assessmentEvaluation) => {
   const subscores = {
     [SUBSCORE_KEYS.PARSING]:
       stored[SUBSCORE_KEYS.PARSING] ?? unavailableSubScore(SUBSCORE_KEYS.PARSING),
-    [SUBSCORE_KEYS.GITHUB]:
-      stored[SUBSCORE_KEYS.GITHUB] ?? githubUnavailable('not_collected_for_score'),
+    [SUBSCORE_KEYS.GITHUB]: storedGithubSubScore(stored[SUBSCORE_KEYS.GITHUB]),
     [SUBSCORE_KEYS.ASSESSMENT]: buildAssessmentSubScore(assessmentEvaluation),
   };
 

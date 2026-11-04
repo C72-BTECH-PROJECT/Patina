@@ -70,7 +70,7 @@ app.get('/api/health', (_req, res) => {
 
 // Catch-all
 app.use((req, res) => {
-  res.status(404).json({ message: `Cannot GET ${req.url}` });
+  res.status(404).json({ message: `Cannot ${req.method} ${req.originalUrl}` });
 });
 
 // Keep a module-level reference and register success/error separately. Passing

@@ -29,6 +29,9 @@
   backend (T-0029): migration-guards, signup-profile and grading-claim (offline) always; -Live adds
              live-resume-authz, live-answer-key-access, live-evaluate-once (needs :8002),
              live-evaluate-release (runs only with :8002 down) and live-signup-role (needs M1 applied).
+  backend (T-0031): upload-limits, applicant-identity, assessment-service-client and backend-cruft
+             (offline) always; -Live adds live-applicants (needs applicant_emails pushed) and
+             live-upload-gates.
   Logs go to tests\.out\ (git-ignored).
 #>
 param(
@@ -114,7 +117,7 @@ try {
     # Offline unit tests (T-0014): explainability layer and the github-evidence client against a
     # local stub. They import this repo's backend modules, so they mean nothing for baseline.
     if ($Target -eq 'current') {
-      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim') {
+      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim', 'upload-limits', 'applicant-identity', 'assessment-service-client', 'backend-cruft') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
       # T-0024/T-0025 route guards (T-0023): no session, no assessment service, no LLM. Baseline has no route.
@@ -132,7 +135,7 @@ try {
       }
       # T-0029 security batch (B1). Not in baseline. They skip without their accounts or services.
       if ($Target -eq 'current') {
-        foreach ($f in 'live-resume-authz', 'live-answer-key-access', 'live-evaluate-once', 'live-evaluate-release', 'live-signup-role') {
+        foreach ($f in 'live-resume-authz', 'live-answer-key-access', 'live-evaluate-once', 'live-evaluate-release', 'live-signup-role', 'live-applicants', 'live-upload-gates') {
           $files += (Join-Path $tests "backend\$f.test.mjs")
         }
       }

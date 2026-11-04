@@ -535,3 +535,57 @@ rollup per archived month at the top of this file.
 - Waiting: P0-3 Task cell back to T-0031, on `b3-backend-correctness`, once the owner confirms the merge. L-0046's "owner to confirm" on rate limits is settled here.
 - Verification: check-trackers 0 warnings.
 - Files changed: tasks/T-0022-api-gateway.md, tasks/T-0032-skill-vocabulary.md, WORKLOG.md (mod). No code.
+
+## L-0048 · 2026-11-04 · T-0031 decisions and post-merge tracker edits
+- Prompt: record D1–D5 and the boundary-test answer; after the merge of `origin/main`, restore the P0-3 Task cell and make the tracker edits. B3 itself does not start in this session.
+- Task: T-0031 (draft, docs only).
+- Done: T-0031 carries the decisions. D1 batched RPC, service role only, stop before the push. D2 delete the handler and route. D3 rebuild fix only. D4 new wording with the job title, from the same query. D5 I-0073 in, as (l). No live bucket upload: the constant-to-migration test plus the multer boundary tests cover it. Payload keys stay `applicationId` and `jobId`.
+- ROADMAP: P0-3 Task back to T-0031, (l) added, I-0073 no longer proposed. ISSUES: I-0065 D3 note, I-0071 D4 note, I-0073 fix, new I-0075 (WONTFIX).
+- Found: the live text behind I-0075 is in no code on any ref.
+- Verification: check-trackers 0 warnings.
+- Files changed: tasks/T-0031-b3-backend-correctness.md (new, untracked), ROADMAP.md, ISSUES.md, WORKLOG.md (mod). No code, no migration.
+
+## L-0049 · 2026-11-04 · T-0031 (B3) executed; waiting on the migration push
+- Prompt: execute T-0031 on `b3-backend-correctness`: each test first and shown failing, stop before every owner step including the push, never commit, fill in the Result and stop.
+- Task: T-0031 (criteria 2-12, 14, 16 PASS; 1, 13, 15 PENDING on owner steps).
+- Done: all twelve defects (a)-(l). New: `applicantIdentity.js`, `assessmentService.js`, `validation.js`, `Config/uploadLimits.js`, `Middlewares/resumeUpload.js`, migration `20261104120300_applicant_emails.sql`, 8 test files. `getAllApplications` deleted (D2).
+- Red first: before-run 27 offline and 16 live failures, all on the new assertions; controls passed. Mutation for (j) recorded and reverted.
+- Verification: backend 171 tests, 166 pass, 1 skip, 4 fail (all `applicant_emails`, need the push); release test 1/1 with the service down; NLP 14/14, github 80/80, assessment 12/12; I-0071 passes. Snapshots unchanged. Local replay: anon and authenticated denied, service role only.
+- Deviations: migration version set by hand (`migration new` at 11:0x UTC would sort before the applied `20261104120200`); over-limit tests stop before storage at HEAD too; run on ports 5050/8050/8052, not `run-suite.ps1`, because orphaned T-0030 listeners hold :5000 and :8002.
+- Not run: `nlp-outage-probe` (needs :5000).
+- Issues: 10 resolved; I-0028 and I-0063 IN-PROGRESS until the push; I-0028 raised to P1; I-0034 analyze half closed; I-0039 stays open for the OAuth vars; I-0076 new.
+- Trackers: 168 AUDIT and ARCHITECTURE cites re-pointed from a diff line map, 21 rewritten by hand. check-trackers 0 warnings.
+- Files changed (uncommitted): backend, assessment-service/app/main.py, nlp-engine/app/{ner,preprocessor}.py, supabase/migrations, tests, .gitignore, AUDIT, ARCHITECTURE, ROADMAP, ISSUES, WORKLOG, tasks/T-0031.
+- Next: owner pushes the migration, then `live-applicants` and criterion 15.
+
+## L-0050 · 2026-11-04 · T-0031 closed after the migration push
+- Prompt: push done, old servers stopped; verify criteria 1, 13, 15, resolve I-0028 and I-0063, run the outage probe and a full `run-suite.ps1` on default ports, update the Result, no commit.
+- Task: T-0031 (all 16 criteria PASS).
+- Done: `live-applicants` 5/5 live; runbook output recorded, ending in `No schema changes found`; `/recruiter/candidates` checked in headless Chrome as `t0001_recr`: real email, no "No contact info". I-0028 and I-0063 resolved.
+- Verification: full suite: nlp 14/14, backend 170 pass, 0 fail, 1 skip, docs 0 warnings, github 80/80, assessment 12/12, frontend exit 1 (I-0068 lint, frontend unchanged). With :8002 down: 166 pass, 0 fail, 5 skip, release case passes. Probe exit 0, P-4..P-6 all PASS.
+- Caveat: the owner's `npm start` was on :5000 from 19:57:29, so `run-suite` ran against it, not its own backend. Same code (source last changed 16:46). Not stopped. A clean run needs :5000 free and is still to do.
+- Probe: run from a scratchpad copy on :5070 (5 lines differ); two earlier attempts stopped before any phase (busy :5000, then 5060 is a fetch-blocked port).
+- Correction: my handover asked the owner to start the backend and also offered a full run, which collide. And `netstat` missed that listener, so a "ports free" reading here was wrong.
+- Issues: I-0028, I-0063 resolved. I-0077 new (P2, P2-6).
+- Files changed (uncommitted): ISSUES, ROADMAP, AUDIT, WORKLOG, tasks/T-0031. No code changed in this session part.
+
+## L-0051 · 2026-11-04 · T-0031 clean run and review answers
+- Prompt: :5000 free, :8002 down; rerun `run-suite.ps1 -Target current -Live` and the real outage probe, show the suite's backend PID on :5000; answer three questions from the code; update the Result; no commit.
+- Task: T-0031 (Result updated).
+- Done: pass 1, full suite: backend PID 21120, parent 22144 (`run-suite`), 0 port errors. 166 pass, 0 fail, 5 skip; nlp 14/14, github 80/80, assessment 12/12, docs 0 warnings, frontend exit 1 (I-0068). Real probe exit 0, P-4..P-6 all PASS.
+- Added, not asked for: pass 2, backend suite with :8002 up, because the 5 skips include criterion 16's test: PID 17248, parent 20544, 170 pass, 0 fail, 1 skip. Between them all 171 passed.
+- Answers: applicants are scoped by session, with no 403 path and no real two-recruiter test; the spec's `Fails (500 / 400)` was not changed, only noted as a deviation; `.txt` is refused by filename extension only.
+- Issues: I-0078 (extension-only gate, P2-3) and I-0079 (isolation test gap, P2-5) new; both ROADMAP placements are my proposal.
+- Verification: check-trackers 0 warnings.
+- Files changed (uncommitted): ISSUES, ROADMAP, WORKLOG, tasks/T-0031. No code.
+
+## L-0052 · 2026-11-04 · T-0031 pre-commit: I-0079 test, spec correction, contentType check
+- Prompt: add a two-recruiter live test and prove it isn't vacuous by removing the filter at `analysis.controller.js:538`, resolve I-0079; correct the task file's 500/400 and deviation 2; report the storage `contentType`, fix only if client-set; rerun both backend passes and the docs checker; no commit.
+- Task: T-0031 (Result and commit groups updated).
+- Done: test "I-0079" in `tests/backend/live-applicants.test.mjs`: 6/6 on real code; filter removed: fails, R gets 8 rows, 7 not theirs; restored, sha256 identical, 6/6. It compares facts only, so no email reached the logs.
+- `contentType`: set on the server (`:162`, `:343`, via `resolveContentType`), so no code change. The fallback at `:36` is unreachable. I-0078 stays open; no test asserts the stored type.
+- Spec: test table now 400/400; deviation 2 says the 500 explanation is inferred, not observed.
+- Verification: :8002 down: PID 7200, parent 21600, 172 tests, 167 pass, 0 fail, 5 skip. :8002 up: PID 21300, parent 20796, 171 pass, 0 fail, 1 skip. check-trackers 0 warnings.
+- Mistakes: two mutation attempts stopped on my script's anchor before touching the file; one :8002-up pass was rerun because the monitor caught only `pid=0`.
+- Issues: I-0079 resolved.
+- Files changed (uncommitted): tests/backend/live-applicants.test.mjs, ISSUES, ROADMAP, WORKLOG, tasks/T-0031. Controller unchanged.

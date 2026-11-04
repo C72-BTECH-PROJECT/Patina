@@ -68,13 +68,13 @@ test('assert_signup_role is not callable by anon (PostgREST rpc refused)', { ski
   assert.ok(['42501', 'PGRST202'].includes(error.code), `unexpected refusal: ${JSON.stringify(error)}`);
 });
 
-async function signupWithRole(tag, role) {
+async function signupWithRole(tag, role, lastName = 'Test') {
   const u = user(tag);
   const { data, error } = await sb.auth.admin.createUser({
     email: u.email,
     password: `T0029-${stamp}-pw!`,
     email_confirm: true,
-    user_metadata: { username: u.username, first_name: 'Role', last_name: 'Test', ...(role === undefined ? {} : { role }) },
+    user_metadata: { username: u.username, first_name: 'Role', last_name: lastName, ...(role === undefined ? {} : { role }) },
   });
   if (data?.user?.id) created.push(data.user.id);
   return { u, data, error };
@@ -104,6 +104,15 @@ test('end to end: a candidate signup still works and gets profiles.role = candid
   assert.ifError(pErr);
   assert.equal(profile.role, 'candidate');
   assert.equal(profile.username, u.username);
+});
+
+// T-0031 (i): I-0016. The database half of a one-word name; a control, so it passes before and after.
+test('end to end: an empty last name creates a profile with last_name = \'\'', { skip }, async () => {
+  const { data, error } = await signupWithRole('oneword', 'candidate', '');
+  assert.ifError(error);
+  const { data: profile, error: pErr } = await sb.from('profiles').select('last_name').eq('id', data.user.id).single();
+  assert.ifError(pErr);
+  assert.equal(profile.last_name, '');
 });
 
 test('record: does an admin profile exist? (decides which case the end-to-end admin test proved)', { skip }, async () => {
