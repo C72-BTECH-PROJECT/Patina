@@ -41,6 +41,7 @@ Create exactly 20 questions:
 - Prefer required job skills and skills claimed in the resume.
 - Use project details to create practical questions where supported by evidence.
 - If GitHub evidence is provided, use it for some questions only when it supports a specific claim.
+- Distribute the "source" field across "jd", "resume", and (when GitHub data is present) "github"; do not tag every question as "jd".
 - Questions must test knowledge and understanding, not merely ask candidates to repeat their resume.
 - Avoid trivia, ambiguous wording, duplicate questions, and unsupported assumptions.
 
