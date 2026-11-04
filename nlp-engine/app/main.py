@@ -1,5 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, UploadFile, File, Form, Request
 import json
 import shutil
 import os
@@ -16,15 +15,21 @@ app = FastAPI(
     version="1.0.0"
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+import uuid as _uuid
+import re as _re
+_VALID_RID = _re.compile(r"^[A-Za-z0-9-]{1,64}$")
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    rid = request.headers.get("x-request-id")
+    if not rid or not _VALID_RID.match(rid):
+        rid = str(_uuid.uuid4())
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = rid
+    return response
 
 @app.get("/")
 def health_check():

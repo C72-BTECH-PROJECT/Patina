@@ -6,6 +6,8 @@ import { mountHealth } from './health.js';
 import { mountLimits } from './limits.js';
 import { mountStatic } from './static.js';
 import { createForwardAuth } from './forwardAuth.js';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 export function loadConfig(env = process.env) {
   return {
@@ -66,7 +68,7 @@ export function createApp(config = {}) {
   return app;
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}`.replace(/\\/g, '/');
+const isMain = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] || '');
 if (isMain) {
   const cfg = loadConfig();
   const app = createApp(cfg);
