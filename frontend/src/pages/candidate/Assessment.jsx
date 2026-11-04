@@ -301,7 +301,6 @@ function Assessment() {
             <h1 className="text-h2 text-foreground">Skill Assessment</h1>
             <p className="text-body-sm text-muted-foreground mt-1">
               AI-generated questions based on your resume and the job
-              {meta?.model ? ` • ${meta.model}` : ''}
             </p>
           </div>
           <button

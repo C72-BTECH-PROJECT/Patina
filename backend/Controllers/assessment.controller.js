@@ -11,6 +11,7 @@ import {
 } from '../Services/assessmentService.js';
 import { InternalHttpError, resolveRequestId } from '../Services/internalHttp.js';
 import { isUuid } from '../Services/validation.js';
+import { fetchGithubEvidence, normaliseGithubLogin } from '../Services/githubEvidence.js';
 
 // Standalone generation service (T-0024/T-0025). The service holds the LLM
 // key and mints the answer key; this proxy forwards the candidate/job
@@ -247,6 +248,23 @@ export const generateAssessment = async (req, res) => {
     }
     const { resume, resumeText } = resolved;
 
+    // Fetch GitHub evidence (if a GitHub link is present in the resume) so the
+    // assessment can include github-sourced questions.
+    let githubData = null;
+    let includeGithub = false;
+    const githubLink = resume?.contact?.github || null;
+    if (githubLink && normaliseGithubLogin(githubLink)) {
+      try {
+        const ev = await fetchGithubEvidence({ githubLink, claimedSkills: resume?.skills ?? [], requestId: req.requestId });
+        if (ev?.ok) {
+          githubData = ev.evidence;
+          includeGithub = true;
+        }
+      } catch (e) {
+        console.warn('[assessment] github evidence fetch failed:', e?.message);
+      }
+    }
+
     const payload = {
       candidate_id: String(candidateId),
       job_id: String(job.id),
@@ -258,6 +276,8 @@ export const generateAssessment = async (req, res) => {
       resume_skills: Array.isArray(resume?.skills) ? resume.skills : [],
       resume_projects: Array.isArray(resume?.projects) ? resume.projects : [],
       experience_level: job.experience_level ?? 'unspecified',
+      include_github: includeGithub,
+      github_data: githubData,
     };
 
     let data;

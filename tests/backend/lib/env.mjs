@@ -28,3 +28,5 @@ export const testEnv = () => ({ ...readEnvFile(join(TESTS_DIR, '.env')), ...proc
 
 export const backendBaseUrl = () =>
   (process.env.BACKEND_BASE_URL || 'http://localhost:5000').replace(/\/+$/, '');
+export const coreBaseUrl = () =>
+  (process.env.CORE_BASE_URL || 'http://localhost:5001').replace(/\/+$/, '');

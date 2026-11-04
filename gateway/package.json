@@ -1,0 +1,20 @@
+{
+  "name": "patina-gateway",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Thin Node API gateway for Patina (Part 1, standalone, offline tests).",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test ../tests/gateway/"
+  },
+  "dependencies": {
+    "cors": "2.8.6",
+    "express": "5.2.1",
+    "express-rate-limit": "7.5.0",
+    "http-proxy-middleware": "3.0.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

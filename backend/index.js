@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 
 import authRoutes from './Routes/auth.routes.js';
 import jobsRoutes from './Routes/jobs.routes.js';
@@ -9,6 +8,7 @@ import notificationRoutes from './Routes/notification.routes.js';
 import assessmentRoutes from './Routes/assessment.routes.js';
 
 import session from 'express-session';
+import { requestIdMiddleware } from './Middlewares/requestId.js';
 
 if (!process.env.SESSION_SECRET) {
   if (process.env.NODE_ENV === 'production') {
@@ -18,14 +18,10 @@ if (!process.env.SESSION_SECRET) {
 }
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+app.set('trust proxy', 1);
+const PORT = process.env.PORT || 5001;
 
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    credentials: true,
-  })
-);
+app.use(requestIdMiddleware);
 app.use(express.json());
 
 app.use(session({
@@ -64,8 +60,13 @@ app.use('/api/notifications', notificationRoutes);
 // POST /generate (T-0024: generate-only, no persistence)
 app.use('/api/assessment', assessmentRoutes);
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', async (_req, res) => {
+  // cheap readiness check
+  try {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  } catch (e) {
+    res.status(503).json({ status: 'error' });
+  }
 });
 
 // Catch-all
