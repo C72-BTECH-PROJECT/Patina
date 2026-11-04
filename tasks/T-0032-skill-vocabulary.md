@@ -115,9 +115,10 @@ Criteria that can't be automated: 4 and 5 need a reviewer to read the diff.
   makes the snapshot diff slightly larger.
 - **A known limit: "not on GitHub" still counts.** AUDIT 1.17 records f4 listing GitHub from that
   sentence. The pattern excludes only `.com` and `.io`, so this false positive remains, and the
-  simulation agrees (f4 loses no skills). Do not widen the pattern here: note it at close.
-- **AUDIT 1.17 may not reach DONE_CORRECTLY.** ROADMAP expects it, but f4 stays Weak in the simulation.
-  Decide at close from the real result; the row needs evidence either way.
+  simulation agrees (f4 loses no skills). **Accepted by the owner (2026-11-04) as a recorded known
+  limit.** Do not widen the pattern; record it in AUDIT 1.17 at close.
+- **AUDIT 1.17 records the real result at close (owner, 2026-11-04).** ROADMAP's MIS→DONE is an
+  expectation, not a target, and f4 stays Weak in the simulation. Do not force DONE_CORRECTLY.
 - **Rollback:** revert the commit. There is no migration, and stored scores are untouched.
 
 ---

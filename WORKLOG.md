@@ -527,3 +527,11 @@ rollup per archived month at the top of this file.
 - ROADMAP: P0-3 Task cell back to `later` so main passes the checker without T-0031; it returns on the B3 branch after the merge.
 - Verification: check-trackers 0 warnings; the branch steps replayed in a throwaway clone without commits.
 - Files changed: tasks/T-0032-skill-vocabulary.md (new); tasks/T-0022-api-gateway.md, ROADMAP.md, ISSUES.md, WORKLOG.md (mod). No code.
+
+## L-0047 · 2026-11-04 · Owner confirmations: rate limits, T-0032 limits
+- Prompt: settle the rate limits, accept the "not on GitHub" limit, record AUDIT 1.17 as it lands; the ROADMAP cell edit on B3 becomes mine, after the owner says the merge is done.
+- Task: ad-hoc (docs).
+- Done: T-0022: password reset gets its own limiter, 5 per 15 minutes, env-configurable (`PASSWORD_RESET_RATE_LIMIT_*`); login and signup 20 per 15 minutes; global 300 per minute. Criterion 10 gains "password reset limit". README note on per-IP limits and shared campus networks. T-0032: known limit accepted; AUDIT 1.17 not forced to DONE.
+- Waiting: P0-3 Task cell back to T-0031, on `b3-backend-correctness`, once the owner confirms the merge. L-0046's "owner to confirm" on rate limits is settled here.
+- Verification: check-trackers 0 warnings.
+- Files changed: tasks/T-0022-api-gateway.md, tasks/T-0032-skill-vocabulary.md, WORKLOG.md (mod). No code.

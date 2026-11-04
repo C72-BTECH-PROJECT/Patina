@@ -35,7 +35,7 @@ moves to Part 2:
 | 5 | "auth/me is never limited" (`edge.test.mjs`) | "auth/me is fast and never limited": 100 calls and the p95, against real core |
 | 6 | "hung auth check fails closed" | "suspended user gets core's 403" (`live-gateway.test.mjs`) |
 | 9 | Both gateway responses | Correcting ARCHITECTURE §5 M3 |
-| 10 | "login limit", second client IP | The two `git grep … -- backend` checks: they pass only once core's `cors()` and limiter are removed |
+| 10 | "login limit", "password reset limit", second client IP | The two `git grep … -- backend` checks: they pass only once core's `cors()` and limiter are removed |
 | 11 | `git grep -n "8001" -- gateway` and `"8002"`: every hit is that service's health-URL default (in `index.js`, and the same value in `.env.example` or `README.md`) | "no route to github-evidence" |
 | 13 | "serves the build" | The owner's MANUAL_SMOKE run |
 
@@ -63,8 +63,10 @@ Each key's name is also its env name:
 | `FRONTEND_BUILD_DIR` | Unset | Static build; unset means non-API paths return 404 |
 | `GLOBAL_RATE_LIMIT_MAX` | `300` | Global per-IP limit |
 | `GLOBAL_RATE_LIMIT_WINDOW_MS` | `60000` | Global per-IP limit |
-| `AUTH_RATE_LIMIT_MAX` | `20` | Login, signup, request-password-reset |
-| `AUTH_RATE_LIMIT_WINDOW_MS` | `900000` | Login, signup, request-password-reset |
+| `AUTH_RATE_LIMIT_MAX` | `20` | Login and signup |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | `900000` | Login and signup |
+| `PASSWORD_RESET_RATE_LIMIT_MAX` | `5` | Request-password-reset, its own limiter because it sends emails |
+| `PASSWORD_RESET_RATE_LIMIT_WINDOW_MS` | `900000` | Request-password-reset |
 
 `ASSESSMENT_URL` is the gateway's name. Core's own variable for the same service is
 `ASSESSMENT_SERVICE_URL`. `.env.example` (Aditya) lists every key above.
@@ -165,7 +167,8 @@ A gateway on `:5000` becomes the single client entry point, in front of core on 
   - **`requestId.js`:** accept `^[A-Za-z0-9-]{1,64}$`, otherwise generate a UUID; set it on the
     proxied request and the response; log it.
   - **Rate limits (`limits.js`):** `express-rate-limit`, keyed on the client IP, with limits from env. There is
-    a strict limit on login, signup and request-password-reset, and a global per-IP limit;
+    a limit on login and signup, a separate limiter on request-password-reset (it sends emails),
+    and a global per-IP limit;
     `/api/auth/me` is exempt.
   - **CORS (`cors.js`):** only at the gateway, `FRONTEND_URL` with credentials.
   - **`health.js`:** `GET /health` checks core `/api/health`, NLP `GET /`, github-evidence
@@ -175,7 +178,8 @@ A gateway on `:5000` becomes the single client entry point, in front of core on 
     - `503` when core is down.
   - **Static build (`static.js`):** serves `frontend/build` (static files plus SPA fallback) when
     `FRONTEND_BUILD_DIR` exists; otherwise non-API paths return 404.
-  - `.env.example` and `README.md` (routes, env, the allowlist rule).
+  - `.env.example` and `README.md` (routes, env, the allowlist rule). The README says limits are
+    per IP, so a shared campus network may need higher values for a demo.
 - **Core:**
   - `backend/index.js`: `PORT` default 5001, `app.set('trust proxy', 1)`, `cors()` removed, and a
     request-ID middleware;
@@ -290,6 +294,8 @@ A gateway on `:5000` becomes the single client entry point, in front of core on 
 10. **Rate limits in one hop.**
     - Login → 429 at limit + 1 from one client, with the limit set by env
       (`edge.test.mjs` "login limit").
+    - Request-password-reset → 429 at its own limit + 1, and using up that limit does not block
+      login (`edge.test.mjs` "password reset limit").
     - A second client IP is unaffected: the gateway listens on `127.0.0.1` and `::1`, and the
       test uses both.
     - `git grep -n "cors(" -- backend` → 0.
