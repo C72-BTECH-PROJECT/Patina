@@ -470,3 +470,28 @@ rollup per archived month at the top of this file.
 - Issues: 8 resolved; I-0071 new (reject notification vs T-0004 test, mapped to P0-3). ARCHITECTURE/AUDIT cites re-pointed for shifted lines.
 - Files changed: backend/Controllers/{auth,analysis,assessment}.controller.js, backend/.env.example, assessment-service/app/{main,config}.py, assessment-service/README.md, tests/run-suite.ps1, tests/README.md, tests/backend/lib/testdb.mjs, ARCHITECTURE/AUDIT/ISSUES/ROADMAP/WORKLOG, tasks/T-0029 (mod); 4 migrations, backend/Services/{signupProfile,gradingClaim}.js, assessment-service/app/__main__.py, requirements-dev.txt, tests/assessment/, 8 backend test files + lib/assessment.mjs (new).
 - Next: owner runs criteria 8–9 in the UI, drops the backup table, commits.
+
+## L-0041 · 2026-11-04 · T-0029 close-out + T-0030 (B2) spec draft
+- Prompt: record criteria 8–9 (owner PASS), accept 3(vi) as a known gap, record the I-0071 decision, draft the B2 spec (CLI link first), read-only only.
+- Done: T-0029 Result updated (8, 9 PASS; 3(vi) accepted gap; committed `edb1a37`). I-0071: reject notifications intended; the test fix and a neutral-text/no-recruiter-data check go in B3 (P0-3 (j)).
+- T-0030 drafted: phases A (CLI install/init/login/link) → B (read-only drift: migration list, schema_migrations, bucket, push --dry-run) → STOP for repair addendum → C (renames, no-op guards, bucket + comment migrations, replay-twice harness, runbook) → D (repair) → E (first db push behind a two-file dry-run gate) → F (Preview check). Decisions D1 (rename all eight), D2 (bucket size cap).
+- Read-only findings: no CLI on PATH; Docker daemon off; Preview still red on `edb1a37` ("Remote migration versions not found"); `20261015_allow_five_assessment_attempts.sql:2` says it was applied as a named migration (likely remote-only rows).
+- Files changed: tasks/T-0029-security-batch.md, ISSUES.md, ROADMAP.md, WORKLOG.md (mod); tasks/T-0030-migrations-batch.md (new).
+- Next: owner approves T-0030 (D1, D2), then runs Phase A and B and pastes the output.
+
+## L-0042 · 2026-11-04 · T-0030 Phase C (in progress) + prompt-log hook gap
+- Prompt: start Phase C; after the memory kill, run a minimal local stack, record the exclude list, raise the prompt-log hook timeout, note the missing log entry.
+- **Prompt-log gap:** the UserPromptSubmit hook (`.claude/hooks/log-prompt.js`) timed out under memory pressure, so one event has no line in `.claude/logs/prompts.jsonl`. Every owner prompt is present (19:18Z..06:50Z). The event missing is most likely the background-task notification reporting that `supabase start` was killed for low memory (between 20:34Z on 2026-11-03 and 06:50Z on 2026-11-04). Fix: `"timeout": 60` on that hook in `.claude/settings.local.json`.
+- Done: renames per the approved table; 2 new migrations; migration-guards 4 fail → 9/9; runbook; root `package.json` (the owner's `npm i -D` had installed into the home folder); `[analytics] enabled = false`; minimal-stack exclude list in the runbook.
+- Fresh replay: `20260831000000_add_single_admin_role.sql` fails (55P04: new enum value used in the same transaction). Stopped for an owner decision.
+- Next: owner picks the fix for 20260831; replay again; first `db diff --linked` (owner).
+
+## L-0043 · 2026-11-04 · T-0030 B2 migrations batch done (I-0057, I-0010, I-0001, I-0041)
+- Prompt: finish Phase D–F (repair, push, Preview check), reconcile counts, close trackers.
+- Task: T-0030 (criteria 1–11 PASS, 10 scoped: NLP-dependent analyze tests not run; see Result).
+- Done: 8 renames (20261015 pair to its remote versions) + 20260831 split (55P04); `.gitattributes` eol=lf + LF files; 3 new migrations (bucket limits mirror live 10 MB, subscores comment, LF function re-create); repair of 11 versions; push of 3; runbook (db push --linked only; no --include-all; no db reset --linked; --linked on every remote command).
+- Verification: fresh replay 16/16 exit 0; post-push `db diff --linked` public + auth,storage empty; `migration list` 16/16; Supabase Preview on `68763e0` = success (first green); migration-guards 12/12; regression 114/116 (I-0071 known, release skip).
+- Counts: 16 files = 16 versions; earlier "17"/"18" in my reports were miscounts, corrected.
+- Issues: I-0057, I-0010, I-0001, I-0041 resolved; I-0072 new (B3); 4 stale AUDIT comma-list cites from T-0029 re-pointed.
+- Files changed (uncommitted): tasks/T-0030, ISSUES, AUDIT, ARCHITECTURE, ROADMAP, README, WORKLOG, tests/README.md, tests/MANUAL_SMOKE.md, backend/Controllers/analysis.controller.js (comment), Docs/SUPABASE_MIGRATIONS_RUNBOOK.md (new), .claude/settings.local.json (hook timeout).
+- Next: owner commits the trackers/runbook; then B3 (P0-3).

@@ -501,19 +501,19 @@ both functions and select on `assessment_keys`, service_role can claim). Owner c
 (0 attempts without a key, 0 mismatches), locked-down backup (`assessments_answer_key_backup`,
 5 rows, anon/authenticated read false), then M4 (`answer_key` gone, 5 = 5). The M-versions
 are not in `schema_migrations` (owner decision; noted in I-0057/I-0010 for B2). Logs in
-`tests/.out/t0029-*`. Not committed.
+`tests/.out/t0029-*`. Committed by the owner as `edb1a37`.
 
 | # | Verdict | Before (`df98068`) | After |
 |---|---|---|---|
 | 1 | **PASS** | `migration-guards`: handle_new_user/assert/prefix tests fail (`t0029-before-offline.log`, 19 offline failures in all) | all pass; I-0057 duplicates reported as `todo` (`t0029-after-offline.log`, 56 pass, 0 fail, 1 todo) |
 | 2 | **PASS** | static gate only (owner decision 6) | `live-signup-role` 10/10: RPC admin/superuser/null → `22023 invalid signup role`; candidate, recruiter accepted; **anon RPC refused**; createUser with superuser/admin/no role → error, no user, no profile; candidate signup works (`t0029-after-live-signup-role.log`) |
-| 3 | **PASS** (i)–(v); (vi) **NOT RUN** | (i), (iii) `answer_key` returned to C and R; (ii) 404 PGRST205 (no table); (iv) passed (regression guard); (v) backend select names `answer_key` | `live-answer-key-access` 5/5 after M4 (`t0029-after-live-answer-key-access.log`; before M4, (i) and (iii) still failed on the null column, as expected). (v) grep: frontend 0; backend only `assessment.controller.js:32` (stripKey), `:286` (service response), `:332` (key-table insert), `:405`, `:409` (key-table read), `:425` (service request). (vi) needs a scratch database; the raise is pinned by `migration-guards`, and the real copy matched 5 = 5 |
+| 3 | **PASS** (i)–(v); (vi) **ACCEPTED GAP** | (i), (iii) `answer_key` returned to C and R; (ii) 404 PGRST205 (no table); (iv) passed (regression guard); (v) backend select names `answer_key` | `live-answer-key-access` 5/5 after M4 (`t0029-after-live-answer-key-access.log`; before M4, (i) and (iii) still failed on the null column, as expected). (v) grep: frontend 0; backend only `assessment.controller.js:32` (stripKey), `:286` (service response), `:332` (key-table insert), `:405`, `:409` (key-table read), `:425` (service request). (vi) not run (needs a scratch database). **Known, accepted gap (owner, 2026-11-04):** the raise is pinned by `migration-guards`, and the real copy matched 5 = 5 (owner check: 0 attempts without a key, 0 mismatches); accepted as evidence |
 | 4 | **PASS** | 4 of 5 fail (docs 200, no HOST/PORT, no `__main__`, README `:8000`) | 5/5 (`t0029-after-assessment.log`; `run-suite.ps1 -Suites assessment` exit 0). Live: `python -m app` listens on 127.0.0.1:8002 only |
 | 5 | **PASS** | R2 → 200 with URL; `not-a-uuid` → 404 | `live-resume-authz` 5/5 (`t0029-after-live-resume-authz.log`) |
 | 6 | **PASS** (offline) | module absent; insert at `auth.controller.js:257-265` | `signup-profile` 6/6, incl. source guard and the `identities: []` existing-account case (no rollback, enumeration-safe) |
 | 7 | **PASS** | concurrency: 200 ×5; fresh/stale seeds rejected (no `grading_started_at`, status check) | `grading-claim` 7/7 offline; `live-evaluate-once` 3/3 (one 200 + four 409, score 50 folded once, later submit 409; fresh claim → 409 + generate `grading_in_progress`; 11-min-old claim reclaimed); `live-evaluate-release` 1/1 with :8002 stopped (502, row back to `generated`, retry claims again). Before, the release test also passed (old code never left `generated`): a regression guard, as the spec says |
-| 8 | **PENDING (owner)** | — | UI generate + submit after M4. Drop `assessments_answer_key_backup` after this passes |
-| 9 | **PENDING (owner)** | — | UI signup, log check, double-click Submit. No `profiles_pkey` line in the backend logs this session (no UI signup happened yet) |
+| 8 | **PASS (owner, manual)** | — | Owner, 2026-11-04: UI generate + submit after M4 works. Backup table `assessments_answer_key_backup` dropped afterwards |
+| 9 | **PASS (owner, manual)** | — | Owner, 2026-11-04: UI signup → 201 and login; no `profiles_pkey` in the backend log; double-clicked Submit shows the 409 text, not a second score |
 | 10 | **PASS** | — | `check-trackers` OK, 0 warnings. I-0055, I-0056, I-0058, I-0017, I-0060, I-0061, I-0066, I-0069 moved to Resolved |
 
 **Regression** (live services, not `run-suite` for backend/nlp: :5000/:8000 were in use):

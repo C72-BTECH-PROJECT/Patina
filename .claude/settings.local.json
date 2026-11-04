@@ -6,7 +6,8 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/log-prompt.js"]
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/log-prompt.js"],
+            "timeout": 60
           }
         ]
       }

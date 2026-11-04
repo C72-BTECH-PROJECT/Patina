@@ -159,13 +159,13 @@ The backend connector is `backend/Config/supabase.js`. It reads `SUPABASE_URL` a
 
 The service-role key must never be exposed to the frontend or committed to Git. `backend/.env` is ignored; `backend/.env.example` is the safe, tracked template. Connectivity and the Auth-linked `profiles` table have been verified. The profile table has an own-profile RLS read policy; future job and analysis tables still need their schema and RLS policies.
 
-Before running the admin console, apply every SQL file in `supabase/migrations` through the Supabase SQL Editor, in filename order. To provision the one administrator, create a normal account, then promote it after applying `20260831_add_single_admin_role.sql`:
+Before running the admin console, apply every SQL file in `supabase/migrations` through the Supabase SQL Editor, in filename order. To provision the one administrator, create a normal account, then promote it after applying `20260831000000_add_single_admin_role.sql`:
 
 ```sql
 update public.profiles set role = 'admin' where username = 'your_admin_username';
 ```
 
-Use that account at `/login/admin`. The `20260901_add_profile_suspension.sql` migration is required for login suspension checks and the access controls.
+Use that account at `/login/admin`. The `20260901000000_add_profile_suspension.sql` migration is required for login suspension checks and the access controls.
 
 ## Development notes
 

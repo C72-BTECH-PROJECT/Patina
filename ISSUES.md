@@ -22,10 +22,8 @@ diff you're already writing.
 
 | ID | Title | Module | Severity | Status | Found |
 |----|-------|--------|----------|--------|-------|
-| I-0001 | `resumes` storage bucket not in any migration | `supabase/migrations/`, `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-08-31, pre-WORKLOG |
 | I-0004 | AI-cruft / hallucinated entries in `SKILL_KEYWORDS` | `nlp-engine/app/ner.py` | P3 | OPEN | pre-WORKLOG (after an NLP fix, exact date not recorded) |
 | I-0006 | Upload.jsx: neither Choose-File nor drag-drop validates file type on selection, only at submit | `frontend/src/pages/candidate/Upload.jsx` | P2 | OPEN | 2026-10-12, L-0001 |
-| I-0010 | Supabase Preview check fails on `main`; fixing it naively turns on auto-apply of migrations to production — **decision needed** | `supabase/migrations/`, Supabase GitHub integration | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0012 | HEAD frontend reads `import.meta.env.VITE_*` under CRA; 5 pages hardcode `localhost:5000` | `frontend/src/**` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0016 | Signup rejects one-word "Full Name" with a misleading "all fields required" message | `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
 | I-0025 | `multer.memoryStorage()` without `limits`: upload size is unbounded and buffered in memory | `backend/Controllers/analysis.controller.js` | P2 | OPEN | 2026-10-12, T-0002 |
@@ -44,7 +42,6 @@ diff you're already writing.
 | I-0038 | Unpinned `requirements.txt`; three Python venvs, one without the spaCy model; Python 3.14 vs README 3.11 | `nlp-engine/requirements.txt`, `README.md` | P2 | OPEN | 2026-10-12, T-0009 |
 | I-0039 | Backend cruft: unused `bcrypt`, two empty middleware files, unused OAuth env vars, empty `backend/uploads/`, tracked `dev/null` | `backend/`, `dev/` | P3 | OPEN | 2026-10-12, T-0009 |
 | I-0040 | Recruiter "GitHub profile" link is relative when the parsed link has no scheme | `frontend/src/components/recruiter/CandidateModal.jsx` | P3 | OPEN | 2026-10-14, T-0010 |
-| I-0041 | `scores.subscores` comment in the migration says `"github_evidence": null`; code stores a full unavailable object | `supabase/migrations/20260903_create_resumes_and_scores.sql` | P3 | OPEN | 2026-10-14, T-0010 |
 | I-0042 | Docs checker silently skips cites to `.yml`/`.yaml`/`.toml`/`.ts` files and paths with spaces | `tests/docs/check-trackers.mjs` | P3 | OPEN | 2026-10-14, T-0010 |
 | I-0043 | ROADMAP P1-3 says the GitHub "full path" is captured; T-0013 returns the profile (repo owner) only | `ROADMAP.md` | P3 | OPEN | 2026-10-15, T-0013 |
 | I-0044 | ROADMAP §1.6 names `pytest-socket --disable-socket`; T-0011 uses `--allow-hosts=127.0.0.1,::1` | `ROADMAP.md` | P3 | OPEN | 2026-10-15, T-0011 |
@@ -55,7 +52,6 @@ diff you're already writing.
 | I-0052 | A résumé whose GitHub link is only a hyperlink annotation behind the text "GitHub" gets `no_github_link`: the NLP text extraction does not read PDF link annotations | `nlp-engine/app` (extraction), `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-10-15, T-0014 manual check |
 | I-0053 | Recruiter's per-job list drops a candidate whose latest score is for another job | `backend/Controllers/analysis.controller.js`, `frontend/src/pages/recruiter/JobDetails.jsx` | P2 | OPEN | 2026-10-15, T-0016 |
 | I-0054 | Recruiter Jobs page always shows "0 Applications Total" | `frontend/src/pages/recruiter/Jobs.jsx` | P3 | OPEN | 2026-10-15, T-0016 |
-| I-0057 | Duplicate migration version prefixes (`20260903_*` ×2, `20261015_*` ×2) can break or skip migrations on `db push` — high priority | `supabase/migrations/` | P1 | OPEN | 2026-10-31, T-0023 |
 | I-0059 | `ner.py` and `preprocessor.py` fall back to a hardcoded Windows `venv/Lib/site-packages/...` spaCy model path | `nlp-engine/app/ner.py`, `nlp-engine/app/preprocessor.py` | P2 | OPEN | 2026-10-31, T-0023 |
 | I-0062 | Backend calls assessment-service with raw `fetch`, not `Services/internalHttp.js` (no request-id propagation, own timeout/retry handling) | `backend/Controllers/assessment.controller.js` | P2 | OPEN | 2026-10-31, T-0023 |
 | I-0063 | `getAllApplications` selects `profiles.email`, which does not exist: every profile read errors silently and each applicant costs an Auth Admin `getUserById` call | `backend/Controllers/jobs.controller.js` | P2 | OPEN | 2026-10-31, T-0023 |
@@ -63,42 +59,8 @@ diff you're already writing.
 | I-0065 | Score rows stored before T-0014 keep the stale `service_disabled` GitHub text ("not part of this deployment yet") when an assessment rebuilds them | `backend/Services/explainability.js` | P3 | OPEN | 2026-10-31, T-0023 |
 | I-0067 | Short-answer grading prompt embeds candidate text with no untrusted-input rule, and grading output is not schema-checked: a crafted answer can steer its own grade | `assessment-service/app/prompts.py`, `assessment-service/app/evaluator.py` | P1 | OPEN | 2026-10-31, T-0023 |
 | I-0068 | Frontend CI build fails on 4 more lint warnings from `main` (CandidateLayout, RecruiterLayout, AllCandidates ×2), on top of the 5 known; `AllCandidates.jsx` reads `import.meta.env` under CRA (I-0012 pattern) | `frontend/src/**` | P2 | OPEN | 2026-10-31, T-0023 |
-| I-0071 | `live-shortlist-authz` control test expects no notification on reject; `3f53f80` added a "rejected" notification, so the test fails (stale test or unintended behaviour) | `tests/backend/live-shortlist-authz.test.mjs`, `backend/Controllers/jobs.controller.js` | P2 | OPEN | 2026-11-04, T-0029 |
-
----
-
-### I-0001 — `resumes` storage bucket not in any migration
-**Status:** OPEN
-**Severity:** P1
-**Module:** `supabase/migrations/`, `backend/Controllers/analysis.controller.js`, `backend/Controllers/jobs.controller.js`
-**Spec ref:** n/a (infra/deployment gap, not a feature spec item)
-**Evidence:**
-- The `resumes` storage bucket was created manually in the Supabase dashboard
-  (2026-08-31) with an `allowed_mime_types` allow-list. It is not defined in
-  any file under `supabase/migrations/` (confirmed current migrations:
-  `20260823_create_profiles.sql`, `20260830_create_jobs_and_applications.sql`,
-  `20260831_add_single_admin_role.sql`, `20260901_add_profile_suspension.sql`,
-  `20260903_create_notifications.sql` — none create a storage bucket).
-- `backend/Controllers/analysis.controller.js:14,24,38,60` and
-  `backend/Controllers/jobs.controller.js:94` do `.from('resumes')` against
-  Supabase Storage, so the app depends on a bucket that only exists because
-  someone created it by hand.
-**Impact:** A fresh environment (new Supabase project, teammate's local
-setup, CI) will not have the bucket and resume upload/retrieval will fail
-with no migration to explain why.
-**Proposed fix:** Move bucket creation + MIME allow-list config into a
-migration (Supabase supports this via `storage.buckets` inserts or the
-management API in a migration script).
-**Note (2026-10-12, T-0002):**
-- **The bucket insert used to exist.** `20260903_create_resumes_and_scores.sql:14-16@32905c1` created it (`id/name/public` only). `314e494` deleted that migration.
-- **Never in any migration:** the MIME allow-list and the 10 MB cap.
-- **Live check:** read-only bucket listing on 2026-10-12: `resumes` is private, `allowed_mime_types` = pdf + docx.
-- See INTEGRATION_REVIEW.md R19 and §7.
-**Note (2026-10-12, T-0008):** partly stale at HEAD `2e87d44`. The bucket insert is back in `supabase/migrations/20260903_create_resumes_and_scores.sql:14-16` (restored by `a7c74e4`). What is still missing from any migration is the MIME allow-list and the 10 MB cap. Left OPEN for that; not re-verified against the live project.
-**Note (2026-10-12, T-0003): still OPEN.**
-- **The bucket insert is back:** the restored `20260903_create_resumes_and_scores.sql:14` has `insert into storage.buckets (id, name, public)` (committed in `a7c74e4`, R19).
-- **Still in no migration:** the MIME allow-list (pdf/docx) and the 10 MB size cap. A fresh environment gets a bucket without them.
-- **The backend no longer depends on the allow-list for correctness:** `saveResumeToStorage` now sends the extension-derived content type, and `uploadResume` accepts only `.pdf`/`.docx` (R7, `e9e4592`).
+| I-0071 | `live-shortlist-authz` control test expects no notification on reject; `3f53f80` added a "rejected" notification (intended, owner 2026-11-04), so the test is stale | `tests/backend/live-shortlist-authz.test.mjs`, `backend/Controllers/jobs.controller.js` | P2 | OPEN | 2026-11-04, T-0029 |
+| I-0072 | nlp-engine extracts `.txt`, but the `resumes` bucket and the backend accept only PDF/DOCX; confirm that no upload path accepts `.txt` | `nlp-engine/app/extractor.py`, `backend/Controllers/analysis.controller.js` | P3 | OPEN | 2026-11-04, T-0030 |
 
 ---
 
@@ -146,75 +108,6 @@ issue (validation does still happen before any upload call is made).
 `Upload.jsx` was rewritten (commit `71c632d`, 2026-09-03) into a different
 flow where the original asymmetric-validation bug no longer exists, but this
 new, related gap was found in its place.
-
----
-
-### I-0010 — Supabase Preview check fails on `main`; auto-apply decision needed
-**Status:** OPEN — decision made (option a, 2026-10-12); stays OPEN until the migrations themselves are fixed
-**Severity:** P1 (not tech debt: see Impact)
-**Module:** `supabase/migrations/`, Supabase GitHub integration (project
-`zzgymrxrwuuffyrbhify`)
-**Spec ref:** n/a (infra)
-**Evidence:**
-- There is no `.github/workflows` directory at any commit
-  (`git log --all -- .github` empty; `gh run list` empty). The red check on
-  commits is the **Supabase Preview** check-run from the Supabase GitHub app.
-- `gh api repos/C72-BTECH-PROJECT/Patina/commits/<sha>/check-runs` for
-  `32905c1` and `cc0e637` (both on `main`): `Supabase Preview | supabase |
-  completed failure` with summary
-  `ERROR: type "patina_user_role" already exists (SQLSTATE 42710) At
-  statement: 0 -- Patina: Supabase Auth profile schema`. For `92db9f0`
-  (`Anthony_V2`): `completed skipped` — "This git branch is not associated
-  with any Supabase Branch".
-- Cause: `supabase/migrations/20260823_create_profiles.sql:6` is an
-  unguarded `create type public.patina_user_role ...`; the file header says
-  "Run once in the Supabase Dashboard SQL Editor", i.e. the schema was
-  applied by hand, so the integration replaying migrations collides.
-- **Update 2026-10-31 (T-0023):** `3f53f80` (head of `main`) fails the same
-  check for a different reason. `gh api .../commits/3f53f80/check-runs`:
-  `Supabase Preview | supabase | failure`, summary `Remote migration versions
-  not found in local migrations directory.` So the hosted DB's migration
-  history now holds versions that no file in `supabase/migrations/` has —
-  consistent with schema applied by hand (L-0035/L-0037 record the two
-  20261015 migrations as "applied"). Not re-checked against the remote
-  history table (needs dashboard/CLI access). Duplicate version prefixes are
-  tracked separately in I-0057.
-- **Update 2026-11-04 (T-0029):** the reverse drift now exists too. The four
-  T-0029 migrations (`20261103120000`..`20261103120300`) are applied by hand in
-  the SQL editor and absent from `supabase_migrations.schema_migrations`. B2's
-  repair marks them applied; see I-0057. History not changed now (owner).
-**Impact:** Today the integration fails at statement 0, so nothing is
-applied. Once the migrations succeed (e.g. someone makes them idempotent),
-**every merge to `main` will auto-apply schema changes to the shared
-production DB** that both teammates and the test harness use.
-**Decision options (not acted on):**
-- (a) Disable production auto-deploy of migrations in the Supabase GitHub
-  integration settings, and keep applying schema by hand / via CLI.
-- (b) First make every migration idempotent (`create ... if not exists`,
-  `do $ begin ... exception when duplicate_object then null; end $;` for
-  types/policies), accepting that merges to `main` then deploy schema
-  automatically.
-**Decision (2026-10-12, owner):** chose option (a) and **disabled production
-auto-deploy of migrations in the Supabase GitHub integration**. Recorded as
-reported by the owner; not independently verified from the repo (the setting
-lives in the Supabase dashboard). Consequence: schema stays applied by hand /
-CLI, merges to `main` no longer deploy schema.
-**Remaining work:** the migrations still collide on replay (e.g.
-`20260823_create_profiles.sql:6` unguarded `create type`), so the Preview
-check may still show red and any future replay (branching, fresh env) will
-fail. Making them idempotent is tracked with I-0001/I-0007/I-0013. Close this
-issue when that is done and the Preview check is verified.
-**Proposed fix:** Option (a) taken; fix the migrations (idempotent) to finish.
-**Note (2026-10-12, T-0003):** both 20260903 migrations are now in the repo, and both are still unguarded:
-- `create table public.resumes` / `public.scores` (`20260903_create_resumes_and_scores.sql:18,41`);
-- `create table public.notifications` (`20260903_create_notifications.sql:6`).
-
-T-0003 kept them verbatim. R19 and R33 put their idempotency in this batch.
-
-**Note (2026-10-12, after the PR #3 merge):** the Supabase check still ran on merge commit `7c83293` (PR #3, `Anthony_V2` into `main`; parents `cc0e637` and `bef8f9e`), after production auto-deploy had been disabled. `gh api repos/C72-BTECH-PROJECT/Patina/commits/7c83293/check-runs`: `Supabase Preview | supabase | completed | failure`, 08:00:45Z to 08:00:54Z, summary `ERROR: type "patina_user_role" already exists (SQLSTATE 42710) At statement: 0`, the same error as on `32905c1` and `cc0e637`.
-- What this shows: disabling production auto-deploy did not stop the Preview check; the check is a separate replay of the migrations that still collides at statement 0. Nothing was applied (the error is at statement 0), so no schema reached production.
-- What it does not show: whether the dashboard setting is really off. That is still only the owner's report. The failure is the same one as before the setting changed, so it neither confirms nor contradicts it.
-- Consequence: the check will stay red on every push and merge until the migrations are idempotent. That is the remaining work above; the "Preview check is verified" close condition is still not met.
 
 ---
 
@@ -296,7 +189,8 @@ fixed in T-0001.
 **Spec ref:** NFR-2 (concurrency)
 **Evidence:** `multer({ storage: multer.memoryStorage() })` with no `limits`, at HEAD and at `32905c1`. Only the storage bucket enforces 10 MB, and only after the whole file has been buffered in the Node process.
 **Impact:** Large uploads are held in memory before rejection, which is a memory-exhaustion risk under concurrent uploads.
-**Proposed fix:** `limits: { fileSize: 10 * 1024 * 1024 }`, plus a 413 response on `LIMIT_FILE_SIZE`.
+**Proposed fix:** `limits: { fileSize: MAX_RESUME_BYTES }` (10 MB, one shared constant), plus a 413 response on `LIMIT_FILE_SIZE`.
+**Decision (owner, 2026-11-04, T-0030 D2):** the cap is **5 MB**, the same as the `resumes` bucket's `file_size_limit` that T-0030 sets when the live bucket has none. T-0030 B4 (2026-11-04) read the live bucket: `file_size_limit = 10485760` (10 MB), so the Evidence above is confirmed, and T-0030 mirrors 10 MB rather than setting 5 MB. **Decision (owner, 2026-11-04):** multer uses **10 MB**, the same as the bucket, from **one shared constant** (e.g. `MAX_RESUME_BYTES = 10 * 1024 * 1024`). The frontend's selection-time check (I-0006, B5 / ROADMAP P0-4 (a)) uses the same value. Supersedes the 5 MB note above. Fixed in B3 (ROADMAP P0-3 (d)).
 
 ---
 
@@ -543,20 +437,6 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 
 ---
 
-### I-0041 — Migration comment describes an outdated `scores.subscores` shape
-**Status:** OPEN
-**Severity:** P3
-**Module:** `supabase/migrations/20260903_create_resumes_and_scores.sql`
-**Spec ref:** n/a (documentation accuracy)
-**Evidence (T-0010):**
-- The column comment says `"github_evidence": null, -- module not built yet` and `"assessment_results": null` (`supabase/migrations/20260903_create_resumes_and_scores.sql:48-53`).
-- The code stores a full unavailable sub-score object instead: `{key, label, available:false, value:null, weight:0, reason, components:null, evidence:[]}` (`backend/Services/explainability.js:121-130`, `:447`).
-
-**Impact:** someone reading the schema expects `null` and mis-parses stored rows. Once ROADMAP P1-4 stores real GitHub sub-scores, the comment is wrong in both directions.
-**Proposed fix:** correct the comment in ROADMAP P3-15 (migrations hygiene). Schema is applied by hand (I-0010), so a comment-only change needs no re-apply.
-
----
-
 ### I-0042 — Docs checker silently skips some cites
 **Status:** OPEN
 **Severity:** P3
@@ -645,16 +525,6 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Impact:** the recruiter sees 0 applications for every job, even when candidates applied.
 **Proposed fix:** P2-5 (merged application-centric dashboard) shows the real count.
 
-### I-0057 — Duplicate migration version prefixes
-**Status:** OPEN — high priority
-**Severity:** P1
-**Module:** `supabase/migrations/`
-**Spec ref:** n/a (infra); related I-0010
-**Evidence:** `supabase/migrations/` holds `20260903_create_notifications.sql` and `20260903_create_resumes_and_scores.sql`, and `20261015_allow_five_assessment_attempts.sql` and `20261015_create_assessments.sql`. The Supabase CLI takes the digits before the first `_` as the migration version, so each pair shares one version.
-**Impact:** `supabase db push` / branching can fail on a duplicate version in `schema_migrations`, or treat the second file of a pair as already applied and skip it. `20261015_allow_five_assessment_attempts` depends on `20261015_create_assessments`, so order inside a pair also matters.
-**Proposed fix:** rename to unique 14-digit timestamps preserving order (create before allow-five), then reconcile the remote history (`supabase migration repair`) by hand — touches applied migrations, so its own spec with the owner (I-0010 decision a).
-**Update 2026-11-04 (T-0029):** the owner applied `20261103120000_restrict_signup_role`, `20261103120100_create_assessment_keys` and `20261103120200_assessment_grading_claim` in the SQL editor (2026-11-04), so `supabase_migrations.schema_migrations` does not record them: local files the remote history lacks, the opposite direction of I-0010's drift. `20261103120300_drop_assessments_answer_key` will follow the same way. B2's history repair must mark all four applied (`supabase migration repair --status applied 20261103120000 20261103120100 20261103120200 20261103120300`) and not re-run them. History left unchanged for now (owner decision).
-
 ### I-0059 — Hardcoded Windows venv model path in NLP
 **Status:** OPEN
 **Severity:** P2
@@ -716,9 +586,150 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Spec ref:** FR-14/FR-15 (recruiter decisions, candidate notification)
 **Evidence (2026-11-04, found in the T-0029 regression run, not caused by it):** the control test asserts that rejecting an application sends no notification (`tests/backend/live-shortlist-authz.test.mjs:106`). `3f53f80` (2026-10-15, T-0016..T-0019 from `main`) added `sendNotification(..., 'rejected', 'Your application has been rejected.')` (`backend/Controllers/jobs.controller.js:303-309`). The test was written in T-0004 (2026-10-12), before that. `tests/.out/t0029-after-full-backend.log` and the isolated rerun `tests/.out/t0029-shortlist-rerun.log`: `1 !== 0`, 10/11 pass. T-0029 changed neither file.
 **Impact:** the `-Live` backend suite is red for a reason unrelated to security; a real regression in shortlist ownership could hide behind a known failure.
-**Proposed fix:** owner decides whether candidates should be told about a rejection. If yes, update the control test to expect one `rejected` notification; if no, remove the call. Either way the I-0019 ownership checks in the same file stay as they are.
+**Decision (owner, 2026-11-04):** candidates **should** be notified of a rejection; the controller's behaviour is intended.
+**Fix (in B3, ROADMAP P0-3 (j), not before):** update the control test to expect exactly one `rejected` notification for the rejected application, and check that its text is neutral and that its payload carries no recruiter-only data (only `applicationId` and `jobId` today, `backend/Controllers/jobs.controller.js:303-309`; no score, notes or recruiter identity). The I-0019 ownership checks in the same file stay as they are.
+
+### I-0072 — nlp-engine `.txt` extraction vs a PDF/DOCX-only bucket
+**Status:** OPEN
+**Severity:** P3
+**Module:** `nlp-engine/app/extractor.py`, `backend/Controllers/analysis.controller.js`, `frontend/src/pages/candidate/Upload.jsx`
+**Spec ref:** n/a (consistency)
+**Evidence (2026-11-04, T-0030 B4):** the live `resumes` bucket allows only `application/pdf` and the DOCX type. `extract_text()` also handles `.txt` (`nlp-engine/app/extractor.py:33-34`, from `main` via `7b6dd3d`). A first look: the backend maps only `.pdf`/`.docx` to content types (`backend/Controllers/analysis.controller.js:28-31`), and the upload input has `accept=".pdf,.docx"` (`frontend/src/pages/candidate/Upload.jsx:299`). Not yet checked: every upload route's extension gate, and whether anything calls `/parse` with a `.txt` file.
+**Proposed fix (owner, 2026-11-04; in B3, ROADMAP P0-3 (k)):** check every upload path. If none accepts `.txt`, record the NLP branch as unused (test-only), and do **not** widen the bucket. If one does, close that path rather than widening the bucket.
 
 ## Resolved
+### I-0057 — Duplicate migration version prefixes (RESOLVED)
+**Status:** RESOLVED T-0030 (2026-11-04): every migration has a unique 14-digit version; local files and remote history agree
+**Severity:** P1
+**Module:** `supabase/migrations/`
+**Spec ref:** n/a (infra); related I-0010
+**Evidence:** `supabase/migrations/` holds `20260903_create_notifications.sql` and `20260903_create_resumes_and_scores.sql`, and `20261015_allow_five_assessment_attempts.sql` and `20261015_create_assessments.sql`. The Supabase CLI takes the digits before the first `_` as the migration version, so each pair shares one version.
+**Impact:** `supabase db push` / branching can fail on a duplicate version in `schema_migrations`, or treat the second file of a pair as already applied and skip it. `20261015_allow_five_assessment_attempts` depends on `20261015_create_assessments`, so order inside a pair also matters.
+**Proposed fix:** rename to unique 14-digit timestamps preserving order (create before allow-five), then reconcile the remote history (`supabase migration repair`) by hand — touches applied migrations, so its own spec with the owner (I-0010 decision a).
+**Update 2026-11-04 (T-0029):** the owner applied `20261103120000_restrict_signup_role`, `20261103120100_create_assessment_keys` and `20261103120200_assessment_grading_claim` in the SQL editor (2026-11-04), so `supabase_migrations.schema_migrations` does not record them: local files the remote history lacks, the opposite direction of I-0010's drift. `20261103120300_drop_assessments_answer_key` will follow the same way. B2's history repair must mark all four applied (`supabase migration repair --status applied 20261103120000 20261103120100 20261103120200 20261103120300`) and not re-run them. History left unchanged for now (owner decision).
+**Evidence of resolution** (2026-11-04, T-0029): Eight 8-digit files renamed per the approved table in `tasks/T-0030-migrations-batch.md`; the 20261015 pair took the versions the remote already recorded (`20261015004738`, `20261015034725`; SQL identical). `20260831000000` split into `…000000` (the `add value`) and `20260831000100` (the index, verbatim), because the CLI's per-file transaction cannot use a new enum value (55P04). The owner ran `npx supabase migration repair --status applied` for the 11 hand-applied versions, after `db diff --linked` showed their content live. `npx supabase migration list --linked`: 16/16 Local = Remote. `tests/backend/migration-guards.test.mjs` "every migration has a unique 14-digit version" and "B2 renames match the approved table" (the I-0057 `todo` failed before; 12/12 pass).
+
+### I-0010 — Supabase Preview check fails on `main`; auto-apply decision needed (RESOLVED)
+**Status:** RESOLVED T-0030 (2026-11-04): the Supabase Preview check is green, and production deploys stay off
+**Severity:** P1 (not tech debt: see Impact)
+**Module:** `supabase/migrations/`, Supabase GitHub integration (project
+`zzgymrxrwuuffyrbhify`)
+**Spec ref:** n/a (infra)
+**Evidence:**
+- There is no `.github/workflows` directory at any commit
+  (`git log --all -- .github` empty; `gh run list` empty). The red check on
+  commits is the **Supabase Preview** check-run from the Supabase GitHub app.
+- `gh api repos/C72-BTECH-PROJECT/Patina/commits/<sha>/check-runs` for
+  `32905c1` and `cc0e637` (both on `main`): `Supabase Preview | supabase |
+  completed failure` with summary
+  `ERROR: type "patina_user_role" already exists (SQLSTATE 42710) At
+  statement: 0 -- Patina: Supabase Auth profile schema`. For `92db9f0`
+  (`Anthony_V2`): `completed skipped` — "This git branch is not associated
+  with any Supabase Branch".
+- Cause: `supabase/migrations/20260823_create_profiles.sql:6` is an
+  unguarded `create type public.patina_user_role ...`; the file header says
+  "Run once in the Supabase Dashboard SQL Editor", i.e. the schema was
+  applied by hand, so the integration replaying migrations collides.
+- **Update 2026-10-31 (T-0023):** `3f53f80` (head of `main`) fails the same
+  check for a different reason. `gh api .../commits/3f53f80/check-runs`:
+  `Supabase Preview | supabase | failure`, summary `Remote migration versions
+  not found in local migrations directory.` So the hosted DB's migration
+  history now holds versions that no file in `supabase/migrations/` has —
+  consistent with schema applied by hand (L-0035/L-0037 record the two
+  20261015 migrations as "applied"). Not re-checked against the remote
+  history table (needs dashboard/CLI access). Duplicate version prefixes are
+  tracked separately in I-0057.
+- **Update 2026-11-04 (T-0029):** the reverse drift now exists too. The four
+  T-0029 migrations (`20261103120000`..`20261103120300`) are applied by hand in
+  the SQL editor and absent from `supabase_migrations.schema_migrations`. B2's
+  repair marks them applied; see I-0057. History not changed now (owner).
+**Impact:** Today the integration fails at statement 0, so nothing is
+applied. Once the migrations succeed (e.g. someone makes them idempotent),
+**every merge to `main` will auto-apply schema changes to the shared
+production DB** that both teammates and the test harness use.
+**Decision options (not acted on):**
+- (a) Disable production auto-deploy of migrations in the Supabase GitHub
+  integration settings, and keep applying schema by hand / via CLI.
+- (b) First make every migration idempotent (`create ... if not exists`,
+  `do $ begin ... exception when duplicate_object then null; end $;` for
+  types/policies), accepting that merges to `main` then deploy schema
+  automatically.
+**Decision (2026-10-12, owner):** chose option (a) and **disabled production
+auto-deploy of migrations in the Supabase GitHub integration**. Recorded as
+reported by the owner; not independently verified from the repo (the setting
+lives in the Supabase dashboard). Consequence: schema stays applied by hand /
+CLI, merges to `main` no longer deploy schema.
+**Remaining work:** the migrations still collide on replay (e.g.
+`20260823_create_profiles.sql:6` unguarded `create type`), so the Preview
+check may still show red and any future replay (branching, fresh env) will
+fail. Making them idempotent is tracked with I-0001/I-0007/I-0013. Close this
+issue when that is done and the Preview check is verified.
+**Proposed fix:** Option (a) taken; fix the migrations (idempotent) to finish.
+**Note (2026-10-12, T-0003):** both 20260903 migrations are now in the repo, and both are still unguarded:
+- `create table public.resumes` / `public.scores` (`20260903_create_resumes_and_scores.sql:18,41`);
+- `create table public.notifications` (`20260903_create_notifications.sql:6`).
+
+T-0003 kept them verbatim. R19 and R33 put their idempotency in this batch.
+
+**Note (2026-10-12, after the PR #3 merge):** the Supabase check still ran on merge commit `7c83293` (PR #3, `Anthony_V2` into `main`; parents `cc0e637` and `bef8f9e`), after production auto-deploy had been disabled. `gh api repos/C72-BTECH-PROJECT/Patina/commits/7c83293/check-runs`: `Supabase Preview | supabase | completed | failure`, 08:00:45Z to 08:00:54Z, summary `ERROR: type "patina_user_role" already exists (SQLSTATE 42710) At statement: 0`, the same error as on `32905c1` and `cc0e637`.
+- What this shows: disabling production auto-deploy did not stop the Preview check; the check is a separate replay of the migrations that still collides at statement 0. Nothing was applied (the error is at statement 0), so no schema reached production.
+- What it does not show: whether the dashboard setting is really off. That is still only the owner's report. The failure is the same one as before the setting changed, so it neither confirms nor contradicts it.
+- Consequence: the check will stay red on every push and merge until the migrations are idempotent. That is the remaining work above; the "Preview check is verified" close condition is still not met.
+
+---
+**Evidence of resolution** (2026-11-04, T-0029): `gh api repos/C72-BTECH-PROJECT/Patina/commits/68763e0/check-runs`: `Supabase Preview | completed | success` (2026-11-04 08:34:15Z–08:34:22Z), the first green run. Before: `failure`, "Remote migration versions not found in local migrations directory" on `edb1a37`. The owner confirmed in the dashboard (2026-11-04) that production deploys in the GitHub integration are off (decision a, 2026-10-12). Fresh replay of all 16 migrations on a local stack: exit 0. `npx supabase db diff --linked` for `public` and `auth,storage` after the push: `No schema changes found` (`tests/.out/t0030-diff3-*`). Replay safety comes from history alignment plus the runbook (`Docs/SUPABASE_MIGRATIONS_RUNBOOK.md`: `db push --linked` only, never `--include-all`, never `db reset --linked`). Guards were not added to the applied files (owner decision).
+
+### I-0001 — `resumes` storage bucket not in any migration (RESOLVED)
+**Status:** RESOLVED T-0030 (2026-11-04): the `resumes` bucket limits are in a migration, mirroring live
+**Severity:** P1
+**Module:** `supabase/migrations/`, `backend/Controllers/analysis.controller.js`, `backend/Controllers/jobs.controller.js`
+**Spec ref:** n/a (infra/deployment gap, not a feature spec item)
+**Evidence:**
+- The `resumes` storage bucket was created manually in the Supabase dashboard
+  (2026-08-31) with an `allowed_mime_types` allow-list. It is not defined in
+  any file under `supabase/migrations/` (confirmed current migrations:
+  `20260823_create_profiles.sql`, `20260830_create_jobs_and_applications.sql`,
+  `20260831_add_single_admin_role.sql`, `20260901_add_profile_suspension.sql`,
+  `20260903_create_notifications.sql` — none create a storage bucket).
+- `backend/Controllers/analysis.controller.js:14,24,38,60` and
+  `backend/Controllers/jobs.controller.js:94` do `.from('resumes')` against
+  Supabase Storage, so the app depends on a bucket that only exists because
+  someone created it by hand.
+**Impact:** A fresh environment (new Supabase project, teammate's local
+setup, CI) will not have the bucket and resume upload/retrieval will fail
+with no migration to explain why.
+**Proposed fix:** Move bucket creation + MIME allow-list config into a
+migration (Supabase supports this via `storage.buckets` inserts or the
+management API in a migration script).
+**Note (2026-10-12, T-0002):**
+- **The bucket insert used to exist.** `20260903_create_resumes_and_scores.sql:14-16@32905c1` created it (`id/name/public` only). `314e494` deleted that migration.
+- **Never in any migration:** the MIME allow-list and the 10 MB cap.
+- **Live check:** read-only bucket listing on 2026-10-12: `resumes` is private, `allowed_mime_types` = pdf + docx.
+- See INTEGRATION_REVIEW.md R19 and §7.
+**Note (2026-10-12, T-0008):** partly stale at HEAD `2e87d44`. The bucket insert is back in `supabase/migrations/20260903_create_resumes_and_scores.sql:14-16` (restored by `a7c74e4`). What is still missing from any migration is the MIME allow-list and the 10 MB cap. Left OPEN for that; not re-verified against the live project.
+**Note (2026-10-12, T-0003): still OPEN.**
+- **The bucket insert is back:** the restored `20260903_create_resumes_and_scores.sql:14` has `insert into storage.buckets (id, name, public)` (committed in `a7c74e4`, R19).
+- **Still in no migration:** the MIME allow-list (pdf/docx) and the 10 MB size cap. A fresh environment gets a bucket without them.
+- **The backend no longer depends on the allow-list for correctness:** `saveResumeToStorage` now sends the extension-derived content type, and `uploadResume` accepts only `.pdf`/`.docx` (R7, `e9e4592`).
+
+---
+**Evidence of resolution** (2026-11-04, T-0029): `supabase/migrations/20261104120000_resumes_bucket_limits.sql` (10 MB, `application/pdf` + the DOCX type), pushed by `npx supabase db push --linked`. Owner B4 check after the push: `public: false`, `file_size_limit: 10485760`, `allowed_mime_types` unchanged. The fresh local replay creates the bucket with those limits. `migration-guards` "resumes bucket limits live in a migration". The backend multer cap (10 MB, shared constant) stays with I-0025 in B3.
+
+### I-0041 — Migration comment describes an outdated `scores.subscores` shape (RESOLVED)
+**Status:** RESOLVED T-0030 (2026-11-04): `scores.subscores` has a database comment describing the stored shape
+**Severity:** P3
+**Module:** `supabase/migrations/20260903_create_resumes_and_scores.sql`
+**Spec ref:** n/a (documentation accuracy)
+**Evidence (T-0010):**
+- The column comment says `"github_evidence": null, -- module not built yet` and `"assessment_results": null` (`supabase/migrations/20260903_create_resumes_and_scores.sql:48-53`).
+- The code stores a full unavailable sub-score object instead: `{key, label, available:false, value:null, weight:0, reason, components:null, evidence:[]}` (`backend/Services/explainability.js:121-130`, `:447`).
+
+**Impact:** someone reading the schema expects `null` and mis-parses stored rows. Once ROADMAP P1-4 stores real GitHub sub-scores, the comment is wrong in both directions.
+**Proposed fix:** correct the comment in ROADMAP P3-15 (migrations hygiene). Schema is applied by hand (I-0010), so a comment-only change needs no re-apply.
+
+---
+**Evidence of resolution** (2026-11-04, T-0029): `supabase/migrations/20261104120100_scores_subscores_comment.sql`, pushed. Owner check: `col_description` returns "Object keyed by parsing_semantic_alignment, github_evidence and assessment_results. Every entry has the same shape…". The stale `--` lines in the applied `20260903000100_create_resumes_and_scores.sql:48-53` are left as they are (applied files are not edited); the database comment is the source of truth. `migration-guards` "scores.subscores has a database comment".
+
 ### I-0055 — `handle_new_user()` trusts the role in signup metadata (HIGH) (RESOLVED)
 **Status:** RESOLVED T-0029 (2026-11-04): signup role goes through `public.assert_signup_role()`; anything but candidate/recruiter raises 22023 and GoTrue rolls the user back
 **Severity:** P0 (security: privilege escalation)

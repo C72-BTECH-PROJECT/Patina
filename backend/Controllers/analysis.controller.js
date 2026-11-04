@@ -61,7 +61,7 @@ const RLS_HINT =
   'Postgres row-level security rejected this write. The backend must talk to Supabase with the ' +
   'service-role key: check SUPABASE_SERVICE_ROLE_KEY in backend/.env (it must decode to role ' +
   '"service_role") and restart the server. If the key is correct, confirm the migration ' +
-  'supabase/migrations/20260903_create_resumes_and_scores.sql has been applied to this project.';
+  'supabase/migrations/20260903000100_create_resumes_and_scores.sql has been applied to this project.';
 
 const logPersistenceError = (context, error) => {
   console.error(`[analyze] ${context} failed: ${describeSupabaseError(error)}`);
