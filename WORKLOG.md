@@ -589,3 +589,23 @@ rollup per archived month at the top of this file.
 - Mistakes: two mutation attempts stopped on my script's anchor before touching the file; one :8002-up pass was rerun because the monitor caught only `pid=0`.
 - Issues: I-0079 resolved.
 - Files changed (uncommitted): tests/backend/live-applicants.test.mjs, ISSUES, ROADMAP, WORKLOG, tasks/T-0031. Controller unchanged.
+
+## L-0053 · 2026-11-05 · T-0033 drafted; `48707d2` reviewed; I-0080..I-0084 filed
+- Prompt: draft T-0033 (occupied-port refusal, lint) and stop; then record D1, D2, suite-scoped ports and criterion 11's routes; summarise `48707d2`; report the safety-check error; file the new issues; do not implement.
+- Task: T-0033 (draft v2, awaiting approval). No code changed.
+- Found: core defaults to :5001 since `48707d2` and `run-suite` still waits on :5000 (read, not run). `check-trackers` exits 1 with 10 cites to lines removed from `auth.routes.js`, a third blocker to exit 0, so D3 is open and depends on I-0080. `.env` beats a caller's `PORT` (`override:true`). The browser check needs the gateway.
+- Added beyond the request, flagged in the spec: `-PreflightOnly`; refuse `-AllowPort 8002` when nothing listens; refuse a conflicting `PORT` in `backend/.env`.
+- Verification: eslint 9 warnings; github 80/80, assessment 12/12, offline backend 88/88; docs exit 1. NLP, frontend and live suites not run since `48707d2`.
+- Tooling: six tool calls got `classifier gave no verdict (error)`; the same commands ran later.
+- Issues: I-0080..I-0084 new.
+- Files changed (uncommitted): tasks/T-0033-test-harness.md (new), ISSUES.md, WORKLOG.md.
+- Next: owner decides I-0080 and D3, then approves the criteria.
+
+## L-0054 · 2026-11-05 · T-0033 paused pending the `48707d2` decision
+- Prompt: pause T-0033 without implementing; add a Paused section covering status, the `48707d2` decision and what D1 and D3 become under each option, the I-0084 check and the first step on resume; add a worklog entry; stop servers and confirm ports closed; report git status by group.
+- Task: T-0033 (paused; draft, not approved, nothing implemented).
+- Done: Paused section at the top of the task file. Owner's leaning: keep `636314c`, revert `7fa7d1b` and `2442ad4` themselves, so core returns to :5000, D1 becomes `PORT=5000` refusing 5000 and 5001, and D3 is dropped.
+- Found: `2442ad4` also changes `gateway/index.js`, `gateway/.env.example` and the session log, and adds `tests/gateway/live-gateway.test.mjs`, so reverting it takes those too. `backend/index.js` and `assessment.controller.js` were conflict-resolved in `48707d2`. The merge is on origin.
+- Servers: this session started none, so none were stopped.
+- Waiting: owner's `48707d2` decision; owner's I-0084 credential check.
+- Files changed (uncommitted): tasks/T-0033-test-harness.md (new), ISSUES.md, WORKLOG.md. No code.

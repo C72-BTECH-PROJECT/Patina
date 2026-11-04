@@ -54,6 +54,11 @@ diff you're already writing.
 | I-0076 | A multipart body busboy cannot parse (truncated, or no boundary) gives a 500 HTML page on both upload routes | `backend/Middlewares/resumeUpload.js`, `backend/index.js` | P3 | OPEN | 2026-11-04, T-0031 |
 | I-0077 | `run-suite.ps1` silently tests whatever already answers on :5000 when its own backend cannot bind the port | `tests/run-suite.ps1` | P2 | OPEN | 2026-11-04, T-0031 |
 | I-0078 | Résumé uploads are checked by file extension only: a text file named `.pdf` passes the gate | `backend/Controllers/analysis.controller.js` | P2 | OPEN | 2026-11-04, T-0031 |
+| I-0080 | Merge `48707d2` landed T-0022 Part 2 core and NLP changes and unspecified assessment work outside approved scope | `backend/`, `nlp-engine/app/main.py`, `assessment-service/app/` | P1 | OPEN | 2026-11-05, T-0033 |
+| I-0081 | Outage probe assumes the backend is on :5000; since `48707d2` core defaults to :5001 | `tests/arch/nlp-outage-probe.mjs` | P2 | OPEN | 2026-11-05, T-0033 |
+| I-0082 | Frontend API base still targets :5000 with no CRA proxy, so the UI needs the gateway running, and `gateway/` is not installed here | `frontend/src/**`, `frontend/.env`, `frontend/package.json`, `gateway/` | P2 | OPEN | 2026-11-05, T-0033 |
+| I-0083 | Docs, `.env` instructions and test defaults still say core is on :5000; two trackers now state it as fact | `README.md`, `ARCHITECTURE.md`, `AUDIT.md`, `Docs/`, `tests/` | P2 | OPEN | 2026-11-05, T-0033 |
+| I-0084 | `tests/.env.example` gained a credential-shaped `Password = pass123` and lines that are not valid dotenv | `tests/.env.example` | P2 | OPEN | 2026-11-05, T-0033 |
 
 ---
 
@@ -500,6 +505,71 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Impact:** a candidate can store a file that is not a résumé. Its later parse fails in `extract_from_pdf` (`nlp-engine/app/extractor.py:5-7`), so an assessment or analyze on it errors instead of scoring.
 **Checked, no change needed (2026-11-04, T-0031):** the `contentType` sent to storage is set on the server (`:162`, `:343`, both through `resolveContentType`): the gate guarantees a `MIME_BY_EXT` hit at `:35`, so the client-mimetype fallback at `:36` cannot be reached. No test asserts the stored content type. This issue stays open for the file's content.
 **Proposed fix:** check the leading bytes in core (`%PDF-` for PDF, a ZIP header plus `word/document.xml` for DOCX) next to the extension gate, with a test for each mismatch.
+
+---
+
+### I-0080 — Merge `48707d2` landed work outside its approved scope
+**Status:** OPEN (owner decides whether it stays as part of T-0022 Part 2)
+**Severity:** P1
+**Module:** `backend/index.js`, `backend/Routes/auth.routes.js`, `backend/Controllers/assessment.controller.js`, `nlp-engine/app/main.py`, `assessment-service/app/`
+**Spec ref:** T-0022 Part 2 (`tasks/T-0022-api-gateway.md:3`, `:16`)
+**Evidence (2026-11-05, T-0033, `git diff 48707d2^1 48707d2`):** `48707d2` is a merge (parents `3b29a9f`, `7fa7d1b`) that brings in `636314c`, `2442ad4` and `7fa7d1b`: 32 files. T-0022 Part 1 was approved for `gateway/` and `tests/gateway/` only (`:16`), and Part 2 is still a draft awaiting approval (`:3`).
+- `2442ad4` makes Part 2's core and NLP changes: core default port 5001, `trust proxy`, `cors()` removed, request-ID middleware, password-reset limiter removed, NLP CORS removed.
+- `7fa7d1b` adds Gemini as the primary LLM with OpenRouter as backup, GitHub evidence in `POST /api/assessment/generate`, a prompt line, and `STEPS_TO_RUN_APP.md`, and removes the model name from `Assessment.jsx`. No file in `tasks/` mentions any of this, and no file in `tests/` references `_try_gemini`, `GEMINI`, `include_github` or `github_data`.
+
+Part 2 items that are missing or differ from the spec:
+- `/api/health` has no Supabase readiness query: the `try` around `res.json` cannot fail (`backend/index.js:63-70`; spec `:189`). `gateway/SESSION_LOG(4-11-26).md:35` lists "health readiness" as done.
+- The NLP middleware echoes the ID but logs nothing (`nlp-engine/app/main.py`; spec `:193`).
+- `resolveRequestId` did not move to the middleware (`backend/Services/internalHttp.js:18`; spec `:186`), and the comment at `backend/Middlewares/requestId.js:1` says it moved "in T-0031", which T-0031 did not do.
+- No `gateway` suite, and `run-suite` was not moved to core on 5001 behind the gateway (spec `:203-205`).
+- The outage probe was not moved (spec `:207`, I-0081), and the ARCHITECTURE refresh was not done (spec `:208`, I-0083).
+- `backend/.env.example` dropped `GITHUB_EVIDENCE_URL`, `GITHUB_EVIDENCE_TIMEOUT_MS`, `ASSESSMENT_SERVICE_URL` and the warning that the service-role key must never reach the frontend.
+
+**Impact:** `run-suite` should fail at the backend wait (`tests/run-suite.ps1:54`, `:103`; read from the code, not run). The docs suite fails with 10 problems, all cites to lines removed from `backend/Routes/auth.routes.js` (`node tests/docs/check-trackers.mjs`, exit 1, 2026-11-05). Without the gateway, core has no CORS and no rate limit, and `trust proxy` applies while :5001 is directly reachable. No full suite has run since this merge.
+**Proposed fix:** owner decides. Keep it and approve T-0022 Part 2 with these gaps as its remaining work, plus a separate spec for the assessment changes; or revert `2442ad4`'s core and NLP edits until Part 2 is approved.
+
+### I-0081 — Outage probe assumes the backend is on :5000
+**Status:** OPEN
+**Severity:** P2
+**Module:** `tests/arch/nlp-outage-probe.mjs`
+**Spec ref:** T-0022 Part 2 (`tasks/T-0022-api-gateway.md:207`)
+**Evidence (2026-11-05, T-0033, from reading the code; not run):** the comment at `:32` says the tree hardcodes :5000, `:380` refuses only a busy :5000, and every request goes to `backendBaseUrl()` (`:45`), whose default is :5000 (`tests/backend/lib/env.mjs:30`). Since `48707d2` core defaults to :5001 (`backend/index.js:22`).
+**Impact:** the probe should fail waiting for a backend on :5000, and a stale core on :5001 passes its port check.
+**Proposed fix:** move it with T-0022 Part 2, as the spec says, through the gateway; until then pass the port explicitly and check :5001 too.
+
+### I-0082 — Frontend API base needs the gateway on :5000
+**Status:** OPEN
+**Severity:** P2
+**Module:** `frontend/src/**`, `frontend/.env`, `frontend/package.json`, `gateway/`
+**Spec ref:** T-0021, T-0022
+**Evidence (2026-11-05, T-0033):** `frontend/.env:1` sets `REACT_APP_API_BASE_URL=http://localhost:5000`, and 17 files under `frontend/src` contain a `localhost:5000` default; `ResetPassword.jsx:6` and `CreateJob.jsx:211` hardcode it (those two are I-0012). `frontend/package.json` has no `proxy` key and there is no `setupProxy`, although T-0022 assumes one (`tasks/T-0022-api-gateway.md:128`; T-0021 is still a draft). Core no longer sends CORS headers, so pointing the frontend at :5001 is not a workaround. `gateway/node_modules` does not exist on this machine.
+**Impact:** `npm start` plus core alone cannot sign in. The UI works only with the gateway on :5000, which is the T-0022 target, so these URLs are correct once the gateway is the standard way to run.
+**Proposed fix:** decide with I-0080. If the merge stays, the run documents start the gateway; T-0021 then replaces the URLs with one API base and a proxy.
+
+### I-0083 — Docs, instructions and test defaults still say core is on :5000
+**Status:** OPEN
+**Severity:** P2
+**Module:** `README.md`, `ARCHITECTURE.md`, `AUDIT.md`, `CODE_MAP.md`, `Docs/HOW_TO_RUN_AND_TEST.md`, `STEPS_TO_RUN_APP.md`, `tests/`
+**Spec ref:** T-0022 Part 2 (`tasks/T-0022-api-gateway.md:208`)
+**Evidence (2026-11-05, T-0033, repo grep excluding `tasks/`, `WORKLOG.md`, `ISSUES.md`, `Docs/archive/`):**
+- Trackers, stated as fact: `ARCHITECTURE.md:55`, `:89` (`process.env.PORT || 5000`), `:334`; `AUDIT.md:67`. The limiter claim at `ARCHITECTURE.md:167-168` and `:306` is also out of date. `:306` cites `backend/Routes/auth.routes.js:17-21`, which still resolves, so the checker cannot flag it.
+- Instructions that break if followed: `README.md:105` tells people to set `PORT=5000` in `backend/.env`, and `backend/Config/supabase.js:12` loads `.env` with `override:true`, so that value beats any port a caller sets. `README.md:136`; `Docs/HOW_TO_RUN_AND_TEST.md:13`, `:52`, `:55`, `:59`; `tests/MANUAL_SMOKE.md:53`, `:80`, `:81`, `:144`, `:154`; `tests/README.md:8`, `:10`.
+- `STEPS_TO_RUN_APP.md:28` sets `VITE_API_BASE_URL`, which CRA ignores (I-0012), and the file carries one developer's absolute paths (`:5`, `:73`, `:80`, `:87`, `:93`, `:100`, `:107`, `:113`).
+- Reference docs: `CODE_MAP.md:365-367`, `:518`, `:522` and `REVIEW_BRIEF.md:87` (the last two files are already I-0030 and I-0031).
+- Test defaults: `tests/backend/lib/env.mjs:30`, and the `BACKEND_BASE_URL=http://localhost:5000` usage comment in 11 `tests/backend/live-*.test.mjs` files. These are right if the gateway is on :5000, wrong for core alone.
+- Correct under the T-0022 target, no change needed: `gateway/index.js:14`, `:75`; `tests/gateway/live-gateway.test.mjs:5-6`; `ARCHITECTURE.md:389`, `:541-550`, `:646`, `:657`, `:732`, `:777`; ROADMAP P2-4.
+
+**Impact:** anyone following the README gets a `backend/.env` that conflicts with the suite. The docs checker fails on 10 cites (I-0080), and other as-is claims are wrong without tripping it.
+**Proposed fix:** update with the I-0080 decision. T-0033 only touches what `run-suite` needs (`tests/README.md`, and the 10 cites if the owner approves D3).
+
+### I-0084 — Credential-shaped lines in `tests/.env.example`
+**Status:** OPEN
+**Severity:** P2
+**Module:** `tests/.env.example`
+**Spec ref:** n/a (secrets hygiene)
+**Evidence (2026-11-05, T-0033):** `7fa7d1b` added `Test candidate = Myuser` and `Password = pass123` to a tracked file (`tests/.env.example:6-7`). Neither is a key the suite reads, and the rest of the file leaves passwords blank. Whether this is a live login was not tested.
+**Impact:** if it is a real account on the shared Supabase project, it is now in git history, and that account does not follow the `t0001_` rule in the file's own header.
+**Proposed fix:** owner checks whether the account exists and rotates or removes it if so; delete both lines.
 
 ---
 
