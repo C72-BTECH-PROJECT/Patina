@@ -70,7 +70,7 @@ async function rowStatus(applicationId) {
 }
 
 async function notificationsFor(applicationId) {
-  const { data, error } = await sb.from('notifications').select('type, data').eq('user_id', ids.C);
+  const { data, error } = await sb.from('notifications').select('type, message, data').eq('user_id', ids.C);
   assert.ifError(error);
   return (data ?? []).filter((n) => n.data?.applicationId === applicationId);
 }
@@ -89,7 +89,7 @@ test('I-0019: recruiter B cannot reject recruiter A\'s application (404, row unc
   assert.deepEqual(state, { http: 404, row: 'submitted' }, `got ${JSON.stringify(state)}`);
 });
 
-test('control: recruiter A shortlists own application (200, row shortlisted, 1 notification) and rejects another (200, no notification)', { skip }, async () => {
+test('control: recruiter A shortlists own application (200, row shortlisted, 1 notification) and rejects another (200, exact D4 notification)', { skip }, async () => {
   const shortlistId = await newApplication();
   const r1 = await api(cookieA, 'POST', SHORTLIST, { applicationId: shortlistId, status: 'shortlisted' });
   assert.equal(r1.status, 200, r1.text);
@@ -103,13 +103,51 @@ test('control: recruiter A shortlists own application (200, row shortlisted, 1 n
   const r2 = await api(cookieA, 'POST', SHORTLIST, { applicationId: rejectId, status: 'rejected' });
   assert.equal(r2.status, 200, r2.text);
   assert.equal(await rowStatus(rejectId), 'rejected');
-  assert.equal((await notificationsFor(rejectId)).length, 0);
+  // T-0031 (I-0071, D4): exactly one notification, naming the job, carrying only the two ids.
+  const { data: rejected, error } = await sb.from('applications').select('job_id').eq('id', rejectId).single();
+  assert.ifError(error);
+  const rejectNotes = await notificationsFor(rejectId);
+  assert.equal(rejectNotes.length, 1);
+  assert.equal(rejectNotes[0].type, 'rejected');
+  assert.equal(
+    rejectNotes[0].message,
+    'The recruiter has decided not to move forward with your application for [T-0001 TEST] harness job.',
+  );
+  assert.deepEqual(Object.keys(rejectNotes[0].data).sort(), ['applicationId', 'jobId']);
+  assert.equal(rejectNotes[0].data.applicationId, rejectId);
+  assert.equal(rejectNotes[0].data.jobId, rejected.job_id);
 });
 
 test('I-0019: well-formed but non-existent applicationId -> 404', { skip }, async () => {
   const r = await api(cookieA, 'POST', SHORTLIST, { applicationId: randomUUID(), status: 'shortlisted' });
   assert.equal(r.status, 404, `HTTP ${r.status}: ${r.text.slice(0, 200)}`);
 });
+
+// T-0031 (b): I-0029. A malformed id is a client error, never a database error,
+// and an array holding a valid id must not reach the update.
+for (const [label, malformed] of [
+  ['"not-a-uuid"', () => 'not-a-uuid'],
+  ['number', () => 123],
+  ['object', () => ({})],
+  ['array holding a valid uuid', (appId) => [appId]],
+]) {
+  test(`I-0029: applicationId ${label} -> 400, row unchanged, no notification`, { skip }, async () => {
+    const appId = await newApplication();
+    const r = await api(cookieA, 'POST', SHORTLIST, { applicationId: malformed(appId), status: 'shortlisted' });
+    const state = {
+      http: r.status,
+      code: r.body?.error,
+      row: await rowStatus(appId),
+      notifications: (await notificationsFor(appId)).length,
+    };
+    assert.deepEqual(
+      state,
+      { http: 400, code: 'invalid_application_id', row: 'submitted', notifications: 0 },
+      `got ${JSON.stringify(state)}`,
+    );
+    assert.ok(r.body.message, 'expected a message');
+  });
+}
 
 test('control: candidate session -> 403', { skip }, async () => {
   const appId = await newApplication();

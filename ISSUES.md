@@ -25,12 +25,7 @@ diff you're already writing.
 | I-0004 | AI-cruft / hallucinated entries in `SKILL_KEYWORDS` | `nlp-engine/app/ner.py` | P3 | OPEN | pre-WORKLOG (after an NLP fix, exact date not recorded) |
 | I-0006 | Upload.jsx: neither Choose-File nor drag-drop validates file type on selection, only at submit | `frontend/src/pages/candidate/Upload.jsx` | P2 | OPEN | 2026-10-12, L-0001 |
 | I-0012 | HEAD frontend reads `import.meta.env.VITE_*` under CRA; 5 pages hardcode `localhost:5000` | `frontend/src/**` | P1 | OPEN | 2026-10-12, T-0001 |
-| I-0016 | Signup rejects one-word "Full Name" with a misleading "all fields required" message | `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js` | P1 | OPEN | 2026-10-12, T-0001 |
-| I-0025 | `multer.memoryStorage()` without `limits`: upload size is unbounded and buffered in memory | `backend/Controllers/analysis.controller.js` | P2 | OPEN | 2026-10-12, T-0002 |
 | I-0026 | Landing page's hardcoded demo score and "10000+ verified" stats read as real data | `frontend/src/pages/public/Landing.jsx` | P3 | OPEN | 2026-10-12, T-0002 |
-| I-0027 | 404 handler always says "Cannot GET", whatever the method | `backend/index.js` | P3 | OPEN | 2026-10-12, T-0003 |
-| I-0028 | `/api/recruiter/applicants` returns an empty email for applicants who have a profile | `backend/Controllers/analysis.controller.js` | P3 | OPEN | 2026-10-12, T-0003 |
-| I-0029 | `shortlistCandidate` returns 500 (not 400/404) for a malformed, non-UUID `applicationId` | `backend/Controllers/jobs.controller.js` | P3 | OPEN | 2026-10-12, T-0004 |
 | I-0030 | `CODE_MAP.md` describes the pre-T-0003 flow (Upload -> `/api/analyze`); no mention of upload/apply/applicants routes | `CODE_MAP.md` | P2 | OPEN | 2026-10-12, T-0008 |
 | I-0031 | `REVIEW_BRIEF.md` rests on CODE_MAP/old AUDIT claims and predates the upload-once/apply flow | `REVIEW_BRIEF.md` | P2 | OPEN | 2026-10-12, T-0008 |
 | I-0032 | `README.md` says tables are pending and jobs are in-memory (both false); API and env tables incomplete | `README.md` | P2 | OPEN | 2026-10-12, T-0008 |
@@ -52,17 +47,13 @@ diff you're already writing.
 | I-0052 | A résumé whose GitHub link is only a hyperlink annotation behind the text "GitHub" gets `no_github_link`: the NLP text extraction does not read PDF link annotations | `nlp-engine/app` (extraction), `backend/Controllers/analysis.controller.js` | P1 | OPEN | 2026-10-15, T-0014 manual check |
 | I-0053 | Recruiter's per-job list drops a candidate whose latest score is for another job | `backend/Controllers/analysis.controller.js`, `frontend/src/pages/recruiter/JobDetails.jsx` | P2 | OPEN | 2026-10-15, T-0016 |
 | I-0054 | Recruiter Jobs page always shows "0 Applications Total" | `frontend/src/pages/recruiter/Jobs.jsx` | P3 | OPEN | 2026-10-15, T-0016 |
-| I-0059 | `ner.py` and `preprocessor.py` fall back to a hardcoded Windows `venv/Lib/site-packages/...` spaCy model path | `nlp-engine/app/ner.py`, `nlp-engine/app/preprocessor.py` | P2 | OPEN | 2026-10-31, T-0023 |
-| I-0062 | Backend calls assessment-service with raw `fetch`, not `Services/internalHttp.js` (no request-id propagation, own timeout/retry handling) | `backend/Controllers/assessment.controller.js` | P2 | OPEN | 2026-10-31, T-0023 |
-| I-0063 | `getAllApplications` selects `profiles.email`, which does not exist: every profile read errors silently and each applicant costs an Auth Admin `getUserById` call | `backend/Controllers/jobs.controller.js` | P2 | OPEN | 2026-10-31, T-0023 |
 | I-0064 | WORKLOG.md is past its ~400-line archive threshold (451 lines after T-0023) | `WORKLOG.md` | P3 | OPEN | 2026-10-31, T-0023 |
-| I-0065 | Score rows stored before T-0014 keep the stale `service_disabled` GitHub text ("not part of this deployment yet") when an assessment rebuilds them | `backend/Services/explainability.js` | P3 | OPEN | 2026-10-31, T-0023 |
 | I-0067 | Short-answer grading prompt embeds candidate text with no untrusted-input rule, and grading output is not schema-checked: a crafted answer can steer its own grade | `assessment-service/app/prompts.py`, `assessment-service/app/evaluator.py` | P1 | OPEN | 2026-10-31, T-0023 |
 | I-0068 | Frontend CI build fails on 4 more lint warnings from `main` (CandidateLayout, RecruiterLayout, AllCandidates ×2), on top of the 5 known; `AllCandidates.jsx` reads `import.meta.env` under CRA (I-0012 pattern) | `frontend/src/**` | P2 | OPEN | 2026-10-31, T-0023 |
-| I-0071 | `live-shortlist-authz` control test expects no notification on reject; `3f53f80` added a "rejected" notification (intended, owner 2026-11-04), so the test is stale | `tests/backend/live-shortlist-authz.test.mjs`, `backend/Controllers/jobs.controller.js` | P2 | OPEN | 2026-11-04, T-0029 |
-| I-0072 | nlp-engine extracts `.txt`, but the `resumes` bucket and the backend accept only PDF/DOCX; confirm that no upload path accepts `.txt` | `nlp-engine/app/extractor.py`, `backend/Controllers/analysis.controller.js` | P3 | OPEN | 2026-11-04, T-0030 |
-| I-0073 | `evaluateAssessment` returns 500 and echoes the database error for a malformed `assessmentId` | `backend/Controllers/assessment.controller.js` | P3 | OPEN | 2026-11-04, T-0031 |
 | I-0074 | Repeating a shortlist or reject decision sends the candidate a duplicate notification | `backend/Controllers/jobs.controller.js` | P3 | OPEN | 2026-11-04, T-0031 |
+| I-0076 | A multipart body busboy cannot parse (truncated, or no boundary) gives a 500 HTML page on both upload routes | `backend/Middlewares/resumeUpload.js`, `backend/index.js` | P3 | OPEN | 2026-11-04, T-0031 |
+| I-0077 | `run-suite.ps1` silently tests whatever already answers on :5000 when its own backend cannot bind the port | `tests/run-suite.ps1` | P2 | OPEN | 2026-11-04, T-0031 |
+| I-0078 | Résumé uploads are checked by file extension only: a text file named `.pdf` passes the gate | `backend/Controllers/analysis.controller.js` | P2 | OPEN | 2026-11-04, T-0031 |
 
 ---
 
@@ -155,47 +146,6 @@ against a backend on `localhost:5000`.
 
 ---
 
-### I-0016 — Signup rejects a one-word "Full Name" with a misleading message
-**Status:** OPEN
-**Severity:** P1 (blocks browser signup for anyone who types a single name)
-**Module:** `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js`
-**Spec ref:** NFR-8 area (authentication), PROJECT_SOURCE_DOCS.md @ 32905c1
-**Reported:** owner, 2026-10-12. Browser signup on the current frontend
-(:3000) alerts "First name, last name, username, email, and password are
-required" with every visible field filled.
-**Evidence (code comparison):**
-- **What the form sends**, the same at HEAD and 32905c1:
-  - HEAD `Login.jsx:103-111`, baseline `:101-109` build
-    `{ email, password, username, role, name }`, plus
-    `companyName`/`verificationInfo` for recruiters.
-  - The only name input is a single "Full Name" field (HEAD `Login.jsx:303-309`, placeholder "John Doe").
-  - The 400 message is shown through `alert(data.message)` at HEAD `:129`.
-- **What the controller requires**, the same logic at both revisions (HEAD `auth.controller.js:129-137`, baseline `:207-215`):
-  - It reads `name`, splits it with `.trim().split(/\s+/)`, takes the first token as `firstName`, and joins the rest into `lastName`.
-  - It then rejects the request if `!firstName || !lastName`, using the generic message above.
-- **Cause:** a one-word Full Name, e.g. "Anthony", gives `lastName === ''`, so the request returns 400 even though every visible field is filled. With username, email and password all non-empty, this is the only path to that message.
-  - The message names "First name, last name" fields that don't exist in the form.
-  - `Login.jsx` changed by only 8 lines between 32905c1 and HEAD (the env-var line, I-0012), so the defect is **not a regression**. It exists at 32905c1 too.
-- Observed workaround: a two-word name (the T-0001 test accounts used "T0001 Candidate" / "T0001 Recruiter" through the API).
-**Impact:** Mononymous users, or anyone typing only a first name, can't sign up, and the error doesn't tell them why.
-**Proposed fix:** Either accept a single-word name (empty `last_name`), or split
-the form into First/Last fields with a specific validation message. Not
-fixed in T-0001.
-
----
-
-### I-0025 — Unbounded in-memory uploads
-**Status:** OPEN
-**Severity:** P2
-**Module:** `backend/Controllers/analysis.controller.js` (both baseline and HEAD)
-**Spec ref:** NFR-2 (concurrency)
-**Evidence:** `multer({ storage: multer.memoryStorage() })` with no `limits`, at HEAD and at `32905c1`. Only the storage bucket enforces 10 MB, and only after the whole file has been buffered in the Node process.
-**Impact:** Large uploads are held in memory before rejection, which is a memory-exhaustion risk under concurrent uploads.
-**Proposed fix:** `limits: { fileSize: MAX_RESUME_BYTES }` (10 MB, one shared constant), plus a 413 response on `LIMIT_FILE_SIZE`.
-**Decision (owner, 2026-11-04, T-0030 D2):** the cap is **5 MB**, the same as the `resumes` bucket's `file_size_limit` that T-0030 sets when the live bucket has none. T-0030 B4 (2026-11-04) read the live bucket: `file_size_limit = 10485760` (10 MB), so the Evidence above is confirmed, and T-0030 mirrors 10 MB rather than setting 5 MB. **Decision (owner, 2026-11-04):** multer uses **10 MB**, the same as the bucket, from **one shared constant** (e.g. `MAX_RESUME_BYTES = 10 * 1024 * 1024`). The frontend's selection-time check (I-0006, B5 / ROADMAP P0-4 (a)) uses the same value. Supersedes the 5 MB note above. Fixed in B3 (ROADMAP P0-3 (d)).
-
----
-
 ### I-0026 — Landing page demo numbers read as real data
 **Status:** OPEN — team decision
 **Severity:** P3
@@ -207,45 +157,6 @@ fixed in T-0001.
 - **History:** present at `32905c1` too. `04835ca` only added a loading spinner, which makes the fixed 82 look computed.
 **Impact:** A public page shows invented figures as if they were product results. This is a credibility risk in a guide review.
 **Proposed fix:** Label the widget "Example" and remove or qualify the stats. The team decides (INTEGRATION_REVIEW.md Q6).
-
----
-
-### I-0027 — 404 handler always says "Cannot GET", whatever the method
-**Status:** OPEN
-**Severity:** P3 (misleading message only)
-**Module:** `backend/index.js`
-**Spec ref:** n/a
-**Evidence:** `index.js:68` (`:66@32905c1`, the same line) returns
-`{ message: \`Cannot GET ${req.url}\` }` for every unmatched route. Found by the T-0003 probe:
-`POST /api/auth/update-password` → `404 {"message":"Cannot GET /api/auth/update-password"}`.
-**Impact:** A POST/PUT/DELETE to a missing route reports "GET", which misleads anyone debugging.
-**Proposed fix:** Use `` `Cannot ${req.method} ${req.originalUrl}` ``. Not fixed in T-0003 (no row covers it).
-
----
-
-### I-0028 — `/api/recruiter/applicants` returns an empty email for most applicants
-**Status:** OPEN
-**Severity:** P3 (no caller today)
-**Module:** `backend/Controllers/analysis.controller.js` (`getAllApplicants`)
-**Spec ref:** FR-14 (recruiter view), loosely
-**Evidence:**
-- **Before T-0003 (ad4f694):** the handler selected `profiles.email`, which doesn't exist. Every profile lookup failed, so every row fell back to `auth.admin.getUserById`, which supplied the email (an N+1).
-- **After R30 fix 5 (T-0003 Phase 4):** names come from one `.in()` profiles query. Only candidates without a profile row fall back to the auth record, so `candidateInfo.email` is `''` for every candidate who has a profile.
-- **Live probe:** the `t0001_cand` application row returned `email empty: True` (`tasks/T-0003-apply-integration.md`, Phase 4).
-- **Callers:** nothing calls this endpoint now. The baseline Dashboard (R38) uses `/api/candidates`, whose email comes from the parsed resume contact.
-**Impact:** None today. The merged application-centric Dashboard (score-on-apply follow-up) would show blank emails if it relies on this field.
-**Proposed fix:** Decide in the score-on-apply task where applicant email comes from: the resume contact (as `serializeCandidate` does), or one batched auth lookup. Don't reintroduce a per-row N+1.
-
----
-
-### I-0029 — `shortlistCandidate` 500s on a malformed `applicationId`
-**Status:** OPEN
-**Severity:** P3
-**Module:** `backend/Controllers/jobs.controller.js`
-**Spec ref:** n/a
-**Evidence:** found during T-0004. Probe as `t0001_recr`: `POST /api/jobs/applications/shortlist {"applicationId":"not-a-uuid","status":"shortlisted"}` → `500 {"message":"Could not update application status."}` (after the T-0004 fix, the ownership lookup hits Postgres `22P02 invalid input syntax for type uuid` and takes the 500 branch).
-**Impact:** A malformed id is a client error but is reported as a server error; no data is touched or leaked.
-**Proposed fix:** Validate `applicationId` as a UUID before the lookup and return 400. Left out of T-0004 on purpose (Scope: Out).
 
 ---
 
@@ -331,7 +242,7 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Proposed fix:**
 - ARCHITECTURE.md M3/M4: NLP becomes internal only (compose network, port not published) and its CORS middleware is removed.
 - Optionally, a shared internal token header checked by NLP.
-- Validate the extension in `analyzeResume` too (or remove analyze once score-on-apply replaces it).
+**Note (T-0031):** the analyze file-type half is closed: `analyzeResume` now uses the same extension gate (I-0072). The rest of this issue stands.
 
 ---
 
@@ -405,7 +316,7 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 ---
 
 ### I-0039 — Backend cruft found during the architecture audit
-**Status:** OPEN — partly fixed (re-verified T-0028 at `df98068`): `githubAggregator.js` deleted in T-0014; unused `bcrypt` (`backend/package.json:17`), the two empty middleware files, tracked `dev/null`, `backend/uploads/` and the OAuth env vars remain. Planned in ROADMAP P0-3 (B3); the OAuth env vars wait for P2-7.
+**Status:** OPEN for the unused OAuth env vars only (P2-7). T-0031 removed `bcrypt`, the two empty middleware files, tracked `dev/null` and the local `backend/uploads/` with its ignore line (`tests/backend/backend-cruft.test.mjs`).
 **Severity:** P3
 **Module:** `backend/`, `dev/`
 **Spec ref:** n/a (cleanup)
@@ -527,44 +438,12 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Impact:** the recruiter sees 0 applications for every job, even when candidates applied.
 **Proposed fix:** P2-5 (merged application-centric dashboard) shows the real count.
 
-### I-0059 — Hardcoded Windows venv model path in NLP
-**Status:** OPEN
-**Severity:** P2
-**Module:** `nlp-engine/app/ner.py`, `nlp-engine/app/preprocessor.py`
-**Evidence:** `MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "venv", "Lib", "site-packages", "en_core_web_sm", "en_core_web_sm-3.8.0")` (`nlp-engine/app/ner.py:5`, `nlp-engine/app/preprocessor.py:7`), added on `main`.
-**Impact:** machine- and OS-specific (Windows `Lib/`, one venv name, one model version); a fallback like this hides a missing `en_core_web_sm` install instead of failing at boot.
-**Proposed fix:** load by package name (`spacy.load("en_core_web_sm")`) and fail loudly at startup if absent; install the model from `requirements.txt`.
-
-### I-0062 — assessment-service calls bypass `internalHttp.js`
-**Status:** OPEN
-**Severity:** P2
-**Module:** `backend/Controllers/assessment.controller.js`
-**Evidence:** raw `fetch` to `${ASSESSMENT_SERVICE_URL}/generate-assessment` (`backend/Controllers/assessment.controller.js:242`) and `/evaluate-assessment` (`:369`) with their own abort timers; no `X-Request-ID` is sent, unlike `backend/Services/githubEvidence.js` via `backend/Services/internalHttp.js`.
-**Impact:** an assessment request cannot be traced across core and the service; timeout/retry/error-shaping rules differ per service.
-**Proposed fix:** a `Services/assessmentService.js` client on `internalHttp.js`, carrying the request id. Fits the P2-4 gateway/inter-service work.
-
-### I-0063 — `getAllApplications` reads a column that does not exist
-**Status:** OPEN
-**Severity:** P2
-**Module:** `backend/Controllers/jobs.controller.js`
-**Evidence:** `.select('first_name, last_name, email')` on `profiles` (`backend/Controllers/jobs.controller.js:214`); `profiles` has no `email` column (`supabase/migrations/20260823_create_profiles.sql:8-28`). supabase-js returns the error rather than throwing, so `profile` is always null and every applicant falls through to `supabase.auth.admin.getUserById` (`:224`) and names from `user_metadata`.
-**Impact:** N Auth Admin calls per request (one per application); names come from signup metadata instead of the profile the user can edit. Authorization itself is correct: applications are limited to the session recruiter's jobs (`:178-200`).
-**Proposed fix:** select `first_name, last_name` from `profiles` and take email from Auth only when needed (or batch it).
-
 ### I-0064 — WORKLOG.md past its archive threshold
 **Status:** OPEN (follow-up, owner decision 2026-10-31: not part of T-0023)
 **Severity:** P3
 **Module:** `WORKLOG.md`
 **Evidence:** 451 lines after the T-0023 entry L-0038 (`wc -l WORKLOG.md`); its header says to archive past ~400.
 **Proposed fix:** move all but the last 20 entries to `docs/worklog-archive/2026-10.md` with a 5-line rollup, as the header specifies.
-
-### I-0065 — Pre-T-0014 score rows keep stale GitHub text on rebuild
-**Status:** OPEN
-**Severity:** P3
-**Module:** `backend/Services/explainability.js`
-**Evidence:** `rebuildScoreRecord` keeps the stored GitHub entry and only falls back to `not_collected_for_score` when the entry is missing (`backend/Services/explainability.js`, `rebuildScoreRecord`; test "rebuildScoreRecord on a score stored without a GitHub entry"). Every row ever written has all three keys, so a row scored before T-0014 carries `GITHUB_REASONS.service_disabled` ("…not part of this deployment yet"), and a later assessment rebuild keeps that text.
-**Impact:** after this merge, the recruiter can see "GitHub is not part of this deployment yet" on an old score that a new assessment just refreshed.
-**Proposed fix (owner decision):** also treat a stored GitHub entry that is unavailable and has no `components.reason_code` as `not_collected_for_score`.
 
 ### I-0067 — Grading can be steered by the answer being graded
 **Status:** OPEN (GR-1 / CHECKLIST 3.6; anti-cheat work is out of T-0023's scope)
@@ -581,33 +460,6 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Evidence:** `tests/.out/t0023-full-harness.log` frontend build (CI=true): the 5 known warnings (`CreateJob.jsx` ×2, `Jobs.jsx` ×3) plus `CandidateLayout.jsx:10` and `RecruiterLayout.jsx:8` (`navigate` unused) and `AllCandidates.jsx:4` (`Filter`, `ExternalLink` unused). `AllCandidates.jsx:8` sets `API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'` under Create React App, the pattern I-0012 describes.
 **Proposed fix:** remove the unused bindings; use `process.env.REACT_APP_API_BASE_URL` like the other pages (or the single API module from M2 / I-0012).
 
-### I-0071 — Shortlist control test disagrees with rejection notifications
-**Status:** OPEN
-**Severity:** P2
-**Module:** `tests/backend/live-shortlist-authz.test.mjs`, `backend/Controllers/jobs.controller.js`
-**Spec ref:** FR-14/FR-15 (recruiter decisions, candidate notification)
-**Evidence (2026-11-04, found in the T-0029 regression run, not caused by it):** the control test asserts that rejecting an application sends no notification (`tests/backend/live-shortlist-authz.test.mjs:106`). `3f53f80` (2026-10-15, T-0016..T-0019 from `main`) added `sendNotification(..., 'rejected', 'Your application has been rejected.')` (`backend/Controllers/jobs.controller.js:303-309`). The test was written in T-0004 (2026-10-12), before that. `tests/.out/t0029-after-full-backend.log` and the isolated rerun `tests/.out/t0029-shortlist-rerun.log`: `1 !== 0`, 10/11 pass. T-0029 changed neither file.
-**Impact:** the `-Live` backend suite is red for a reason unrelated to security; a real regression in shortlist ownership could hide behind a known failure.
-**Decision (owner, 2026-11-04):** candidates **should** be notified of a rejection; the controller's behaviour is intended.
-**Fix (in B3, ROADMAP P0-3 (j), not before):** update the control test to expect exactly one `rejected` notification for the rejected application, and check that its text is neutral and that its payload carries no recruiter-only data (only `applicationId` and `jobId` today, `backend/Controllers/jobs.controller.js:303-309`; no score, notes or recruiter identity). The I-0019 ownership checks in the same file stay as they are.
-
-### I-0072 — nlp-engine `.txt` extraction vs a PDF/DOCX-only bucket
-**Status:** OPEN
-**Severity:** P3
-**Module:** `nlp-engine/app/extractor.py`, `backend/Controllers/analysis.controller.js`, `frontend/src/pages/candidate/Upload.jsx`
-**Spec ref:** n/a (consistency)
-**Evidence (2026-11-04, T-0030 B4):** the live `resumes` bucket allows only `application/pdf` and the DOCX type. `extract_text()` also handles `.txt` (`nlp-engine/app/extractor.py:33-34`, from `main` via `7b6dd3d`). A first look: the backend maps only `.pdf`/`.docx` to content types (`backend/Controllers/analysis.controller.js:28-31`), and the upload input has `accept=".pdf,.docx"` (`frontend/src/pages/candidate/Upload.jsx:299`). Not yet checked: every upload route's extension gate, and whether anything calls `/parse` with a `.txt` file.
-**Proposed fix (owner, 2026-11-04; in B3, ROADMAP P0-3 (k)):** check every upload path. If none accepts `.txt`, record the NLP branch as unused (test-only), and do **not** widen the bucket. If one does, close that path rather than widening the bucket.
-
-### I-0073 — `evaluateAssessment` 500s on a malformed `assessmentId`
-**Status:** OPEN
-**Severity:** P3
-**Module:** `backend/Controllers/assessment.controller.js`
-**Spec ref:** n/a
-**Evidence (2026-11-04, T-0031, from reading the code at `f5069a3`):** `:360` checks only that `assessmentId` is a string. A non-UUID reaches `.eq('id', assessmentId)` (`:377`), which should raise Postgres 22P02, and `:379-381` returns 500 with `loadError.message`. Same class as I-0029. Not run live.
-**Impact:** a client error is reported as a server error, and raw database text reaches the client. No data is touched.
-**Proposed fix:** validate with the shared `isUuid` from T-0031 and return 400. T-0031 D5 asks the owner whether it joins B3.
-
 ### I-0074 — Repeated shortlist or reject sends a duplicate notification
 **Status:** OPEN
 **Severity:** P3
@@ -617,7 +469,196 @@ ARCHITECTURE.md §2 finds the system is a monolith plus one service, and "indepe
 **Impact:** none in the UI today. It would appear once P2-5 adds the shortlist and reject buttons.
 **Proposed fix:** notify only when the status actually changes, and decide which transitions are allowed, in P2-5.
 
+### I-0076 — Unparseable multipart body gives 500 HTML
+**Status:** OPEN
+**Severity:** P3
+**Module:** `backend/Middlewares/resumeUpload.js`, `backend/index.js`
+**Spec ref:** n/a (correctness)
+**Evidence (2026-11-04, T-0031, a scratch probe of the real middleware):** a truncated multipart body and a `multipart/form-data` header with no boundary each give 500 `text/html`. These are busboy errors, not `MulterError`, so `resumeUpload` passes them to `next(err)` as the T-0031 spec says, and core has no error handler, so Express answers with its HTML page. The stack trace is included outside production.
+**Impact:** low. The browser's `FormData` cannot produce either body; a hand-written client can, and it gets a 500 instead of a 400.
+**Proposed fix:** answer 400 JSON for any parse error in `resumeUpload`, or add a JSON error handler in `backend/index.js`.
+
+---
+
+### I-0077 — `run-suite.ps1` tests a backend it did not start
+**Status:** OPEN
+**Severity:** P2
+**Module:** `tests/run-suite.ps1`
+**Spec ref:** n/a (test harness)
+**Evidence (2026-11-04, T-0031):** with a backend already on :5000, the script's own backend exits with `Could not start: port 5000 is already in use` (only in `tests/.out/current-backend.err.log`), and `Wait-Http` passes against the other process. The run reports normally and its summary says nothing. This happened in T-0031's final run. The outage probe has the check this script lacks (`tests/arch/nlp-outage-probe.mjs:380`).
+**Impact:** a run can report results for old code. In T-0031 the other backend was on the current code, so that run's results held, but nothing in the output says so.
+**Proposed fix:** before starting services, refuse to run if :5000 or :8000 already answers on 127.0.0.1 or ::1, and fail if the started process has exited. Note that `netstat` output is not a reliable check here: a port-free check through `netstat` in T-0031 missed this listener, so connect to the port instead.
+
+---
+
+### I-0078 — Upload gate reads the extension, not the file
+**Status:** OPEN
+**Severity:** P2
+**Module:** `backend/Controllers/analysis.controller.js`
+**Spec ref:** FR-1
+**Evidence (2026-11-04, T-0031, from reading the code; not run):** `isSupportedResume` (`backend/Controllers/analysis.controller.js:31`) looks only at the extension of `originalname`. Neither the declared Content-Type nor the file's bytes are read, and `backend` has no `%PDF` or magic-byte check (grep: 0). `resolveContentType` (`:33-38`) then labels the file by extension, so a text file named `resume.pdf` should pass the gate and the bucket's allow-list. `tests/backend/live-upload-gates.test.mjs` names its `.txt` files `.txt`, so it does not cover this. I-0072 closed the `.txt` name, not non-PDF content.
+**Impact:** a candidate can store a file that is not a résumé. Its later parse fails in `extract_from_pdf` (`nlp-engine/app/extractor.py:5-7`), so an assessment or analyze on it errors instead of scoring.
+**Checked, no change needed (2026-11-04, T-0031):** the `contentType` sent to storage is set on the server (`:162`, `:343`, both through `resolveContentType`): the gate guarantees a `MIME_BY_EXT` hit at `:35`, so the client-mimetype fallback at `:36` cannot be reached. No test asserts the stored content type. This issue stays open for the file's content.
+**Proposed fix:** check the leading bytes in core (`%PDF-` for PDF, a ZIP header plus `word/document.xml` for DOCX) next to the extension gate, with a test for each mismatch.
+
+---
+
+
 ## Resolved
+### I-0079 — Cross-recruiter applicants isolation had no real test (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): a live test now covers two recruiters who each have an applicant
+**Severity:** P2
+**Module:** `tests/backend/live-analysis-isolation.test.mjs`, `tests/backend/live-applicants.test.mjs`
+**Spec ref:** FR-14, NFR-9
+**Evidence (2026-11-04, T-0031):** `getAllApplicants` takes no job or recruiter parameter. It scopes by the session (`backend/Controllers/analysis.controller.js:533`, `:538`, `:549`), and `applicant_emails` is called only with those ids. So there is no 403 path to test: the expected result for another recruiter is 200 without those rows. The only two-recruiter check (`tests/backend/live-analysis-isolation.test.mjs:90-92`) uses R2, who owns no jobs, and `before` seeds **no application** (`:40-59`). R2 therefore returns at `:543`, before the applications query and the RPC. `live-applicants` signs in only one recruiter. If the scoping were removed, that check would fail only if other live applications happened to exist.
+**Impact:** this endpoint now returns real emails through a service-role call, so a scoping regression would expose them, and no test is built to catch it.
+**Proposed fix:** give R2 a job with its own application and C an application to R's job; assert that R2 sees only its own applicant, and that C's email is absent from the body.
+**Evidence of resolution** (2026-11-04, T-0031): `tests/backend/live-applicants.test.mjs`, test "I-0079": t0001_recr and t0001_recr2 each own a job with one applicant, and each gets 200 with exactly one row, their own candidate's Auth email, and neither the other's application id nor email. It compares facts only, so a failure prints no emails. Proven not vacuous (`tests/.out/t0031-i0079-mutation.log`): passes 6/6 on real code; with `.eq('recruiter_id', recruiterId)` removed from `backend/Controllers/analysis.controller.js:538` it fails, R getting 8 rows of which 7 are someone else's; restored, sha256 identical, 6/6. In both suite passes the test passes.
+
+### I-0028 — `/api/recruiter/applicants` returns an empty email for most applicants (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): recruiters get the real Auth email for every applicant
+**Severity:** P1 (corrected, T-0031: the email is blank for every applicant, and `frontend/src/pages/recruiter/AllCandidates.jsx:20` is a live caller)
+**Module:** `backend/Controllers/analysis.controller.js` (`getAllApplicants`)
+**Spec ref:** FR-14 (recruiter view), loosely
+**Evidence:**
+- **Before T-0003 (ad4f694):** the handler selected `profiles.email`, which doesn't exist. Every profile lookup failed, so every row fell back to `auth.admin.getUserById`, which supplied the email (an N+1).
+- **After R30 fix 5 (T-0003 Phase 4):** names come from one `.in()` profiles query. Only candidates without a profile row fall back to the auth record, so `candidateInfo.email` is `''` for every candidate who has a profile.
+- **Live probe:** the `t0001_cand` application row returned `email empty: True` (`tasks/T-0003-apply-integration.md`, Phase 4).
+- **Callers:** nothing calls this endpoint now. The baseline Dashboard (R38) uses `/api/candidates`, whose email comes from the parsed resume contact.
+**Impact:** None today. The merged application-centric Dashboard (score-on-apply follow-up) would show blank emails if it relies on this field.
+**Proposed fix:** Decide in the score-on-apply task where applicant email comes from: the resume contact (as `serializeCandidate` does), or one batched auth lookup. Don't reintroduce a per-row N+1.
+**Evidence of resolution** (2026-11-04, T-0031): `backend/Services/applicantIdentity.js:15`, `public.applicant_emails` (`supabase/migrations/20261104120300_applicant_emails.sql`, pushed by the owner; `db diff --linked`: `No schema changes found`). `tests/backend/live-applicants.test.mjs` 5/5 against the shared project: the email equals Auth, anon and a signed-in candidate get 42501, the service role gets only the requested id. `/recruiter/candidates` in headless Chrome as `t0001_recr` shows the real email and no "No contact info" (`tests/.out/t0031-final-page.json`).
+
+### I-0063 — `getAllApplications` reads a column that does not exist (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): the handler is deleted and the email source is one batched RPC
+**Severity:** P2
+**Module:** `backend/Controllers/jobs.controller.js`
+**Evidence:** `.select('first_name, last_name, email')` on `profiles` (`backend/Controllers/jobs.controller.js:214`); `profiles` has no `email` column (`supabase/migrations/20260823_create_profiles.sql:8-28`). supabase-js returns the error rather than throwing, so `profile` is always null and every applicant falls through to `supabase.auth.admin.getUserById` (`:224`) and names from `user_metadata`.
+**Impact:** N Auth Admin calls per request (one per application); names come from signup metadata instead of the profile the user can edit. Authorization itself is correct: applications are limited to the session recruiter's jobs (`:178-200`).
+**Proposed fix:** select `first_name, last_name` from `profiles` and take email from Auth only when needed (or batch it).
+**Note (T-0031):** the handler and its route are deleted (D2): no caller existed in `frontend/`, `backend/` or `tests/`. The `profiles.email` read is gone with it.
+**Evidence of resolution** (2026-11-04, T-0031): `getAllApplications` and its route are gone (D2; grep in `tasks/T-0031-b3-backend-correctness.md`). `getAllApplicants` makes one profiles query plus one RPC and no `getUserById` (`tests/backend/applicant-identity.test.mjs`). `tests/backend/live-applicants.test.mjs` "D2": 404.
+
+### I-0016 — Signup rejects a one-word "Full Name" with a misleading message (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): a one-word name passes signup validation; the database accepts an empty last name
+**Severity:** P1 (blocks browser signup for anyone who types a single name)
+**Module:** `frontend/src/pages/public/Login.jsx`, `backend/Controllers/auth.controller.js`
+**Spec ref:** NFR-8 area (authentication), PROJECT_SOURCE_DOCS.md @ 32905c1
+**Reported:** owner, 2026-10-12. Browser signup on the current frontend
+(:3000) alerts "First name, last name, username, email, and password are
+required" with every visible field filled.
+**Evidence (code comparison):**
+- **What the form sends**, the same at HEAD and 32905c1:
+  - HEAD `Login.jsx:103-111`, baseline `:101-109` build
+    `{ email, password, username, role, name }`, plus
+    `companyName`/`verificationInfo` for recruiters.
+  - The only name input is a single "Full Name" field (HEAD `Login.jsx:303-309`, placeholder "John Doe").
+  - The 400 message is shown through `alert(data.message)` at HEAD `:129`.
+- **What the controller requires**, the same logic at both revisions (HEAD `auth.controller.js:129-137`, baseline `:207-215`):
+  - It reads `name`, splits it with `.trim().split(/\s+/)`, takes the first token as `firstName`, and joins the rest into `lastName`.
+  - It then rejects the request if `!firstName || !lastName`, using the generic message above.
+- **Cause:** a one-word Full Name, e.g. "Anthony", gives `lastName === ''`, so the request returns 400 even though every visible field is filled. With username, email and password all non-empty, this is the only path to that message.
+  - The message names "First name, last name" fields that don't exist in the form.
+  - `Login.jsx` changed by only 8 lines between 32905c1 and HEAD (the env-var line, I-0012), so the defect is **not a regression**. It exists at 32905c1 too.
+- Observed workaround: a two-word name (the T-0001 test accounts used "T0001 Candidate" / "T0001 Recruiter" through the API).
+**Impact:** Mononymous users, or anyone typing only a first name, can't sign up, and the error doesn't tell them why.
+**Proposed fix:** Either accept a single-word name (empty `last_name`), or split
+the form into First/Last fields with a specific validation message. Not
+fixed in T-0001.
+**Evidence of resolution** (2026-11-04, T-0031): `backend/Controllers/auth.controller.js:216` no longer requires `lastName`, and `:217` has the new message. `tests/backend/smoke.test.mjs` "I-0016" reaches the password rule (red at HEAD: the generic message, `tests/.out/t0031-before-offline.log`). `tests/backend/live-signup-role.test.mjs` "an empty last name" proves the database half (control, passes both ways). A one-word signup through the real form has not been run end to end.
+
+### I-0025 — Unbounded in-memory uploads (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): uploads are capped at 10 MB with a JSON error, from one constant equal to the bucket
+**Severity:** P2
+**Module:** `backend/Controllers/analysis.controller.js` (both baseline and HEAD)
+**Spec ref:** NFR-2 (concurrency)
+**Evidence:** `multer({ storage: multer.memoryStorage() })` with no `limits`, at HEAD and at `32905c1`. Only the storage bucket enforces 10 MB, and only after the whole file has been buffered in the Node process.
+**Impact:** Large uploads are held in memory before rejection, which is a memory-exhaustion risk under concurrent uploads.
+**Proposed fix:** `limits: { fileSize: MAX_RESUME_BYTES }` (10 MB, one shared constant), plus a 413 response on `LIMIT_FILE_SIZE`.
+**Decision (owner, 2026-11-04, T-0030 D2):** the cap is **5 MB**, the same as the `resumes` bucket's `file_size_limit` that T-0030 sets when the live bucket has none. T-0030 B4 (2026-11-04) read the live bucket: `file_size_limit = 10485760` (10 MB), so the Evidence above is confirmed, and T-0030 mirrors 10 MB rather than setting 5 MB. **Decision (owner, 2026-11-04):** multer uses **10 MB**, the same as the bucket, from **one shared constant** (e.g. `MAX_RESUME_BYTES = 10 * 1024 * 1024`). The frontend's selection-time check (I-0006, B5 / ROADMAP P0-4 (a)) uses the same value. Supersedes the 5 MB note above. Fixed in B3 (ROADMAP P0-3 (d)).
+**Evidence of resolution** (2026-11-04, T-0031): `backend/Config/uploadLimits.js:4`; `backend/Middlewares/resumeUpload.js:9-12`, used by both routes (`backend/Controllers/analysis.controller.js:259`, `:288`); `:199` returns `maxResumeBytes`. `tests/backend/upload-limits.test.mjs` (exactly 10485760 accepted, 10485761 gives 413 JSON, constant equals the migration), `tests/backend/live-upload-gates.test.mjs`. Gap left: I-0076.
+
+### I-0027 — 404 handler always says "Cannot GET", whatever the method (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): the 404 message names the real method and path
+**Severity:** P3 (misleading message only)
+**Module:** `backend/index.js`
+**Spec ref:** n/a
+**Evidence:** `index.js:68` (`:66@32905c1`, the same line) returns
+`{ message: \`Cannot GET ${req.url}\` }` for every unmatched route. Found by the T-0003 probe:
+`POST /api/auth/update-password` → `404 {"message":"Cannot GET /api/auth/update-password"}`.
+**Impact:** A POST/PUT/DELETE to a missing route reports "GET", which misleads anyone debugging.
+**Proposed fix:** Use `` `Cannot ${req.method} ${req.originalUrl}` ``. Not fixed in T-0003 (no row covers it).
+**Evidence of resolution** (2026-11-04, T-0031): `backend/index.js:73`; `tests/backend/smoke.test.mjs` "I-0027" (red at HEAD: `Cannot GET …`).
+
+### I-0029 — `shortlistCandidate` 500s on a malformed `applicationId` (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): a malformed `applicationId` gives 400 with no change and no notification
+**Severity:** P3
+**Module:** `backend/Controllers/jobs.controller.js`
+**Spec ref:** n/a
+**Evidence:** found during T-0004. Probe as `t0001_recr`: `POST /api/jobs/applications/shortlist {"applicationId":"not-a-uuid","status":"shortlisted"}` → `500 {"message":"Could not update application status."}` (after the T-0004 fix, the ownership lookup hits Postgres `22P02 invalid input syntax for type uuid` and takes the 500 branch).
+**Impact:** A malformed id is a client error but is reported as a server error; no data is touched or leaked.
+**Proposed fix:** Validate `applicationId` as a UUID before the lookup and return 400. Left out of T-0004 on purpose (Scope: Out).
+**Evidence of resolution** (2026-11-04, T-0031): `backend/Services/validation.js:7` (string required), `backend/Controllers/jobs.controller.js:185`. `tests/backend/live-shortlist-authz.test.mjs` "I-0029" ×4. At HEAD three gave 500, and the array form changed the row and sent a notification (`tests/.out/t0031-before-live.log`).
+
+### I-0059 — Hardcoded Windows venv model path in NLP (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): the spaCy model loads by package name only
+**Severity:** P2
+**Module:** `nlp-engine/app/ner.py`, `nlp-engine/app/preprocessor.py`
+**Evidence:** `MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "venv", "Lib", "site-packages", "en_core_web_sm", "en_core_web_sm-3.8.0")` (`nlp-engine/app/ner.py:5`, `nlp-engine/app/preprocessor.py:7`), added on `main`.
+**Impact:** machine- and OS-specific (Windows `Lib/`, one venv name, one model version); a fallback like this hides a missing `en_core_web_sm` install instead of failing at boot.
+**Proposed fix:** load by package name (`spacy.load("en_core_web_sm")`) and fail loudly at startup if absent; install the model from `requirements.txt`.
+**Evidence of resolution** (2026-11-04, T-0031): `nlp-engine/app/ner.py:5`, `nlp-engine/app/preprocessor.py:7`; `tests/nlp/test_model_load.py` (one call with `en_core_web_sm`, the import raises). The parse snapshots for every fixture are byte-identical to `tests/nlp/snapshots/current/`.
+
+### I-0062 — assessment-service calls bypass `internalHttp.js` (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): both assessment calls use `postJson`; the request id reaches assessment-service, which logs and echoes it
+**Severity:** P2
+**Module:** `backend/Controllers/assessment.controller.js`
+**Evidence:** raw `fetch` to `${ASSESSMENT_SERVICE_URL}/generate-assessment` (`backend/Controllers/assessment.controller.js:242`) and `/evaluate-assessment` (`:369`) with their own abort timers; no `X-Request-ID` is sent, unlike `backend/Services/githubEvidence.js` via `backend/Services/internalHttp.js`.
+**Impact:** an assessment request cannot be traced across core and the service; timeout/retry/error-shaping rules differ per service.
+**Proposed fix:** a `Services/assessmentService.js` client on `internalHttp.js`, carrying the request id. Fits the P2-4 gateway/inter-service work.
+**Evidence of resolution** (2026-11-04, T-0031): `backend/Services/assessmentService.js:18-22`; `backend/Services/internalHttp.js` `resolveRequestId`; `assessment-service/app/main.py:36`. `tests/backend/assessment-service-client.test.mjs`, `tests/assessment/test_request_id.py`. The upstream body no longer reaches the client, which was the I-0036 problem on this path.
+
+### I-0065 — Pre-T-0014 score rows keep stale GitHub text on rebuild (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): a rebuild replaces the stale text; stored rows are not rewritten (D3)
+**Severity:** P3
+**Module:** `backend/Services/explainability.js`
+**Evidence:** `rebuildScoreRecord` keeps the stored GitHub entry and only falls back to `not_collected_for_score` when the entry is missing (`backend/Services/explainability.js`, `rebuildScoreRecord`; test "rebuildScoreRecord on a score stored without a GitHub entry"). Every row ever written has all three keys, so a row scored before T-0014 carries `GITHUB_REASONS.service_disabled` ("…not part of this deployment yet"), and a later assessment rebuild keeps that text.
+**Impact:** after this merge, the recruiter can see "GitHub is not part of this deployment yet" on an old score that a new assessment just refreshed.
+**Proposed fix (owner decision):** also treat a stored GitHub entry that is unavailable and has no `components.reason_code` as `not_collected_for_score`.
+**Decision (owner, 2026-11-04, T-0031 D3):** the rebuild fix only. The stored text was true when it was written, because GitHub evidence was not deployed then, so stored rows are not rewritten.
+**Evidence of resolution** (2026-11-04, T-0031): `backend/Services/explainability.js:768` `storedGithubSubScore`; `tests/backend/explainability.test.mjs` "I-0065" (red at HEAD) and its control. The 4 live rows change only when an assessment rebuilds them.
+
+### I-0071 — Shortlist control test disagrees with rejection notifications (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): a reject sends one notification with the D4 text, naming the job
+**Severity:** P2
+**Module:** `tests/backend/live-shortlist-authz.test.mjs`, `backend/Controllers/jobs.controller.js`
+**Spec ref:** FR-14/FR-15 (recruiter decisions, candidate notification)
+**Evidence (2026-11-04, found in the T-0029 regression run, not caused by it):** the control test asserts that rejecting an application sends no notification (`tests/backend/live-shortlist-authz.test.mjs:106`). `3f53f80` (2026-10-15, T-0016..T-0019 from `main`) added `sendNotification(..., 'rejected', 'Your application has been rejected.')` (`backend/Controllers/jobs.controller.js:303-309`). The test was written in T-0004 (2026-10-12), before that. `tests/.out/t0029-after-full-backend.log` and the isolated rerun `tests/.out/t0029-shortlist-rerun.log`: `1 !== 0`, 10/11 pass. T-0029 changed neither file.
+**Impact:** the `-Live` backend suite is red for a reason unrelated to security; a real regression in shortlist ownership could hide behind a known failure.
+**Decision (owner, 2026-11-04):** candidates **should** be notified of a rejection; the controller's behaviour is intended.
+**Fix (in B3, ROADMAP P0-3 (j), not before):** update the control test to expect exactly one `rejected` notification for the rejected application, and check that its text is neutral and that its payload carries no recruiter-only data (only `applicationId` and `jobId` today, `backend/Controllers/jobs.controller.js:303-309`; no score, notes or recruiter identity). The I-0019 ownership checks in the same file stay as they are.
+**Wording (owner, 2026-11-04, T-0031 D4):** a candidate with several applications cannot tell which one was rejected, so the text becomes `The recruiter has decided not to move forward with your application for <job title>.` This extends the fix above to the controller. The title is not recruiter-only data, because the candidate saw it when applying. It comes from the same query, not a second round trip, and the test pins the exact string. The payload stays `applicationId` and `jobId` only.
+**Evidence of resolution** (2026-11-04, T-0031): `backend/Controllers/jobs.controller.js:198` (title from the same query), `:234`. `tests/backend/live-shortlist-authz.test.mjs` control test pins the exact text and the payload keys. Mutation run with `score: 99` fails that test (`tests/.out/t0031-j-mutation.log`), reverted.
+
+### I-0072 — nlp-engine `.txt` extraction vs a PDF/DOCX-only bucket (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): `/api/analyze` no longer accepts `.txt`; the bucket is unchanged
+**Severity:** P3
+**Module:** `nlp-engine/app/extractor.py`, `backend/Controllers/analysis.controller.js`, `frontend/src/pages/candidate/Upload.jsx`
+**Spec ref:** n/a (consistency)
+**Evidence (2026-11-04, T-0030 B4):** the live `resumes` bucket allows only `application/pdf` and the DOCX type. `extract_text()` also handles `.txt` (`nlp-engine/app/extractor.py:33-34`, from `main` via `7b6dd3d`). A first look: the backend maps only `.pdf`/`.docx` to content types (`backend/Controllers/analysis.controller.js:28-31`), and the upload input has `accept=".pdf,.docx"` (`frontend/src/pages/candidate/Upload.jsx:299`). Not yet checked: every upload route's extension gate, and whether anything calls `/parse` with a `.txt` file.
+**Proposed fix (owner, 2026-11-04; in B3, ROADMAP P0-3 (k)):** check every upload path. If none accepts `.txt`, record the NLP branch as unused (test-only), and do **not** widen the bucket. If one does, close that path rather than widening the bucket.
+**Evidence of resolution** (2026-11-04, T-0031): `backend/Controllers/analysis.controller.js:31` (shared gate), `:298`. `tests/backend/live-upload-gates.test.mjs`: at HEAD `.txt` gave 200 and a new `resumes` row, both plain and declared as PDF, and the declared one passed the bucket's allow-list (only the plain one logged `InvalidMimeType`). nlp-engine's `.txt` branch (`nlp-engine/app/extractor.py:33-34`) is **unused**: nothing reaches it through core, and no file in `tests/nlp` uses it. Kept by owner decision.
+
+### I-0073 — `evaluateAssessment` 500s on a malformed `assessmentId` (RESOLVED)
+**Status:** RESOLVED T-0031 (2026-11-04): a malformed `assessmentId` gives 400 with no database text
+**Severity:** P3
+**Module:** `backend/Controllers/assessment.controller.js`
+**Spec ref:** n/a
+**Evidence (2026-11-04, T-0031, from reading the code at `f5069a3`):** `:360` checks only that `assessmentId` is a string. A non-UUID reaches `.eq('id', assessmentId)` (`:377`), which should raise Postgres 22P02, and `:379-381` returns 500 with `loadError.message`. Same class as I-0029. Not run live.
+**Impact:** a client error is reported as a server error, and raw database text reaches the client. No data is touched.
+**Fix (in B3, ROADMAP P0-3 (l); owner included it, T-0031 D5):** validate with the shared `isUuid` from T-0031 and return 400, with a test.
+**Evidence of resolution** (2026-11-04, T-0031): `backend/Controllers/assessment.controller.js:356`; `tests/backend/live-evaluate-once.test.mjs` "I-0073" (red at HEAD: 500). A valid missing id stays 404.
+
 ### I-0057 — Duplicate migration version prefixes (RESOLVED)
 **Status:** RESOLVED T-0030 (2026-11-04): every migration has a unique 14-digit version; local files and remote history agree
 **Severity:** P1
@@ -1252,3 +1293,11 @@ the bug in tests; production remains nondeterministic.**
 - `backend/Services/explainability.js:75` (`GITHUB_REASONS.insufficient_evidence`, the draft text above).
 - `ROADMAP.md` §1.3 has the row.
 - `tests/backend/github-evidence-client.test.mjs` "maps every service outcome" › "200 sub_score unavailable: insufficient_evidence (D1)", and `tests/backend/explainability.test.mjs` "every GitHub reason is unavailable, never zero" (10 codes), both pass (`tests/.out/t0014-green.log`).
+
+### I-0075 — Live notification text of unknown origin (WONTFIX)
+**Status:** WONTFIX: the row is not modified (owner, 2026-11-04, T-0031 D4). Nothing in the repo writes this text, so there is no code to fix.
+**Severity:** P3
+**Module:** `public.notifications` (live data)
+**Spec ref:** n/a
+**Evidence (2026-11-04, T-0031):** the owner reported a live row reading `Your application for a job has been updated.` The string is not in the tree at `88d03eb`, and `git log --all -S` finds no commit that ever added it. The backend's only writers are `backend/Controllers/jobs.controller.js:295` and `:304`, with other text. Origin unknown. Not explained by this search: `supabase/migrations/20260903000000_create_notifications.sql:26` created a policy letting recruiters insert notifications directly, so the row may not have come through the backend.
+**Impact:** one old row. It does not affect the I-0071 wording.

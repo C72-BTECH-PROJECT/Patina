@@ -244,6 +244,27 @@ test('rebuildScoreRecord on a score stored without a GitHub entry', () => {
   near(weightSum(rebuilt), 1, 1e-3, 'weights sum to 1');
 });
 
+test('I-0065: rebuild replaces the stale text on a stored pre-T-0014 entry', () => {
+  // As the 4 live rows are stored: unavailable, components null, no reason_code.
+  const stored = JSON.parse(JSON.stringify(buildScoreRecord(NLP).subscores));
+  stored[G] = { ...stored[G], components: null };
+  assert.match(stored[G].reason, /not part of this deployment/, 'the fixture must hold the old text');
+
+  const sub = rebuildScoreRecord(stored, EVALUATION).subscores[G];
+  assert.equal(sub.available, false);
+  assert.equal(sub.components.reason_code, 'not_collected_for_score');
+  assert.equal(sub.reason, GITHUB_REASONS.not_collected_for_score);
+  assert.doesNotMatch(sub.reason, /not part of this deployment/);
+});
+
+test('I-0065 control: rebuild keeps a stored entry that has a reason code', () => {
+  const stored = JSON.parse(JSON.stringify(buildScoreRecord(NLP).subscores));
+  assert.equal(stored[G].components.reason_code, 'service_disabled');
+  const sub = rebuildScoreRecord(stored, EVALUATION).subscores[G];
+  assert.equal(sub.components.reason_code, 'service_disabled');
+  assert.equal(sub.reason, stored[G].reason);
+});
+
 test('every factor has an evidence array', () => {
   const partial = { ...GITHUB_OK, evidence: { ...FIXTURE, status: 'partial', sub_score: { ...FIXTURE.sub_score, partial: true } } };
   const githubInputs = [undefined, GITHUB_OK, partial, ...REASON_CODES.map((reasonCode) => ({ ok: false, reasonCode }))];

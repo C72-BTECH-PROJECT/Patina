@@ -155,6 +155,21 @@ const RAW = readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
   .map((f) => ({ file: f, raw: readFileSync(join(DIR, f), 'utf8') }));
 const FN_RE = /create (?:or replace )?function public\.(\w+)\s*\([\s\S]*?\$\$[\s\S]*?\$\$;/gi;
 
+test('applicant_emails reads auth.users as security definer, service role only (T-0031, D1)', () => {
+  const f = byName('_applicant_emails.sql');
+  assert.ok(f, 'missing the applicant_emails migration');
+  const { sql } = f;
+  assert.match(sql, /create or replace function public\.applicant_emails\(p_candidate_ids uuid\[\]\)/);
+  assert.match(sql, /returns table ?\(id uuid, email text\)/);
+  assert.match(sql, /security definer/);
+  assert.match(sql, /set search_path = ''/);
+  assert.match(sql, /from auth\.users \w+ where \w+\.id = any\(p_candidate_ids\)/);
+  assert.match(sql, /revoke execute on function public\.applicant_emails\(uuid\[\]\) from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.applicant_emails\(uuid\[\]\) to service_role/);
+  const grants = sql.match(/grant [^;]*;/g) ?? [];
+  assert.deepEqual(grants, ['grant execute on function public.applicant_emails(uuid[]) to service_role;']);
+});
+
 test('no migration file contains a carriage return (T-0030, .gitattributes eol=lf)', () => {
   for (const { file, raw } of RAW) assert.ok(!raw.includes('\r'), `${file}: CRLF line endings`);
 });

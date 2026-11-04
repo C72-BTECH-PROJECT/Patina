@@ -4,6 +4,13 @@ import fetch from 'node-fetch';
 import supabase from '../Config/supabase.js';
 import { rebuildScoreRecord } from '../Services/explainability.js';
 import { GradeError, gradeOnce } from '../Services/gradingClaim.js';
+import {
+  assessmentFailure,
+  evaluateAnswers,
+  generateAssessment as requestAssessment,
+} from '../Services/assessmentService.js';
+import { InternalHttpError, resolveRequestId } from '../Services/internalHttp.js';
+import { isUuid } from '../Services/validation.js';
 import { fetchGithubEvidence, normaliseGithubLogin } from '../Services/githubEvidence.js';
 
 // Standalone generation service (T-0024/T-0025). The service holds the LLM
@@ -13,14 +20,12 @@ import { fetchGithubEvidence, normaliseGithubLogin } from '../Services/githubEvi
 // T-0029 (I-0066): keys live in public.assessment_keys (RLS on, no policy, no
 // anon/authenticated grant), never in public.assessments, which candidates can
 // read through PostgREST.
-const ASSESSMENT_SERVICE_URL =
-  process.env.ASSESSMENT_SERVICE_URL || 'http://localhost:8002';
 
 // T-0029 (I-0069): a 'grading' claim older than this may be taken over, so a
 // crashed grader never leaves an attempt stuck. Far above the 120 s evaluate
-// abort below, so a live grader is never treated as stale.
+// abort (EVALUATE_TIMEOUT_MS in Services/assessmentService.js), so a live grader
+// is never treated as stale.
 const GRADING_STALE_AFTER = '10 minutes';
-const EVALUATE_TIMEOUT_MS = 120000;
 
 // T-0026: the upload page stores the raw file without parsing it, so
 // generate must be able to run the NLP parser on demand. Same endpoint and
@@ -173,6 +178,7 @@ const resolveResumeForAssessment = async (candidateId, job) => {
 export const generateAssessment = async (req, res) => {
   try {
     const candidateId = req.session.userId;
+    const requestId = resolveRequestId(req);
     const { jobId } = req.body || {};
     if (!jobId) {
       return res.status(400).json({ message: 'jobId is required' });
@@ -274,34 +280,19 @@ export const generateAssessment = async (req, res) => {
       github_data: githubData,
     };
 
-    let response;
+    let data;
     try {
-      response = await fetch(`${ASSESSMENT_SERVICE_URL}/generate-assessment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        // T-0027: free-tier LLM needs 2-4 min; the old 120 s abort cut slow
-        // generations with a misleading 502.
-        signal: AbortSignal.timeout(300000),
-      });
-    } catch {
-      return res.status(502).json({
-        message: 'Assessment service is unavailable. Start it (assessment-service) and try again.',
-      });
-    }
-
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      return res.status(502).json({
-        message: 'Assessment generation failed',
-        error: detail.slice(0, 500),
-      });
+      data = await requestAssessment(payload, { requestId });
+    } catch (err) {
+      if (!(err instanceof InternalHttpError)) throw err;
+      console.error(`[assessment] generate failed: request_id=${requestId} kind=${err.kind} status=${err.status ?? '-'}`);
+      const failure = assessmentFailure(err, 'Assessment generation failed');
+      return res.status(failure.status).json(failure.body);
     }
 
     // The service wraps the payload: questions = { assessment_id,
     // model_used, prompt_version, questions: [...] }, answer_key =
     // { assessment_id, answers: [...] }.
-    const data = await response.json();
     const questionBundle = data.questions || {};
     const answerBundle = data.answer_key || {};
     const assessmentId = questionBundle.assessment_id;
@@ -376,10 +367,14 @@ export const generateAssessment = async (req, res) => {
 export const evaluateAssessment = async (req, res) => {
   try {
     const candidateId = req.session.userId;
+    const requestId = resolveRequestId(req);
     const { assessmentId, answers } = req.body || {};
 
     if (!assessmentId || typeof assessmentId !== 'string') {
       return res.status(400).json({ message: 'assessmentId is required' });
+    }
+    if (!isUuid(assessmentId)) {
+      return res.status(400).json({ error: 'invalid_assessment_id', message: 'assessmentId must be a UUID.' });
     }
     if (!Array.isArray(answers) || answers.length === 0) {
       return res.status(400).json({ message: 'answers must be a non-empty array' });
@@ -437,24 +432,21 @@ export const evaluateAssessment = async (req, res) => {
           throw new GradeError(500, { message: 'Stored assessment is incomplete' });
         }
 
-        let response;
         try {
-          response = await fetch(`${ASSESSMENT_SERVICE_URL}/evaluate-assessment`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assessment_id: claimed.id, questions, answer_key: answerKey, answers }),
-            signal: AbortSignal.timeout(EVALUATE_TIMEOUT_MS),
-          });
-        } catch {
-          throw new GradeError(502, {
-            message: 'Assessment service is unavailable, so your answers were not graded. Start it (assessment-service) and try again.',
-          });
+          return await evaluateAnswers(
+            { assessment_id: claimed.id, questions, answer_key: answerKey, answers },
+            { requestId }
+          );
+        } catch (err) {
+          if (!(err instanceof InternalHttpError)) throw err;
+          console.error(`[assessment] evaluate failed: request_id=${requestId} kind=${err.kind} status=${err.status ?? '-'}`);
+          const failure = assessmentFailure(
+            err,
+            'Assessment evaluation failed',
+            'Assessment service is unavailable, so your answers were not graded. Start it (assessment-service) and try again.'
+          );
+          throw new GradeError(failure.status, failure.body);
         }
-        if (!response.ok) {
-          const detail = await response.text().catch(() => '');
-          throw new GradeError(502, { message: 'Assessment evaluation failed', error: detail.slice(0, 500) });
-        }
-        return response.json();
       },
       complete: async (claimedAt, evaluation) => {
         const { data, error } = await supabase

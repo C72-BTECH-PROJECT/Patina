@@ -27,6 +27,12 @@ test('unknown route -> 404', async () => {
   assert.equal(r.status, 404);
 });
 
+test('I-0027: unknown route with POST -> 404 naming the real method', async () => {
+  const r = await postJson('/api/t0001-no-such-route', {});
+  assert.equal(r.status, 404);
+  assert.equal((await r.json()).message, 'Cannot POST /api/t0001-no-such-route');
+});
+
 test('POST /api/auth/login with empty body -> 400', async () => {
   const r = await postJson('/api/auth/login', {});
   assert.equal(r.status, 400);
@@ -37,6 +43,14 @@ test('POST /api/auth/signup with empty body -> 400', async () => {
   const r = await postJson('/api/auth/signup', {});
   assert.equal(r.status, 400);
   assert.ok((await r.json()).message, 'expected an error message');
+});
+
+test('I-0016: a one-word name passes the required-fields check (reaches the password rule, creates no user)', async () => {
+  const r = await postJson('/api/auth/signup', {
+    name: 'Madonna', username: 't0001_oneword', email: 't0001_oneword@example.com', password: '12345',
+  });
+  assert.equal(r.status, 400);
+  assert.equal((await r.json()).message, 'Password must be at least 8 characters.');
 });
 
 test('POST /api/auth/login with unknown username -> 401, no session cookie', async () => {

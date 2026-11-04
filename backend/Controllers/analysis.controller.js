@@ -1,22 +1,16 @@
 import crypto from 'crypto';
 import path from 'path';
-import multer from 'multer';
 import FormData from 'form-data';
 import fetch from 'node-fetch';
 
 import supabase from '../Config/supabase.js';
 import { buildScoreRecord, SUBSCORE_KEYS } from '../Services/explainability.js';
 import { fetchGithubEvidence } from '../Services/githubEvidence.js';
-
-const upload = multer({ storage: multer.memoryStorage() });
-
-// Same rule as github-evidence (github-evidence/README.md): an incoming ID is
-// kept only if it is this shape, otherwise core generates one.
-const REQUEST_ID_RE = /^[A-Za-z0-9-]{1,64}$/;
-const resolveRequestId = (req) => {
-  const incoming = req.get('X-Request-ID');
-  return incoming && REQUEST_ID_RE.test(incoming) ? incoming : crypto.randomUUID();
-};
+import { resolveRequestId } from '../Services/internalHttp.js';
+import { loadApplicantIdentities } from '../Services/applicantIdentity.js';
+import { isUuid } from '../Services/validation.js';
+import { MAX_RESUME_BYTES } from '../Config/uploadLimits.js';
+import { resumeUpload } from '../Middlewares/resumeUpload.js';
 
 const NLP_PARSE_URL = process.env.NLP_PARSE_URL || 'http://localhost:8000/parse';
 const PARSER_VERSION = 'nlp-engine@1.0.0';
@@ -30,6 +24,11 @@ const MIME_BY_EXT = {
   '.pdf': 'application/pdf',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 };
+
+// The extension decides: it is also what the stored path and content type are
+// derived from, and the client-reported mimetype is unreliable.
+const UNSUPPORTED_RESUME_MESSAGE = 'Only PDF or DOCX resumes are supported.';
+const isSupportedResume = (file) => Boolean(MIME_BY_EXT[path.extname(file.originalname || '').toLowerCase()]);
 
 const resolveContentType = (file) => {
   const ext = path.extname(file.originalname || '').toLowerCase();
@@ -197,10 +196,9 @@ export const getMyResumeStatus = async (req, res) => {
     hasResume: Boolean(resumeFile),
     fileName: resumeFile?.name || null,
     updatedAt: resumeFile?.updated_at || null,
+    maxResumeBytes: MAX_RESUME_BYTES,
   });
 };
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Generates a signed URL for a candidate's resume. Intended for recruiters
 // reviewing applicants; the frontend opens this URL in a new tab.
@@ -209,7 +207,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const getCandidateResume = async (req, res) => {
   try {
     const { candidateId } = req.params;
-    if (!UUID_RE.test(String(candidateId || ''))) {
+    if (!isUuid(candidateId)) {
       return res.status(400).json({ error: 'invalid_candidate_id', message: 'candidateId must be a UUID.' });
     }
 
@@ -258,18 +256,15 @@ export const getCandidateResume = async (req, res) => {
 // Each candidate profile has exactly one resume, stored at a fixed path, so a
 // re-upload simply overwrites the previous one (upsert).
 export const uploadResume = [
-  upload.single('resume'),
+  resumeUpload,
   async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No resume file uploaded' });
       }
 
-      // The extension decides: it is also what the stored path and content type
-      // are derived from, and the client-reported mimetype is unreliable.
-      const ext = path.extname(req.file.originalname || '').toLowerCase();
-      if (!MIME_BY_EXT[ext]) {
-        return res.status(400).json({ message: 'Only PDF or DOCX resumes are supported.' });
+      if (!isSupportedResume(req.file)) {
+        return res.status(400).json({ message: UNSUPPORTED_RESUME_MESSAGE });
       }
 
       const saved = await saveResumeToStorage(req.session.userId, req.file);
@@ -290,7 +285,7 @@ export const uploadResume = [
 ];
 
 export const analyzeResume = [
-  upload.single('resume'),
+  resumeUpload,
   async (req, res) => {
     try {
       const candidateId = req.session.userId;
@@ -299,6 +294,9 @@ export const analyzeResume = [
       const { jobId } = req.body || {};
       if (!req.file) {
         return res.status(400).json({ message: 'Resume file is required (field name: resume)' });
+      }
+      if (!isSupportedResume(req.file)) {
+        return res.status(400).json({ message: UNSUPPORTED_RESUME_MESSAGE });
       }
       if (!jobId) {
         return res.status(400).json({ message: 'jobId is required' });
@@ -557,35 +555,13 @@ export const getAllApplicants = async (req, res) => {
 
     const jobsById = new Map(jobRows.map((j) => [j.id, j]));
 
-    // One query for every applicant's name. `profiles` has no email column.
-    const candidateIds = [...new Set((applicationRows || []).map((app) => app.candidate_id))];
-    const { data: profileRows, error: profilesError } = candidateIds.length
-      ? await supabase.from('profiles').select('id, first_name, last_name').in('id', candidateIds)
-      : { data: [], error: null };
-    if (profilesError) {
-      return res.status(500).json({ message: 'Failed to load applicant profiles', error: profilesError.message });
-    }
-    const profilesById = new Map((profileRows || []).map((p) => [p.id, p]));
+    const identities = await loadApplicantIdentities(
+      supabase,
+      (applicationRows || []).map((app) => app.candidate_id)
+    );
 
     const enriched = await Promise.all((applicationRows || []).map(async (app) => {
-      const profile = profilesById.get(app.candidate_id) || null;
-      let authUser = null;
-
-      // Only a candidate without a profile row falls back to the auth record.
-      if (!profile) {
-        try {
-          const authResult = await supabase.auth.admin.getUserById(app.candidate_id);
-          authUser = authResult.data?.user;
-        } catch (e) {
-          authUser = null;
-        }
-      }
-
-      const meta = authUser?.user_metadata || authUser?.raw_user_meta_data || {};
-      const firstName = profile?.first_name || meta.first_name || '';
-      const lastName = profile?.last_name || meta.last_name || '';
-      const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'Candidate';
-      const email = authUser?.email || meta.email || '';
+      const { name, email } = identities.get(app.candidate_id);
       const location = jobsById.get(app.job_id)?.location || '—';
 
       // A candidate can be analysed more than once for the same job; the most
@@ -605,7 +581,7 @@ export const getAllApplicants = async (req, res) => {
         jobId: app.job_id,
         jobTitle: jobsById.get(app.job_id)?.title || 'Unknown Job',
         candidateInfo: {
-          name: fullName,
+          name,
           email,
           location,
         },

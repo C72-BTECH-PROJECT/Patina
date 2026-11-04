@@ -61,7 +61,7 @@ cd frontend; npm start                                      # port 3000
 | B3 | Upload `tests/fixtures/f1_dev_github.pdf` | **Predicted failure:** "Could not upload your resume." `/api/resume/upload` returns 500, `path is not defined` (ISSUES I-0009). | |
 | B4 | `/candidate/jobs`, open "[T-0001 TEST] harness job" (`/candidate/jobs/:id`), try Apply | Apply is blocked or fails, since no resume was stored (B3) | |
 | B5 | There is no results route at HEAD (`Results.jsx` is unrouted; Processing goes to `/candidate/dashboard`) | Dashboard shows no score for this job | |
-| B6 | Sign out. Sign in as `t0001_recr`, open `/recruiter/dashboard` | Loads (`/api/recruiter/applicants`, `/api/jobs/mine`, `/api/jobs/applications`). No applicant for the test job. | |
+| B6 | Sign out. Sign in as `t0001_recr`, open `/recruiter/dashboard` | Loads (`/api/recruiter/applicants`, `/api/jobs/mine`). No applicant for the test job. | |
 | B7 | Clean up: `node tests/backend/sweep.mjs` | Every count `0`; exit code 0 | |
 
 ---

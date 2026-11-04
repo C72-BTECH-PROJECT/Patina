@@ -8,8 +8,17 @@
 //   * typed errors that never carry the upstream body or URL (the lesson of
 //     I-0036: core used to echo the NLP service's raw error text to the client).
 //
-// Used for github-evidence now; ROADMAP P2-1 reuses it for the NLP call.
+// Used for github-evidence and assessment-service; ROADMAP P2-1 reuses it for the NLP call.
+import crypto from 'crypto';
 import fetch from 'node-fetch';
+
+// Same rule as github-evidence (github-evidence/README.md): an incoming ID is
+// kept only if it is this shape, otherwise core generates one.
+const REQUEST_ID_RE = /^[A-Za-z0-9-]{1,64}$/;
+export const resolveRequestId = (req) => {
+  const incoming = req.get('X-Request-ID');
+  return incoming && REQUEST_ID_RE.test(incoming) ? incoming : crypto.randomUUID();
+};
 
 export class InternalHttpError extends Error {
   /**

@@ -213,8 +213,8 @@ export const signup = async (req, res) => {
   const firstName = nameParts.shift() || '';
   const lastName = nameParts.join(' ');
 
-  if (!email || !password || !firstName || !lastName || !normalizedUsername) {
-    return res.status(400).json({ message: 'First name, last name, username, email, and password are required.' });
+  if (!email || !password || !firstName || !normalizedUsername) {
+    return res.status(400).json({ message: 'Name, username, email, and password are required.' });
   }
   if (!ALLOWED_ROLES.has(normalizedRole)) {
     return res.status(400).json({ message: 'Invalid role.' });
