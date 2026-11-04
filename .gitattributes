@@ -1,0 +1,3 @@
+# T-0030: migration files are LF on every checkout. Function bodies keep their line
+# endings byte for byte in Postgres, so CRLF checkouts made `db diff` report changes.
+supabase/migrations/*.sql text eol=lf

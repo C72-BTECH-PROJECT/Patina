@@ -155,7 +155,7 @@ Seed the job first: `node tests/backend/sweep.mjs --seed-job` (note the job id).
 | D5 | Back in the browser, `/candidate/assessment`, pick the test job, generate | Questions appear after up to 2-4 min (free-tier models); no answer key in the Network response (`/api/assessment/generate`) | |
 | D6 | Answer every question and submit | A score is shown. Backend log: `[assessment] completed … score=…` then `[assessment] score <id> rebuilt composite=…` | |
 | D7 | Sign out. Sign in as `t0001_recr`, open `/recruiter/dashboard`, open `t0001_cand` | Composite score with three factors: Résumé ↔ Job Semantic Alignment, GitHub Evidence (with "Public repositories only…" note) and Assessment Results ("Assessment score … X of Y points"). Weights 0.40 / 0.35 / 0.25. Not "evidence limited". | |
-| D8 | Stop the five processes. Clean up: `node tests/backend/sweep.mjs`; `del $env:TEMP\p.jar` | `remaining:` all `0`; exit code 0. The sweep does not count `assessments` (`tests/backend/sweep.mjs` never names the table); the test's rows go with the seeded job through `job_id … on delete cascade` (`supabase/migrations/20261015_create_assessments.sql:14`), so the job removal is what cleans them. | |
+| D8 | Stop the five processes. Clean up: `node tests/backend/sweep.mjs`; `del $env:TEMP\p.jar` | `remaining:` all `0`; exit code 0. The sweep does not count `assessments` (`tests/backend/sweep.mjs` never names the table); the test's rows go with the seeded job through `job_id … on delete cascade` (`supabase/migrations/20261015004738_create_assessments.sql:14`), so the job removal is what cleans them. | |
 
 ---
 

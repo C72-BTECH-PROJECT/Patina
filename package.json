@@ -1,0 +1,8 @@
+{
+  "name": "patina",
+  "private": true,
+  "description": "Repo-root tooling only (T-0030): the pinned Supabase CLI. Services keep their own package.json.",
+  "devDependencies": {
+    "supabase": "2.122.1"
+  }
+}

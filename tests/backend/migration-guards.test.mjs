@@ -4,7 +4,7 @@
 //
 //   node --test tests/backend/migration-guards.test.mjs
 //
-// B2 (ROADMAP P0-2) and T-0020 extend this file (idempotency, score-on-apply).
+// T-0030 (B2) added the 14-digit, rename-table, bucket and comment checks; T-0020 extends it next.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -36,25 +36,63 @@ const need = (name) => {
   return f.sql;
 };
 
-test('migration version prefixes are unique (T-0029 files use 14 digits)', () => {
+test('every migration has a unique 14-digit version (I-0057, T-0030)', () => {
   for (const name of Object.values(T0029)) assert.ok(byName(name), `missing migration ${name}`);
-  const long = files.filter((f) => /^\d{14}$/.test(f.prefix));
   const seen = new Map();
-  for (const f of long) {
-    assert.ok(!seen.has(f.prefix), `duplicate 14-digit version ${f.prefix}: ${seen.get(f.prefix)} and ${f.file}`);
-    seen.set(f.prefix, f.file);
-  }
-  // Lengths differ, so an 8-digit version can never equal a 14-digit one; new files
-  // must not reuse the old 8-digit form at all (owner decision 7).
   for (const f of files) {
-    assert.match(f.prefix, /^(\d{8}|\d{14})$/, `${f.file}: version prefix must be 8 or 14 digits`);
-    if (f.prefix.length === 8) assert.ok(f.sortKey < '20261103000000', `${f.file}: new migrations need a 14-digit prefix`);
+    assert.match(f.prefix, /^\d{14}$/, `${f.file}: version must be 14 digits (no 8-digit file may remain)`);
+    assert.ok(!seen.has(f.prefix), `duplicate version ${f.prefix}: ${seen.get(f.prefix)} and ${f.file}`);
+    seen.set(f.prefix, f.file);
   }
 });
 
-test('8-digit duplicate prefixes (I-0057, fixed in B2)', { todo: 'I-0057: 20260903 x2 and 20261015 x2; B2 (ROADMAP P0-2)' }, () => {
-  const short = files.filter((f) => f.prefix.length === 8).map((f) => f.prefix);
-  assert.equal(new Set(short).size, short.length);
+// The rename table approved in tasks/T-0030-migrations-batch.md. The 20261015 pair takes
+// the versions the remote history already records (R1), so no repair touches them.
+const RENAMED = [
+  '20260823000000_create_profiles.sql',
+  '20260830000000_create_jobs_and_applications.sql',
+  '20260831000000_add_single_admin_role.sql',
+  '20260831000100_add_single_admin_index.sql',
+  '20260901000000_add_profile_suspension.sql',
+  '20260903000000_create_notifications.sql',
+  '20260903000100_create_resumes_and_scores.sql',
+  '20261015004738_create_assessments.sql',
+  '20261015034725_allow_five_assessment_attempts.sql',
+];
+
+test('B2 renames match the approved table, in dependency order (I-0057, T-0030)', () => {
+  const order = files.map((f) => f.file);
+  for (const name of RENAMED) assert.ok(order.includes(name), `missing renamed migration ${name}`);
+  const idx = RENAMED.map((n) => order.indexOf(n));
+  assert.deepEqual([...idx].sort((a, b) => a - b), idx, 'renamed files must sort in the approved order');
+  assert.ok(order.indexOf('20261015004738_create_assessments.sql') < order.indexOf(T0029.keys),
+    'assessments must exist before the T-0029 migrations');
+});
+
+test('a file that adds an enum value does nothing else in that transaction (T-0030, SQLSTATE 55P04)', () => {
+  // The CLI runs each file as one transaction, and Postgres cannot use an enum value
+  // in the transaction that added it. So an `add value` file holds only `add value`s.
+  const adders = files.filter((f) => /alter type [\w.]+ add value/.test(f.sql));
+  assert.ok(adders.length, 'expected at least the admin enum migration');
+  for (const f of adders) {
+    const stmts = f.sql.split(';').map((x) => x.trim()).filter(Boolean);
+    for (const st of stmts) assert.match(st, /^alter type [\w.]+ add value /, `${f.file}: "${st.slice(0, 60)}" must move to its own file`);
+  }
+  assert.match(need('20260831000100_add_single_admin_index.sql'),
+    /create unique index if not exists profiles_single_admin_role on public\.profiles \(role\) where role = 'admin'/);
+});
+
+test('resumes bucket limits live in a migration, mirroring the live bucket (I-0001, T-0030)', () => {
+  const sql = need('20261104120000_resumes_bucket_limits.sql');
+  assert.match(sql, /update storage\.buckets set file_size_limit = 10485760, allowed_mime_types = array\[ ?'application\/pdf', 'application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document' ?\]::text\[\] where id = 'resumes'/);
+});
+
+test('scores.subscores has a database comment describing the stored shape (I-0041, T-0030)', () => {
+  const sql = need('20261104120100_scores_subscores_comment.sql');
+  assert.match(sql, /comment on column public\.scores\.subscores is '/);
+  for (const field of ['key', 'label', 'available', 'value', 'weight', 'reason', 'components', 'evidence']) {
+    assert.match(sql, new RegExp(`\\b${field}\\b`), `comment must name the ${field} field`);
+  }
 });
 
 test('latest handle_new_user() takes its role from assert_signup_role (I-0055)', () => {
@@ -110,4 +148,25 @@ test('M3 adds the grading claim: status, open index, atomic claim function (I-00
   assert.match(sql, /a\.status = 'generated' or \(a\.status = 'grading' and a\.grading_started_at < now\(\) - p_stale_after\)/);
   assert.match(sql, /returning /);
   assert.match(sql, /revoke execute on function public\.claim_assessment_for_grading\(uuid, uuid, interval\) from public, anon, authenticated/);
+});
+
+// T-0030: function bodies are stored byte for byte, so line endings matter to `db diff`.
+const RAW = readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
+  .map((f) => ({ file: f, raw: readFileSync(join(DIR, f), 'utf8') }));
+const FN_RE = /create (?:or replace )?function public\.(\w+)\s*\([\s\S]*?\$\$[\s\S]*?\$\$;/gi;
+
+test('no migration file contains a carriage return (T-0030, .gitattributes eol=lf)', () => {
+  for (const { file, raw } of RAW) assert.ok(!raw.includes('\r'), `${file}: CRLF line endings`);
+});
+
+test('20261104120200 re-creates every public function verbatim from its latest earlier definition (T-0030)', () => {
+  const target = '20261104120200_function_bodies_lf.sql';
+  const latest = new Map();
+  for (const { file, raw } of RAW) {
+    if (file >= target) continue;
+    for (const m of raw.matchAll(FN_RE)) latest.set(m[1], m[0].replace(/^create function/i, 'create or replace function'));
+  }
+  const recreated = new Map([...RAW.find((r) => r.file === target).raw.matchAll(FN_RE)].map((m) => [m[1], m[0]]));
+  assert.deepEqual([...recreated.keys()].sort(), [...latest.keys()].sort(), 'must cover every public function');
+  for (const [name, stmt] of latest) assert.equal(recreated.get(name), stmt, `${name} must be byte-identical`);
 });
