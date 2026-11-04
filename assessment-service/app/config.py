@@ -9,6 +9,18 @@ load_dotenv(SERVICE_DIR / ".env")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+# Gemini (primary). OpenAI-compatible endpoint.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_BASE_URL = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+GEMINI_MODELS = [
+    m.strip()
+    for m in os.getenv(
+        "GEMINI_MODELS",
+        os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
+    ).split(",")
+    if m.strip()
+]
+
 FREE_MODELS = [
     model.strip()
     for model in os.getenv(

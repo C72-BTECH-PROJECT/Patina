@@ -41,6 +41,13 @@
 - tests/gateway/live-gateway.test.mjs: created; both tests pass.
 - gateway/index.js: fixed direct-run (isMain) detection on Windows.
 
+## Assessment service: Gemini integration
+- config.py: added GEMINI_API_KEY, GEMINI_BASE_URL, GEMINI_MODELS (list, default gemini-3.1-flash-lite,gemini-3.5-flash-lite,gemini-3.8-flash).
+- llm_client.py: Gemini tried first (multiple free models), OpenRouter as backup.
+- prompts.py: strengthened to distribute source across jd/resume/github.
+- backend/Controllers/assessment.controller.js: wired include_github + github_data (from github-evidence) into payload.
+- .env / .env.example updated with GEMINI_MODELS.
+
 ## Verification (Part 2)
 - Offline gateway: 12 pass, 0 fail.
 - Live gateway: 2 pass, 0 fail.
