@@ -27,6 +27,7 @@
     ]
   },
   "filename": "f5_multicolumn.pdf",
+  "parser_version": "nlp-engine@2.0.0",
   "preprocessing": {
     "noun_chunks_preview": [
       "rosa delgado\ncontact experience",
@@ -65,7 +66,9 @@
       "fastapi"
     ]
   },
+  "raw_text": "Rosa Delgado\nCONTACT EXPERIENCE\nrosa.delgado@example.com Platform Engineer\n+1 555 010 9988 Proseware Cloud (Feb 2022 - Present)\nDenver, CO - Ran 40 Kubernetes services on AWS EKS with Terraform.\ngithub.com/example-rdelgado - Built FastAPI internal tools for deploy approvals.\nBackend Developer\nSKILLS\nLucerne Media (Jul 2020 - Jan 2022)\nPython - Wrote Python services over PostgreSQL for ad reporting.\nFastAPI\nPROJECTS\nPostgreSQL\nSQL infra-lint - Terraform policy checker\nDocker github.com/example-rdelgado/infra-lint\nKubernetes\nAWS\nTerraform\nGit\nEDUCATION\nB.S. Computer Science\nExample State University\n2016 - 2020",
   "raw_text_preview": "Rosa Delgado\nCONTACT EXPERIENCE\nrosa.delgado@example.com Platform Engineer\n+1 555 010 9988 Proseware Cloud (Feb 2022 - Present)\nDenver, CO - Ran 40 Kubernetes services on AWS EKS with Terraform.\ngithub.com/example-rdelgado - Built FastAPI internal tools for deploy approvals.\nBackend Developer\nSKILLS",
+  "raw_text_truncated": false,
   "semantic_analysis": {
     "component_weights": {
       "semantic_score": 0.4,

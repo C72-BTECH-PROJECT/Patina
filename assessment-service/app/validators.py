@@ -22,9 +22,14 @@ def validate_assessment(
     assessment_id: str,
     model_used: str,
     prompt_version: str,
+    *,
+    github_supplied: bool,
 ) -> tuple[dict, dict]:
     """
     Validate the generated questions and answer key.
+
+    `github_supplied` is whether GitHub evidence was given to the model; without
+    it a question with source "github" is invented evidence and is rejected.
 
     Returns:
         (questions_json, answers_json)
@@ -87,6 +92,12 @@ def validate_assessment(
             if parsed.question_id in questions_by_id:
                 raise AssessmentValidationError(
                     f"Duplicate question ID: {parsed.question_id}."
+                )
+
+            if parsed.source == "github" and not github_supplied:
+                raise AssessmentValidationError(
+                    f"Question {parsed.question_id} has source 'github' but no "
+                    "GitHub data was supplied; use 'jd' or 'resume'."
                 )
 
             questions_by_id[parsed.question_id] = parsed

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import supabase from '../Config/supabase.js';
 import { getSupabaseAuth } from '../Config/supabaseAuth.js';
 import { ensureProfileOrRollback } from '../Services/signupProfile.js';
+import { logError } from '../Middlewares/errorHandler.js';
 
 const ALLOWED_ROLES = new Set(['candidate', 'recruiter']);
 const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,30}$/;
@@ -31,6 +32,27 @@ const createUserScopedClient = () => {
   });
 };
 
+// R-03 (D§9): Supabase Auth's own error text never reaches the client. Known
+// GoTrue error codes map to fixed sentences; anything else gets the fallback.
+// The status stays 400, as before; the detail is logged with the request id.
+const AUTH_ERRORS = {
+  user_already_exists: ['account_exists', 'An account with this email already exists.'],
+  email_exists: ['account_exists', 'An account with this email already exists.'],
+  weak_password: ['weak_password', 'Choose a stronger password.'],
+  same_password: ['same_password', 'The new password must be different from the current one.'],
+  email_address_invalid: ['invalid_email', 'Enter a valid email address.'],
+  validation_failed: ['invalid_input', 'Check the details and try again.'],
+  signup_disabled: ['signup_disabled', 'New accounts cannot be created right now.'],
+  over_email_send_rate_limit: ['rate_limited', 'Too many emails were requested. Please wait a few minutes and try again.'],
+  over_request_rate_limit: ['rate_limited', 'Too many requests. Please wait a few minutes and try again.'],
+};
+
+const sendAuthError = (req, res, error, context, [fallbackCode, fallbackMessage]) => {
+  logError(req, context, error);
+  const [code, message] = AUTH_ERRORS[error?.code] || [fallbackCode, fallbackMessage];
+  return res.status(400).json({ error: code, message });
+};
+
 const formatProfile = (profile, email) => ({
   id: profile.id,
   _id: profile.id,
@@ -44,6 +66,26 @@ const formatProfile = (profile, email) => ({
   githubUrl: profile.github_url,
   companyName: profile.company_name,
 });
+
+// R-04 (D§2): exact, case-insensitive username lookup. Usernames keep their display
+// case and are unique on lower(username) (migration 20260823000000). PostgREST
+// cannot filter on lower(), so the query is an ILIKE whose LIKE wildcards are
+// escaped (`_` and `%` match only themselves), and the result is then confirmed in
+// code to be an exact match on the lowercased value. Anything that is not a valid
+// username shape (e.g. contains `%`) matches nothing and never reaches the database.
+const findProfileByUsername = async (username, columns) => {
+  const wanted = String(username || '').trim().toLowerCase();
+  if (!USERNAME_PATTERN.test(wanted)) return { profile: null, error: null };
+  const pattern = wanted.replace(/[\\%_]/g, (c) => `\\${c}`);
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(`${columns}, username`)
+    .ilike('username', pattern)
+    .limit(2);
+  if (error) return { profile: null, error };
+  const exact = (data || []).filter((p) => String(p.username).toLowerCase() === wanted);
+  return { profile: exact.length === 1 ? exact[0] : null, error: null };
+};
 
 const loadProfile = async (userId) => {
   const { data, error } = await supabase
@@ -67,6 +109,17 @@ export const me = async (req, res) => {
   } catch (error) {
     return res.status(401).json({ message: 'Session is no longer valid.' });
   }
+};
+
+// R-04 (D§2): the gateway's pre-check. Answers from the in-memory session only
+// (no Supabase call), so a slow database cannot fail every request at the gateway.
+// Core still runs the full check (profile exists, not suspended) on the real request.
+export const session = (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  if (!req.session?.userId) {
+    return res.status(401).json({ error: 'unauthorized', message: 'Not authenticated' });
+  }
+  return res.status(200).json({ userId: req.session.userId, role: req.session.role ?? null });
 };
 
 export const logout = (req, res) => {
@@ -95,7 +148,10 @@ export const resendConfirmation = async (req, res) => {
     options: { emailRedirectTo: `${FRONTEND_URL}/email-confirmed` },
   });
 
-  if (error) return res.status(400).json({ message: error.message });
+  if (error) {
+    return sendAuthError(req, res, error, 'resend confirmation failed',
+      ['resend_failed', 'Could not send the confirmation email. Please try again later.']);
+  }
   return res.status(200).json({ message: 'Confirmation email sent. Check your inbox and spam folder.' });
 };
 
@@ -123,11 +179,7 @@ export const requestPasswordReset = async (req, res) => {
     if (identifier.includes('@')) {
       targetEmail = identifier.toLowerCase();
     } else {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .ilike('username', identifier)
-        .maybeSingle();
+      const { profile } = await findProfileByUsername(identifier, 'id');
 
       if (profile?.id) {
         const { data: authUser } = await supabase.auth.admin.getUserById(profile.id);
@@ -196,8 +248,8 @@ export const resetPassword = async (req, res) => {
   await userClient.auth.signOut().catch(() => {});
 
   if (updateError) {
-    console.error('Password reset update failed:', updateError.message);
-    return res.status(400).json({ message: updateError.message });
+    return sendAuthError(req, res, updateError, 'password reset update failed',
+      ['reset_failed', 'Could not update the password. Request a new reset link and try again.']);
   }
 
   return res
@@ -252,7 +304,10 @@ export const signup = async (req, res) => {
     },
   });
 
-  if (error) return res.status(400).json({ message: error.message });
+  if (error) {
+    return sendAuthError(req, res, error, 'signup failed',
+      ['signup_failed', 'Could not create the account. Check the details and try again.']);
+  }
   if (!data.user) return res.status(500).json({ message: 'Account creation did not return a user.' });
 
   // T-0029 (I-0058, I-0017): the on_auth_user_created trigger is the only
@@ -274,14 +329,7 @@ export const login = async (req, res) => {
     return res.status(400).json({ message: 'Username and password are required.' });
   }
 
-  const trimmedUsername = String(username).trim();
-  console.log(`Login attempt for username: ${trimmedUsername}`);
-
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id, role, is_suspended')
-    .ilike('username', trimmedUsername)
-    .maybeSingle();
+  const { profile, error: profileError } = await findProfileByUsername(username, 'id, role, is_suspended');
 
   if (profileError) {
     console.error('Login profile lookup failed:', profileError.message);
@@ -291,7 +339,6 @@ export const login = async (req, res) => {
   }
 
   if (!profile) {
-    console.log(`No profile found for username: ${trimmedUsername}`);
     return res.status(401).json({ message: 'Invalid username or password.' });
   }
 
@@ -317,9 +364,7 @@ export const login = async (req, res) => {
     authClient = getSupabaseAuth();
   } catch (err) {
     console.error('Login misconfigured:', err?.message || err);
-    return res.status(500).json({
-      message: 'Authentication is not configured correctly. Set SUPABASE_ANON_KEY in backend/.env.',
-    });
+    return res.status(500).json({ error: 'auth_not_configured', message: 'Sign-in is not available right now.' });
   }
 
   // Verify the password on the anon client, never the shared service-role one
@@ -339,6 +384,11 @@ export const login = async (req, res) => {
   }
 
   const fullProfile = await loadProfile(signInData.user.id);
+  // R-04 (D§2): a new session id on login (session fixation). Nothing an anonymous
+  // session carries has to survive: login is the only writer of session data.
+  await new Promise((resolve, reject) => {
+    req.session.regenerate((err) => (err ? reject(err) : resolve()));
+  });
   req.session.userId = signInData.user.id;
   req.session.email = signInData.user.email;
   req.session.role = fullProfile.role.toUpperCase();

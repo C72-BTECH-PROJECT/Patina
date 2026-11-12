@@ -278,3 +278,70 @@ test('every factor has an evidence array', () => {
     }
   }
 });
+
+// R-06 (REBUILD/DECISIONS.md §5): linking an inactive GitHub account (repositories, zero
+// commits in the window) gives exactly the composite of linking none, for the same parsing
+// input, whatever its claims show. The bodies are github-evidence's R-06 answers
+// (github-evidence/README.md "No recent activity"; tests/github/snapshots/octocat.json),
+// served by a local stub and read through core's real client, so core's reason-code
+// mapping is exercised too.
+test('R-06: an inactive linked account gives the same composite as no account', async () => {
+  const { fetchGithubEvidence } = await import(
+    new URL(`file:///${join(REPO_DIR, 'backend', 'Services', 'githubEvidence.js').replace(/\\/g, '/')}`)
+  );
+  const { json, startStub } = await import('./lib/stub-server.mjs');
+
+  const off = (reason) => ({ value: null, weight: 0, available: false, reason });
+  const idle = {
+    ...FIXTURE,
+    commit_activity: { available: true, window_days: 365, authored_commits: 0, active_weeks: 0, weeks: 52, weekly: Array(52).fill(0) },
+    repositories: { ...FIXTURE.repositories, with_authored_commits: 0 },
+  };
+  const inactiveSub = {
+    available: false, value: null, reason_code: 'no_recent_public_activity', weights_source: 'default', partial: false,
+    components: ['activity', 'consistency', 'ownership', 'corroboration'].map((key) => ({ key, ...off('no_recent_public_activity') })),
+  };
+  // Mokafor-style claims: python evidenced, javascript not_found, the rest not_checkable.
+  const mixedClaims = { ...idle, sub_score: inactiveSub };
+  assert.ok(mixedClaims.claims.some((c) => c.status === 'not_found'), 'fixture has a not_found claim');
+  // Every checkable claim evidenced (the octocat case).
+  const allEvidenced = { ...idle, claims: FIXTURE.claims.filter((c) => c.status !== 'not_found'), sub_score: inactiveSub };
+
+  const saved = process.env.GITHUB_EVIDENCE_URL;
+  let body;
+  const stub = await startStub({ handler: (_req, res) => json(res, 200, body) });
+  process.env.GITHUB_EVIDENCE_URL = stub.url;
+  try {
+    const none = buildScoreRecord(NLP, { github: await fetchGithubEvidence({ githubLink: '' }) });
+    assert.equal(none.subscores[G].components.reason_code, 'no_github_link');
+    const fetchFor = async (b) => {
+      body = b;
+      return fetchGithubEvidence({ githubLink: 'github.com/example-mokafor', claimedSkills: ['python'] });
+    };
+
+    for (const [name, b] of Object.entries({ mixedClaims, allEvidenced })) {
+      const record = buildScoreRecord(NLP, { github: await fetchFor(b) });
+      assert.equal(record.subscores[G].available, false, name);
+      assert.equal(record.weights[G], 0, name);
+      assert.deepEqual(record.weights, none.weights, `${name}: same weights as no account`);
+      assert.equal(record.composite, none.composite, `${name}: composite must equal the no-account composite`);
+      // NOTE: core does not know `no_recent_public_activity` yet (githubEvidence.js:90 reasonForBody,
+      // explainability.js:75 GITHUB_REASONS), so it is mapped to service_error: same weight 0 and
+      // composite, but the stated reason text is service_error's. The backend card adds the code.
+    }
+  } finally {
+    await stub.close();
+    if (saved === undefined) delete process.env.GITHUB_EVIDENCE_URL;
+    else process.env.GITHUB_EVIDENCE_URL = saved;
+  }
+
+  // Control: the pre-R-06 answer (activity components an available 0.0) broke the rule.
+  const before = {
+    ...allEvidenced,
+    sub_score: { ...inactiveSub, available: true, reason_code: null, value: 0.3, components: [
+      ...['activity', 'consistency', 'ownership'].map((key, i) => ({ key, value: 0, weight: [0.25, 0.25, 0.2][i], available: true, reason: null })),
+      { key: 'corroboration', value: 1, weight: 0.3, available: true, reason: null }] },
+  };
+  const old = buildScoreRecord(NLP, { github: { ok: true, evidence: before, requestId: 'r06' } });
+  assert.ok(old.composite < buildScoreRecord(NLP).composite, 'the control must show the old defect');
+});

@@ -36,7 +36,7 @@ export const getOverview = async (_req, res) => {
   const candidates = allUsers.filter((profile) => profile.role === 'CANDIDATE');
   const recruiters = allUsers.filter((profile) => profile.role === 'RECRUITER');
 
-  console.log(`[ADMIN OVERVIEW] project=${new URL(process.env.SUPABASE_URL).host} candidates=${candidates.length} recruiters=${recruiters.length}`);
+  console.log(`[ADMIN OVERVIEW] candidates=${candidates.length} recruiters=${recruiters.length}`);
 
   // Counts and tabs come from one profile query, so they cannot diverge.
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');

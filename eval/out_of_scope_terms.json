@@ -1,0 +1,52 @@
+{
+  "_comment": "Terms in the 'do not label' categories of eval/LABELLING_GUIDE.md section 3.1 (soft skills; general fields and concepts; working methods). They are removed from the PARSER'S OUTPUT before comparing, so they count neither for nor against it (guide section 6). Gold labels are never filtered; the script warns if a gold row contains one of these. This list must never contain a specific named technology, product, language, protocol or standard. Certificates, degrees, job titles and organisation names are not listed here because the parser does not emit them as skills. Freeze this file before a measurement, like aliases.json.",
+  "soft_skills": [
+    "communication",
+    "communication skills",
+    "teamwork",
+    "leadership",
+    "problem solving",
+    "problem-solving",
+    "time management",
+    "collaboration"
+  ],
+  "general_fields_and_concepts": [
+    "machine learning",
+    "deep learning",
+    "artificial intelligence",
+    "computer vision",
+    "natural language processing",
+    "nlp",
+    "data science",
+    "data analysis",
+    "web development",
+    "networking",
+    "cloud computing",
+    "object-oriented programming",
+    "object oriented programming",
+    "oop",
+    "data structures",
+    "algorithms",
+    "system design",
+    "design patterns",
+    "solid principles",
+    "clean code",
+    "api",
+    "apis",
+    "microservices",
+    "unit testing",
+    "integration testing",
+    "troubleshooting",
+    "incident management",
+    "root cause analysis"
+  ],
+  "working_methods": [
+    "agile",
+    "scrum",
+    "kanban",
+    "waterfall",
+    "sdlc",
+    "devops",
+    "ci/cd"
+  ]
+}

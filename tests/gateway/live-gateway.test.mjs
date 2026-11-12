@@ -10,7 +10,11 @@ test('unauthenticated protected route stops at gateway', async () => {
   const r = await fetch(`${GATEWAY}/api/jobs`);
   assert.equal(r.status, 401);
   const b = await r.json();
-  assert.deepEqual(b, { source: 'gateway' });
+  // R-03 error contract: { error, message, requestId } plus the gateway marker.
+  assert.equal(b.source, 'gateway');
+  assert.equal(b.error, 'unauthorized');
+  assert.equal(typeof b.message, 'string');
+  assert.equal(b.requestId, r.headers.get('x-request-id'));
 });
 
 test('no route to github-evidence', async () => {

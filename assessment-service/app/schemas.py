@@ -1,6 +1,13 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictFloat,
+    StrictInt,
+    model_validator,
+)
 
 
 class AssessmentInput(BaseModel):
@@ -94,20 +101,49 @@ class EvaluateInput(BaseModel):
     answers: list[CandidateAnswer] = Field(min_length=1, max_length=50)
 
 
+# ── Grader output (R-08). Strict: no extra keys, numeric points only. ──────────
+class GraderGrade(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question_id: str = Field(min_length=1, max_length=128)
+    points: StrictInt | StrictFloat
+    feedback: str = Field(min_length=1, max_length=1000)
+
+
+class GraderOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    grades: list[GraderGrade]
+
+
+# ── Evaluation result returned to core. ────────────────────────────────────────
 class QuestionResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     question_id: str
-    question_type: str
+    question_type: Literal["mcq", "short_answer"]
     skill: str
     correct: bool
-    points: float
+    points: Literal[0.0, 0.5, 1.0]
     max_points: float
-    feedback: str | None = None
+    # Safe for the candidate: written by code, never the correct option, the
+    # ideal answer, key points or explanation.
+    candidate_feedback: str
+    # Full detail for the recruiter: correct option and explanation, or the
+    # grader's reasoning.
+    recruiter_feedback: str
 
 
 class EvaluationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     assessment_id: str
     points_earned: float
     points_possible: float
     score: float
     results: list[QuestionResult]
-    short_answer_graded: bool
+    # Always true: if any answered short answer cannot be graded, the call
+    # fails with 502 grading_unavailable instead of returning a result.
+    short_answer_graded: Literal[True]
+    grading_model: str | None
+    grading_prompt_version: str

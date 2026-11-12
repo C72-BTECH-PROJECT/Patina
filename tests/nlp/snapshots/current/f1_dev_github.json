@@ -49,6 +49,7 @@
     ]
   },
   "filename": "f1_dev_github.pdf",
+  "parser_version": "nlp-engine@2.0.0",
   "preprocessing": {
     "noun_chunks_preview": [
       "maya okafor",
@@ -87,7 +88,9 @@
       "django"
     ]
   },
+  "raw_text": "Maya Okafor\nmaya.okafor@example.com | +1 555 010 4477 | Austin, TX\ngithub.com/example-mokafor | linkedin.com/in/example-maya-okafor\nSUMMARY\nBackend-leaning software engineer with 3 years of experience building\nPython web services and React front ends.\nSKILLS\nPython, Django, FastAPI, React, JavaScript, PostgreSQL, SQL, Docker,\nAWS, Git, REST API, Redis, Pytest\nEXPERIENCE\nSoftware Engineer - Northwind Labs (Jun 2022 - Present)\n- Built REST APIs in Django and FastAPI serving 40k daily users.\n- Cut p95 latency by 35% by adding Redis caching and query indexes.\n- Containerised services with Docker and deployed to AWS ECS.\nSoftware Engineering Intern - Bluebird Analytics (Jan 2022 - May 2022)\n- Wrote ETL jobs in Python and SQL for the reporting warehouse.\nPROJECTS\nLedgerly - personal finance tracker (React, FastAPI, PostgreSQL)\ngithub.com/example-mokafor/ledgerly\nQueueBench - load-testing harness for job queues (Python, Redis)\nEDUCATION\nB.Tech in Computer Science - Example Institute of Technology (2018 - 2022)",
   "raw_text_preview": "Maya Okafor\nmaya.okafor@example.com | +1 555 010 4477 | Austin, TX\ngithub.com/example-mokafor | linkedin.com/in/example-maya-okafor\nSUMMARY\nBackend-leaning software engineer with 3 years of experience building\nPython web services and React front ends.\nSKILLS\nPython, Django, FastAPI, React, JavaScrip",
+  "raw_text_truncated": false,
   "semantic_analysis": {
     "component_weights": {
       "semantic_score": 0.4,

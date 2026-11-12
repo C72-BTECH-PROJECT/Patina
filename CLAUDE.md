@@ -88,3 +88,17 @@ Guide-review items, owner-reported (no written source in the repo):
   WORKLOG.md (format and length limit defined there).
 - Never commit, push, or open PRs (existing rule above — kept here as a
   reminder since this section is read every session).
+
+## Rebuild mode (Nov 12–18, 2026): append this section to the end of CLAUDE.md
+
+A ground-up correctness rebuild is in progress on branch `rebuild/fable`. The session brief is `REBUILD/KICKOFF.md`; current state is `REBUILD/PROGRESS.md`. Every agent, the lead and all subagents, follows these rules:
+
+- `main` must stay demo-able for the Nov 18 evaluation. All rebuild work happens on `rebuild/fable`.
+- Git is read-only for Claude. Anthony commits, pushes and merges.
+- Never apply Supabase migrations or run destructive SQL. Write migration files only.
+- Never print or copy secrets or `.env` values.
+- Ask Anthony before deleting a feature, deleting a file, changing the DB schema, or changing auth.
+- Existing code and checked boxes are not evidence. Only verified behaviour counts.
+- Never fabricate data or stub results to make something look complete; unfinished features are shown honestly as specced-not-built.
+- `REBUILD/DECISIONS.md`, once Anthony approves it, overrides older design notes in other docs where they conflict.
+- Out-of-scope findings go to `ISSUES.md`.

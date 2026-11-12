@@ -2,12 +2,19 @@
 
 Black-box tests that run unchanged against two trees:
 
-| Target | Tree | NLP | Backend | Frontend (manual) |
-|---|---|---|---|---|
-| `baseline` | `../patina-baseline` (git worktree, detached at `32905c1`) | 8100 | 5100 | 3100 |
-| `current` | this repo | 8000 | 5000 | 3000 |
+| Target | Tree | NLP | Backend core | Gateway | Frontend (manual) |
+|---|---|---|---|---|---|
+| `baseline` | `../patina-baseline` (git worktree, detached at `32905c1`) | 8100 | 5100 | none | 3100 |
+| `current` | this repo | 8000 | 5001 (`127.0.0.1`) | 5000 | 3000 |
 
-Current must use 8000/5000: HEAD hardcodes both (ISSUES I-0009, I-0012).
+Current (I-0080, kept by the rebuild): the gateway owns :5000 and is the only
+public entry; core listens on `127.0.0.1:5001` behind it. The backend suite
+and the `live-*` tests talk to **core directly** (`tests/backend/lib/env.mjs`:
+`BACKEND_BASE_URL`, default = `CORE_BASE_URL`, default `http://127.0.0.1:5001`),
+because they assert core's own answers and the gateway's deny-by-default 401
+would mask them. Gateway tests use `GATEWAY_BASE_URL` (default
+`http://localhost:5000`). The harness refuses to start if a port it needs is
+already in use, so it never tests a process it did not start.
 The baseline ports come from the worktree's **copied** `backend/.env`
 (`PORT`, `NLP_PARSE_URL`, `FRONTEND_URL` appended), because
 `backend/Config/supabase.js` loads `.env` with `override:true` — shell env
@@ -41,12 +48,16 @@ powershell -File tests\run-suite.ps1 -Target baseline -Suites backend -Live   # 
 powershell -File tests\run-suite.ps1 -Target current -Suites github         # github-evidence service vs recorded/synthetic GitHub responses (T-0011), no services, network blocked
 powershell -File tests\run-suite.ps1 -Target current -Suites assessment     # assessment-service in process: docs off, 127.0.0.1:8002 bind (T-0029), no LLM, no port
 powershell -File tests\run-suite.ps1 -Target current -Suites docs           # CHECKLIST/AUDIT/CLAUDE.md/ARCHITECTURE.md/ROADMAP.md drift check (T-0008..T-0010), no services
-node tests\arch\nlp-outage-probe.mjs                                          # outage probe: P-1..P-3 NLP down/hung/busy (T-0009, descriptive), P-4..P-6 github-evidence down/hung/rate-limited (T-0015, asserting; exit 1 on a FAIL); starts its own backend, NLP and github-evidence, ports 5000/8000/8001 must be free; `--phase N` is repeatable
+powershell -File tests\run-suite.ps1 -Target current -Suites backend        # NLP :8000 + core :5001, tests talk to core directly
+powershell -File tests\run-suite.ps1 -Target current -Suites gateway        # core :5001 + gateway :5000, every tests\gateway\*.test.mjs (R-01), no writes
+cd gateway; npm test                                                          # offline gateway tests only (no services); `npm run test:live` needs core + gateway running
+node tests\arch\nlp-outage-probe.mjs                                          # outage probe: P-1..P-3 NLP down/hung/busy (T-0009, descriptive), P-4..P-6 github-evidence down/hung/rate-limited (T-0015, asserting; exit 1 on a FAIL); starts its own core (no gateway), NLP and github-evidence, ports 5001/8000/8001 must be free; `--phase N` is repeatable
 ```
 
-The script starts NLP (`PYTHONHASHSEED=0`, HF offline) and the backend from
-the chosen tree, waits for health, runs the suites, kills the processes, and
-logs to `tests/.out/` (git-ignored).
+The script starts NLP (`PYTHONHASHSEED=0`, HF offline), backend core and,
+for the gateway suite, the gateway from the chosen tree, waits for each
+health URL (`:8000/`, `:5001/api/health`, `:5000/health`), runs the suites,
+kills the processes it started, and logs to `tests/.out/` (git-ignored).
 
 ## Suites and data safety
 
@@ -54,6 +65,7 @@ logs to `tests/.out/` (git-ignored).
 |---|---|---|
 | NLP | `nlp/test_parse.py`, `nlp/test_contact_determinism.py`, `nlp/test_model_load.py` | None — the NLP service has no Supabase client. The determinism test runs `extract_entities` in child processes (venv interpreter, `PYTHONHASHSEED` 0-4) and needs no running service (T-0013). |
 | Backend tier 1 | `backend/smoke.test.mjs` | No writes; one `profiles` read (unknown-username login). |
+| Gateway (R-01) | `gateway/auth-routing.test.mjs`, `gateway/edge.test.mjs` (offline: in-process gateway, stub upstreams on random loopback ports), `gateway/live-gateway.test.mjs` (against the gateway the harness started on :5000, core on :5001) | None. `cd gateway; npm test` runs the two offline files only; a new offline gateway test file must be added to that script too. Skipped for `-Target baseline`. |
 | Backend unit (T-0014) | `backend/explainability.test.mjs`, `backend/github-evidence-client.test.mjs`, `backend/lib/stub-server.mjs`, `backend/fixtures/github-evidence-example-mokafor.json` | None, and no network beyond loopback. Import this repo's `backend/Services/*.js` directly. The client test runs against `lib/stub-server.mjs`, an HTTP stub bound on 127.0.0.1 and ::1, never the real service. Run in the default backend suite for `-Target current` only. |
 | Backend tier 2 | `backend/live-analyze.test.mjs`, `backend/live-analyze-github.test.mjs` (T-0014) | **Live.** Dedicated `t0001_cand` / `t0001_recr` accounts (`tests/.env`), a job tagged `[T-0001 TEST]`, sweep before and after. `live-analyze-github` binds a github-evidence stub on **:8001** (core's default `GITHUB_EVIDENCE_URL`) that replays the fixture, so stop any real github-evidence service first; GitHub is never called. `-Target current` only. |
 | Backend unit (T-0029) | `backend/migration-guards.test.mjs`, `backend/signup-profile.test.mjs`, `backend/grading-claim.test.mjs` | None. `migration-guards` reads `supabase/migrations/*.sql` (comments stripped) and checks the T-0029 migrations and the `handle_new_user` role rule; since T-0030 also: every file has a unique 14-digit version in the approved rename order, a file that adds an enum value does nothing else, no file contains a CR, the bucket-limits and `scores.subscores` comment migrations, and `20261104120200_function_bodies_lf.sql` re-creates every public function verbatim. The other two drive `backend/Services/{signupProfile,gradingClaim}.js` with fakes. |

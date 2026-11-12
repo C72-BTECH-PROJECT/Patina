@@ -6,7 +6,10 @@ older services ignore the two skill fields). The full response is saved as a
 snapshot under snapshots/<SNAPSHOT_LABEL>/ — snapshots are a reference for
 diffing revisions, NOT a statement that the output is correct.
 
-Only the response *shape* common to 32905c1 and HEAD is asserted.
+Only the response *shape* common to 32905c1 and HEAD is asserted, plus, for
+the current tree only, the R-05 contract (unreadable fixtures answer 422 and a
+successful parse carries raw_text and parser_version). The fuller R-05 cases
+are in test_parse_contract.py.
 """
 
 import json
@@ -31,6 +34,11 @@ SEMANTIC_KEYS = {
     "skill_coverage", "resume_skills", "jd_skills", "matched_skills",
     "missing_skills", "match_reason",
 }
+
+# R-05: fields added after 32905c1, and fixtures with no extractable text.
+# The baseline worktree (SNAPSHOT_LABEL=baseline) predates both.
+R05_TOP_KEYS = {"raw_text", "parser_version"}
+EXPECTED_UNREADABLE = {"f6_image_only": "no_text_layer"}
 
 MIME = {
     ".pdf": "application/pdf",
@@ -90,6 +98,14 @@ def test_parse_fixture(base_url, snapshot_label, manifest, timings, resume_path,
     payload = body if r.status_code == 200 else {"_http_status": r.status_code, "_body": body}
     _write_snapshot(snapshot_label, resume_path, is_private, payload)
 
+    r05 = snapshot_label != "baseline"
+    unreadable_reason = None if is_private else EXPECTED_UNREADABLE.get(resume_path.stem)
+    if r05 and unreadable_reason:
+        assert r.status_code == 422, f"HTTP {r.status_code}: {r.text[:300]}"
+        assert body.get("error") == "unreadable_document"
+        assert body.get("reason") == unreadable_reason
+        return
+
     assert r.status_code == 200, f"HTTP {r.status_code}: {r.text[:300]}"
     assert body.get("status") == "success"
     assert TOP_KEYS <= body.keys(), f"missing top-level keys: {TOP_KEYS - body.keys()}"
@@ -101,3 +117,6 @@ def test_parse_fixture(base_url, snapshot_label, manifest, timings, resume_path,
     assert body["filename"] == resume_path.name
     assert isinstance(body["entities"]["skills"], list)
     assert body["entities"]["skill_count"] == len(body["entities"]["skills"])
+    if r05:
+        assert R05_TOP_KEYS <= body.keys(), f"missing R-05 keys: {R05_TOP_KEYS - body.keys()}"
+        assert body["raw_text"].startswith(body["raw_text_preview"])

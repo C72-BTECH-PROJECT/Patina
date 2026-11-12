@@ -10,6 +10,14 @@ from app.ner import SKILL_ALIASES, extract_skills, normalize_skills
 # local API while still providing useful sentence-level similarity.
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
+# Read the vector size from the loaded model instead of hardcoding it.
+# sentence-transformers 5.x renamed get_sentence_embedding_dimension to
+# get_embedding_dimension; requirements are unpinned, so accept either.
+_dimension_getter = getattr(model, "get_embedding_dimension", None) or model.get_sentence_embedding_dimension
+EMBEDDING_DIMENSION = _dimension_getter()
+if not isinstance(EMBEDDING_DIMENSION, int) or EMBEDDING_DIMENSION <= 0:
+    raise RuntimeError(f"Sentence model reported no usable embedding dimension: {EMBEDDING_DIMENSION!r}")
+
 # How the two signals combine into the parsing sub-score. These are emitted with
 # every response as `component_weights` so the explainability layer can state
 # what each component contributed instead of hard-coding the same numbers again
@@ -181,8 +189,8 @@ def analyse(
         "focused_score": focused_similarity,
         "full_text_score": full_text_similarity,
         "match_level": match_level,
-        "resume_embedding_size": 384,
-        "jd_embedding_size": 384,
+        "resume_embedding_size": EMBEDDING_DIMENSION,
+        "jd_embedding_size": EMBEDDING_DIMENSION,
         # Explainable fields for the UI, debugging, and future scoring logic.
         "semantic_score": semantic_score,
         "skill_coverage": skill_coverage,

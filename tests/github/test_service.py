@@ -65,6 +65,29 @@ def test_health(client, gh):
     assert len(gh.calls) == 0
 
 
+def test_health_reports_the_real_token_state(make_client, gh):
+    """R-06: token_configured is computed from the app's settings on each call, not a constant."""
+    import dataclasses
+
+    client = make_client()
+    with_token = client.get("/health")
+    assert with_token.status_code == 200
+    assert with_token.json()["token_configured"] is True and with_token.json()["status"] == "ok"
+    assert TOKEN not in with_token.text
+
+    # The service refuses to start without a token (test_requires_token), so the only way to see the
+    # "no token" answer is to blank the token in the running app's settings.
+    for blank in ("", "   "):
+        client.app.state.settings = dataclasses.replace(client.app.state.settings, token=blank)
+        without = client.get("/health")
+        assert without.status_code == 200
+        assert without.json() == {
+            "status": "degraded", "service": "github-evidence", "contract_version": "1", "token_configured": False,
+        }
+        assert TOKEN not in without.text
+    assert len(gh.calls) == 0
+
+
 # ---- criterion 4: the octocat recording is exercised in test_metrics.py (it needs the T-0012 detail files)
 
 

@@ -22,6 +22,39 @@ test('GET /api/health -> 200 {status:"ok"}', async () => {
   assert.equal((await r.json()).status, 'ok');
 });
 
+test('R-03: health reports the database check; no x-powered-by', async () => {
+  const r = await fetch(`${BASE}/api/health`);
+  const body = await r.json();
+  assert.equal(body.checks?.database, 'ok');
+  assert.equal(r.headers.get('x-powered-by'), null);
+});
+
+test('R-03: malformed JSON body -> 400 JSON { error, message, requestId }, no stack', async () => {
+  const r = await fetch(`${BASE}/api/auth/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'r03-smoke-1' }, body: '{"username": ',
+  });
+  assert.equal(r.status, 400);
+  assert.match(r.headers.get('content-type') || '', /application\/json/);
+  const text = await r.text();
+  const body = JSON.parse(text);
+  assert.equal(body.error, 'invalid_json');
+  assert.ok(body.message);
+  assert.equal(body.requestId, 'r03-smoke-1');
+  assert.ok(!/"stack"|\n\s+at |SyntaxError/.test(text), text);
+});
+
+test('R-03: errors carry a code and the request id', async () => {
+  const r = await fetch(`${BASE}/api/t0001-no-such-route`, { headers: { 'X-Request-ID': 'r03-smoke-2' } });
+  const body = await r.json();
+  assert.equal(body.error, 'not_found');
+  assert.equal(body.requestId, 'r03-smoke-2');
+  const r2 = await fetch(`${BASE}/api/jobs`);
+  const b2 = await r2.json();
+  assert.equal(r2.status, 401);
+  assert.equal(b2.error, 'unauthorized');
+  assert.equal(b2.requestId, r2.headers.get('x-request-id'));
+});
+
 test('unknown route -> 404', async () => {
   const r = await fetch(`${BASE}/api/t0001-no-such-route`);
   assert.equal(r.status, 404);

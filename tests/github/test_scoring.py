@@ -51,21 +51,56 @@ def test_saturation_points():
     comps = by_key(sub)
     assert [comps[k]["value"] for k in ("activity", "consistency", "ownership")] == [1.0, 1.0, 1.0]
     assert subscore(authored_commits=200)["components"][0]["value"] == pytest.approx(1.0, abs=1e-9)
-    assert subscore(authored_commits=0, active_weeks=0, owned_with_commits=0)["components"][0]["value"] == 0.0
+    from app import scoring
+    assert scoring.activity(0) == 0.0  # the formula's floor; compute_subscore never reports it (R-06)
     assert subscore(active_weeks=26)["components"][1]["value"] == pytest.approx(1.0, abs=1e-9)
     assert subscore(owned_with_commits=5)["components"][2]["value"] == pytest.approx(1.0, abs=1e-9)
 
 
-def test_zero_is_a_value_but_missing_data_is_not():
-    """An inactive account scores low; missing commit data is unavailable, never 0 (GF-4)."""
-    inactive = subscore(authored_commits=0, active_weeks=0, owned_with_commits=0)
-    assert inactive["available"] is True
-    assert by_key(inactive)["activity"]["value"] == 0.0 and by_key(inactive)["activity"]["available"] is True
-
+def test_missing_commit_data_is_not_a_zero():
+    """Missing commit data is unavailable, never 0 (GF-4)."""
     unknown = subscore(authored_commits=None, active_weeks=None, owned_with_commits=None)
     for key in ("activity", "consistency", "ownership"):
         c = by_key(unknown)[key]
         assert (c["available"], c["value"], c["weight"], c["reason"]) == (False, None, 0, "no_commit_data")
+
+
+# ---- R-06: an inactive account (repos, zero commits in the window) is never an available 0.0
+
+def assert_inactive(sub):
+    assert (sub["available"], sub["value"], sub["reason_code"]) == (False, None, "no_recent_public_activity")
+    assert [c["key"] for c in sub["components"]] == ["activity", "consistency", "ownership", "corroboration"]
+    for c in sub["components"]:
+        assert (c["available"], c["value"], c["weight"], c["reason"]) == (
+            False, None, 0, "no_recent_public_activity"), c["key"]
+
+
+def test_inactive_account_is_unavailable():
+    """Zero commits in the window: the whole sub-score is unavailable and no component carries weight,
+    whatever the claims say (REBUILD/DECISIONS.md §5: never lower than linking no account)."""
+    zero = dict(authored_commits=0, active_weeks=0, owned_with_commits=0)
+    for claims in (dict(evidenced=3, not_found=1), dict(evidenced=4, not_found=0), dict(evidenced=0, not_found=2),
+                   dict(evidenced=0, not_found=0)):
+        assert_inactive(subscore(**zero, **claims))
+    # env weights and the partial flag do not change the rule
+    assert_inactive(subscore('{"corroboration": 1}', **zero))
+    assert subscore(partial=True, **zero)["partial"] is True
+
+
+def test_missing_commit_data_is_still_insufficient_evidence():
+    """Commit data that could not be fetched is a different case from zero commits."""
+    unknown = subscore(authored_commits=None, active_weeks=None, owned_with_commits=None, evidenced=0, not_found=0)
+    assert (unknown["available"], unknown["reason_code"]) == (False, "insufficient_evidence")
+    assert by_key(unknown)["activity"]["reason"] == "no_commit_data"
+    assert by_key(unknown)["corroboration"]["reason"] == "no_checkable_claims"
+
+
+def test_one_commit_is_still_scored():
+    """The rule is about zero activity only: one commit in the window is real, low activity."""
+    sub = subscore(authored_commits=1, active_weeks=1, owned_with_commits=1)
+    for key in ("activity", "consistency", "ownership"):
+        assert by_key(sub)[key]["available"] is True, key
+    assert by_key(sub)["activity"]["value"] == pytest.approx(math.log(2) / math.log(201), abs=1e-9)
 
 
 # ---- criterion 6

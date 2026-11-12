@@ -37,6 +37,7 @@
     ]
   },
   "filename": "f3_support_nogithub.pdf",
+  "parser_version": "nlp-engine@2.0.0",
   "preprocessing": {
     "noun_chunks_preview": [
       "lena fischer",
@@ -75,7 +76,9 @@
       "windows"
     ]
   },
+  "raw_text": "Lena Fischer\nlena.fischer@example.com | +49 151 5550 1234 | Hamburg, Germany\nSUMMARY\nIT support engineer focused on incident management and keeping\nproduction systems healthy. No public code portfolio.\nSKILLS\nLinux, Windows Server, SQL, Bash, ServiceNow, Jira, ITIL,\nNagios, Active Directory, Incident Management, Troubleshooting\nEXPERIENCE\nApplication Support Engineer - Tailspin Logistics (Mar 2021 - Present)\n- Resolved 600+ L2 tickets with a 96% SLA hit rate.\n- Wrote Bash and SQL runbooks that cut mean time to resolve by 30%.\n- Ran monthly patching for 120 Linux and Windows servers.\nIT Helpdesk Analyst - Woodgrove Bank (Jan 2019 - Feb 2021)\n- First-line support for 800 staff; managed Active Directory accounts.\nCERTIFICATIONS\nITIL 4 Foundation (2021)\nEDUCATION\nB.Sc. in Information Systems - Example University Hamburg (2015 - 2018)",
   "raw_text_preview": "Lena Fischer\nlena.fischer@example.com | +49 151 5550 1234 | Hamburg, Germany\nSUMMARY\nIT support engineer focused on incident management and keeping\nproduction systems healthy. No public code portfolio.\nSKILLS\nLinux, Windows Server, SQL, Bash, ServiceNow, Jira, ITIL,\nNagios, Active Directory, Inciden",
+  "raw_text_truncated": false,
   "semantic_analysis": {
     "component_weights": {
       "semantic_score": 0.4,

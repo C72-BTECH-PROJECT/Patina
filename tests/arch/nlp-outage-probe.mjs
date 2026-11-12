@@ -29,7 +29,8 @@
 // With NLP down or hung, analyze stops before any write: the NLP call
 // (backend/Controllers/analysis.controller.js:262) precedes the storage/resumes/scores
 // writes (:277, :303, :331). P-1/P-2 refuse to start if anything answers on :8000.
-// Ports 5000 (backend) and 8000 (NLP) must be free: the current tree hardcodes both.
+// The probe starts backend core itself and talks to it directly (no gateway): core's port
+// (CORE_BASE_URL, default 127.0.0.1:5001) and 8000 (NLP) must be free.
 // Logs: tests/.out/t0009-probe-*.log; result table: tests/.out/t0009-probe.md
 // (t0015-probe.md when P-4..P-6 run).
 import { spawn, execFileSync } from 'node:child_process';
@@ -37,12 +38,14 @@ import { mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { REPO_DIR, TESTS_DIR, backendBaseUrl } from '../backend/lib/env.mjs';
+import { REPO_DIR, TESTS_DIR, coreBaseUrl } from '../backend/lib/env.mjs';
 import { login } from '../backend/lib/session.mjs';
 import { client, counts, insertTestJob, isZero, liveConfig, resolveAccounts, sweep } from '../backend/lib/testdb.mjs';
 import { startStub } from '../backend/lib/stub-server.mjs';
 
-const BASE = backendBaseUrl();
+// Core directly: the probe starts core alone, and login() (lib/session.mjs) defaults to core too.
+const BASE = coreBaseUrl();
+const CORE_PORT = Number(new URL(BASE).port || 80);
 const NLP = 'http://127.0.0.1:8000';
 const OUT = join(TESTS_DIR, '.out');
 const FIXTURE = join(TESTS_DIR, 'fixtures', 'f1_dev_github.pdf');
@@ -377,7 +380,7 @@ try {
   if (live) {
     const cfg = liveConfig();
     if (cfg.missing.length) throw new Error(`tests/.env is missing ${cfg.missing.join(', ')}`);
-    if (await portOpen(5000)) throw new Error(':5000 is already in use; stop the running backend first');
+    if (await portOpen(CORE_PORT)) throw new Error(`:${CORE_PORT} is already in use; stop the running backend core first`);
     if (await portOpen(8000)) throw new Error(':8000 is already in use; P-1/P-2 need the NLP service stopped (P-4..P-6 start their own)');
     if (githubPhases.length && await portOpen(GITHUB_EVIDENCE_PORT)) throw new Error(':8001 is already in use; P-4..P-6 need the github-evidence service stopped');
     sb = client();
@@ -385,8 +388,10 @@ try {
     console.log('pre-run sweep removed:', JSON.stringify(await sweep(sb, ids)));
     const jobId = await insertTestJob(sb, ids.R);
 
-    backend = startProcess('backend', process.execPath, ['index.js'], join(REPO_DIR, 'backend'),
-      githubPhases.length ? { GITHUB_EVIDENCE_URL: `http://localhost:${GITHUB_EVIDENCE_PORT}` } : {});
+    backend = startProcess('backend', process.execPath, ['index.js'], join(REPO_DIR, 'backend'), {
+      PORT: String(CORE_PORT),
+      ...(githubPhases.length ? { GITHUB_EVIDENCE_URL: `http://localhost:${GITHUB_EVIDENCE_PORT}` } : {}),
+    });
     if (!(await waitHttp(`${BASE}/api/health`, 60))) throw new Error('backend did not become healthy (see tests/.out/t0009-probe-backend.*.log)');
     const t = performance.now();
     const cookie = await login(cfg.candidateUsername, cfg.candidatePassword);

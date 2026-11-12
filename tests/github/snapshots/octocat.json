@@ -218,39 +218,39 @@
     }
   ],
   "sub_score": {
-    "available": true,
-    "value": 0.3,
-    "reason_code": null,
+    "available": false,
+    "value": null,
+    "reason_code": "no_recent_public_activity",
     "weights_source": "default",
     "partial": false,
     "components": [
       {
         "key": "activity",
-        "value": 0.0,
-        "weight": 0.25,
-        "available": true,
-        "reason": null
+        "value": null,
+        "weight": 0.0,
+        "available": false,
+        "reason": "no_recent_public_activity"
       },
       {
         "key": "consistency",
-        "value": 0.0,
-        "weight": 0.25,
-        "available": true,
-        "reason": null
+        "value": null,
+        "weight": 0.0,
+        "available": false,
+        "reason": "no_recent_public_activity"
       },
       {
         "key": "ownership",
-        "value": 0.0,
-        "weight": 0.2,
-        "available": true,
-        "reason": null
+        "value": null,
+        "weight": 0.0,
+        "available": false,
+        "reason": "no_recent_public_activity"
       },
       {
         "key": "corroboration",
-        "value": 1.0,
-        "weight": 0.3,
-        "available": true,
-        "reason": null
+        "value": null,
+        "weight": 0.0,
+        "available": false,
+        "reason": "no_recent_public_activity"
       }
     ]
   },

@@ -47,7 +47,11 @@ and stay in ROADMAP §1.2.
 ### `GET /health`
 
 `200 {"status":"ok","service":"github-evidence","contract_version":"1","token_configured":true}`.
-It makes no GitHub call.
+It makes no GitHub call. `token_configured` is computed from the loaded settings on every call
+(R-06), not a constant: it is `true` only when a non-blank `GITHUB_TOKEN` is configured, and
+then `status` is `"ok"`; otherwise `token_configured` is `false` and `status` is `"degraded"`
+(still HTTP 200). Because the service refuses to start without the token, a running service
+normally reports `true`. The token itself is never part of the response.
 
 ### `POST /v1/evidence`
 
@@ -156,15 +160,26 @@ provisional starting values** (owner, 2026-10-15); P3-12 calibrates them against
 
 - The value is the weighted sum, with the weights renormalised over the available components. An
   unavailable component has `value: null` and `weight: 0`, and `reason` says why
-  (`no_commit_data`, `no_checkable_claims`). The `weight` reported is the one actually used.
+  (`no_commit_data`, `no_recent_public_activity`, `no_checkable_claims`). The `weight` reported is
+  the one actually used.
+- **No recent activity (R-06).** When commit data was fetched but holds zero authored commits in the
+  window, the whole sub-score is unavailable (`reason_code: "no_recent_public_activity"`), whether or
+  not claims are checkable, and all four components are unavailable with that same reason (`value:
+  null`, `weight: 0`). No component carries weight. Everything measured is still returned for display:
+  `commit_activity` with its zeros (`available: true`, `authored_commits: 0`, 52 zero weeks), `claims`
+  with their `evidenced` / `not_found` results, `languages` and `repositories`. Rule (REBUILD/DECISIONS.md
+  §5): linking an inactive account never gives a lower composite than linking none.
 - `GITHUB_SUBSCORE_WEIGHTS` is JSON such as `{"corroboration": 0.5}`. Keys you give replace the
   defaults; unknown keys and negative or non-numeric values are ignored; a total of 0 or invalid
   JSON (logged as a warning) falls back to the defaults. `weights_source` is `env` only if at least
   one key was applied, else `default`. Same rules as `CREDIBILITY_WEIGHTS` in core.
 - `sub_score.available: false` with `reason_code`:
   - `no_public_repositories`: the user owns no non-fork repo (GF-4: unavailable, never 0);
-  - `insufficient_evidence`: owned repos exist but no component could be computed.
-- An inactive account with real, corroborated claims is available and low, not unavailable.
+  - `no_recent_public_activity`: owned repos exist and commit data was fetched, with zero authored
+    commits in the window (see "No recent activity" above);
+  - `insufficient_evidence`: owned repos exist but no component could be computed (commit data could
+    not be fetched and there are no checkable claims).
+- An account with at least one authored commit in the window is scored as before, however low.
 
 ### Limitations
 

@@ -1,4 +1,15 @@
 import rateLimit from 'express-rate-limit';
+import { normalizePath } from './public-routes.js';
+
+// R-04 (D§2):
+// - login + signup count FAILED answers only (status >= 400; express-rate-limit's
+//   skipSuccessfulRequests), so one laptop switching demo accounts cannot lock
+//   itself out; 20 failures per 15 min per IP, configurable.
+// - the password-reset request always answers 200 (it must not reveal whether an
+//   account exists), so it counts every request: 5 per 15 min per IP.
+// - paths are matched in core's normalised form (case-insensitive, trailing slash
+//   ignored), so /api/auth/Login and /api/auth/login/ share the login limit.
+const isAuthMe = (req) => normalizePath(req.path) === '/api/auth/me';
 
 export function mountLimits(app, config) {
   const authMax = Number(config.AUTH_RATE_LIMIT_MAX || 20);
@@ -13,7 +24,7 @@ export function mountLimits(app, config) {
     max: authMax,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => req.path === '/api/auth/me',
+    skipSuccessfulRequests: true,
     message: { error: 'too_many_requests' },
   });
 
@@ -22,7 +33,6 @@ export function mountLimits(app, config) {
     max: resetMax,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => req.path === '/api/auth/me',
     message: { error: 'too_many_requests' },
   });
 
@@ -31,12 +41,12 @@ export function mountLimits(app, config) {
     max: globalMax,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => req.path === '/api/auth/me',
+    skip: isAuthMe,
     message: { error: 'too_many_requests' },
   });
 
   app.use((req, res, next) => {
-    const p = req.path;
+    const p = normalizePath(req.path);
     if (p === '/api/auth/request-password-reset') return resetLimiter(req, res, next);
     if (p === '/api/auth/login' || p === '/api/auth/signup') return authLimiter(req, res, next);
     next();

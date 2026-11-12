@@ -33,7 +33,8 @@ test('health aggregates core, nlp, github-evidence, assessment-service', async (
 });
 
 test('login limit', async () => {
-  const stub = await startStub({ handler: (req, res) => json(res, 200, { ok: true }) });
+  // R-04: only failed logins count, so core answers 401 here.
+  const stub = await startStub({ handler: (req, res) => json(res, 401, { error: 'unauthorized' }) });
   const app = createApp({ ...loadConfig({}), CORE_URL: stub.url, AUTH_RATE_LIMIT_MAX: '2', GLOBAL_RATE_LIMIT_MAX: '1000' });
   const srv = app.listen(0);
   const port = srv.address().port;

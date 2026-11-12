@@ -32,5 +32,7 @@ Microsoft/
 # are scratch. Synthetic fixtures are exempt from the *.pdf/*.docx rules.
 tests/private/
 tests/.out/
+eval/resumes/
+eval/labels/
 !tests/fixtures/*.pdf
 !tests/fixtures/*.docx

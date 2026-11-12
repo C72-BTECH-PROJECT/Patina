@@ -396,14 +396,68 @@ def test_octocat_language_breakdown(make_client, gh):
 
 
 def test_octocat_is_an_inactive_account(make_client, gh):
-    """Every octocat push is from 2024, so its 365-day window (pinned to the recording date) is empty."""
+    """Every octocat push is from 2024, so its 365-day window (pinned to the recording date) is empty.
+
+    R-06: the measured zeros are reported in commit_activity, and the sub-score is unavailable with
+    reason no_recent_public_activity, even when every claimed language is evidenced.
+    """
     body = octocat(make_client, gh)
     act = body["commit_activity"]
     assert act["available"] is True
     assert act["authored_commits"] == 0 and act["active_weeks"] == 0
     assert act["weekly"] == [0] * 52
-    assert component(body, "activity")["value"] == 0.0 and component(body, "consistency")["value"] == 0.0
-    assert body["sub_score"]["available"] is True
+    assert_inactive(body)
+    assert body["languages"], "language evidence is still returned"
+
+    gh.routes.clear()
+    claimed = octocat(make_client, gh, claimed_skills=["html", "css"])
+    assert_inactive(claimed)
+    assert {c["skill"]: c["status"] for c in claimed["claims"]} == {"html": "evidenced", "css": "evidenced"}
+
+
+# ---- R-06: an account with repositories but no commits in the window
+
+def no_commits(name, rec):
+    """Empty every commit page of a recorded account, as GitHub answers for an inactive author."""
+    if name.startswith("commits_"):
+        rec["response"]["body"] = []
+        rec["response"]["headers"].pop("link", None)
+
+
+def assert_inactive(body):
+    """R-06: the whole sub-score is unavailable and no component carries weight."""
+    sub = body["sub_score"]
+    assert (sub["available"], sub["value"], sub["reason_code"]) == (False, None, "no_recent_public_activity")
+    assert [c["key"] for c in sub["components"]] == ["activity", "consistency", "ownership", "corroboration"]
+    for c in sub["components"]:
+        assert (c["available"], c["value"], c["weight"], c["reason"]) == (
+            False, None, 0, "no_recent_public_activity"), c["key"]
+
+
+def test_inactive_account_is_never_scored(make_client, gh):
+    """Evidenced and not_found claims alike: an inactive account is unavailable, and everything measured
+    is still returned for display."""
+    body = active(make_client, gh, mutate=no_commits)
+    assert body["status"] == "complete"
+    act = body["commit_activity"]
+    assert (act["available"], act["authored_commits"], act["active_weeks"]) == (True, 0, 0)
+    assert act["weekly"] == [0] * 52
+    assert body["repositories"]["with_authored_commits"] == 0 and body["repositories"]["owned"] == 4
+    assert_inactive(body)
+    # claims are still judged from the repositories' languages at any age, as for an active account
+    statuses = {c["skill"]: c["status"] for c in body["claims"]}
+    assert [s for s, v in statuses.items() if v == "evidenced"] == ["Python", "go", "Golang", "Ruby", "HTML"]
+    assert [s for s, v in statuses.items() if v == "not_found"] == ["c++", "Rust", "Java"]
+    assert [x["name"] for x in body["languages"]] == ["Python", "Go", "HTML", "Ruby", "Perl"]
+
+
+def test_inactive_account_with_no_checkable_claim_is_unavailable(make_client, gh):
+    body = active(make_client, gh, mutate=no_commits, payload={"claimed_skills": ["react", "docker"]})
+    assert_inactive(body)
+    # evidence that does not depend on recent activity is still returned, so it can be shown
+    assert [x["name"] for x in body["languages"]] == ["Python", "Go", "HTML", "Ruby", "Perl"]
+    assert [(c["skill"], c["status"]) for c in body["claims"]] == [("react", "not_checkable"), ("docker", "not_checkable")]
+    assert body["repositories"]["considered"] == 4
 
 
 def test_octocat_languages_are_evidenced_at_any_age(make_client, gh):

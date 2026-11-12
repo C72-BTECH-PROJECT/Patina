@@ -12,7 +12,15 @@
   baseline = ..\patina-baseline (git worktree at 32905c1), ports NLP 8100 / backend 5100.
              Ports come from the worktree's copied backend\.env (PORT, NLP_PARSE_URL),
              because backend\Config\supabase.js loads .env with override:true.
-  current  = this repo, ports NLP 8000 / backend 5000 (HEAD hardcodes both).
+  current  = this repo, ports NLP 8000 / backend core 5001 (127.0.0.1) / gateway 5000 (I-0080:
+             the gateway is the public entry on 5000, core sits behind it on 5001).
+             The backend suite talks to core directly (BACKEND_BASE_URL = core): its black-box
+             tests assert core's own answers, which the gateway's deny-by-default would mask.
+  gateway  = (current only, R-01) starts core and the gateway, then runs every
+             tests\gateway\*.test.mjs: the offline ones (in-process app, stub upstreams) and
+             live-*.test.mjs against the started gateway (GATEWAY_BASE_URL). Writes nothing.
+  Every port the run needs must be free before it starts; the script refuses to test a process
+  it did not start, and stops everything it started.
   -Live adds tests\backend\live-analyze.test.mjs, which writes to the shared
   Supabase project (scoped to the t0001_ test accounts; see tests\README.md).
   backend (current only, T-0014): explainability + github-evidence-client unit tests and the
@@ -36,7 +44,7 @@
 #>
 param(
   [Parameter(Mandatory = $true)][ValidateSet('baseline', 'current')][string]$Target,
-  [ValidateSet('nlp', 'backend', 'frontend', 'docs', 'github', 'assessment')][string[]]$Suites = @('nlp', 'backend', 'frontend', 'docs', 'github', 'assessment'),
+  [ValidateSet('nlp', 'backend', 'gateway', 'frontend', 'docs', 'github', 'assessment')][string[]]$Suites = @('nlp', 'backend', 'gateway', 'frontend', 'docs', 'github', 'assessment'),
   [switch]$Live
 )
 
@@ -48,25 +56,53 @@ New-Item -ItemType Directory -Force $out | Out-Null
 
 if ($Target -eq 'baseline') {
   $tree = Join-Path (Split-Path -Parent $repo) 'patina-baseline'
-  $nlpPort = 8100; $bePort = 5100
+  $nlpPort = 8100; $bePort = 5100; $gwPort = $null
 } else {
   $tree = $repo
-  $nlpPort = 8000; $bePort = 5000
+  $nlpPort = 8000; $bePort = 5001; $gwPort = 5000
 }
 if (-not (Test-Path $tree)) { throw "Tree not found: $tree (create it with: git worktree add ../patina-baseline 32905c1)" }
 
 $python = Join-Path $repo 'nlp-engine\venv\Scripts\python.exe'
 $nlpUrl = "http://127.0.0.1:$nlpPort"
-$beUrl = "http://localhost:$bePort"
+# Core binds 127.0.0.1 (R-02); the literal address avoids a localhost -> ::1 miss.
+$beUrl = "http://127.0.0.1:$bePort"
+$gwUrl = if ($gwPort) { "http://127.0.0.1:$gwPort" } else { $null }
 $started = @()
 $results = [ordered]@{}
 
-function Wait-Http([string]$url, [int]$timeoutSec) {
+function Assert-PortFree([int]$port, [string]$what) {
+  if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) {
+    throw "Port $port ($what) is already in use. Stop that process first: the harness only tests processes it started."
+  }
+}
+
+# Start a child with extra environment variables visible to it only (restored afterwards), so
+# e.g. the gateway's PORT=5000 never leaks into core.
+function Start-Child([string]$file, [string[]]$argv, [string]$cwd, [string]$log, [hashtable]$vars = @{}) {
+  $saved = @{}
+  foreach ($k in $vars.Keys) { $saved[$k] = [Environment]::GetEnvironmentVariable($k, 'Process'); [Environment]::SetEnvironmentVariable($k, [string]$vars[$k], 'Process') }
+  try {
+    return Start-Process -FilePath $file -PassThru -WindowStyle Hidden -WorkingDirectory $cwd -ArgumentList $argv `
+      -RedirectStandardOutput (Join-Path $out "$log.out.log") -RedirectStandardError (Join-Path $out "$log.err.log")
+  } finally {
+    foreach ($k in $saved.Keys) { [Environment]::SetEnvironmentVariable($k, $saved[$k], 'Process') }
+  }
+}
+
+# Healthy only if the URL answers 200 AND the process we started is still running: if the port
+# was taken between Assert-PortFree and the start, our child exits (EADDRINUSE) and a 200 would
+# come from someone else's process.
+function Wait-Http([string]$url, [int]$timeoutSec, $proc = $null) {
   $deadline = (Get-Date).AddSeconds($timeoutSec)
   while ((Get-Date) -lt $deadline) {
+    if ($proc -and $proc.HasExited) { return $false }
     try {
       $r = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5
-      if ($r.StatusCode -eq 200) { return $true }
+      if ($r.StatusCode -eq 200) {
+        Start-Sleep -Seconds 1
+        return -not ($proc -and $proc.HasExited)
+      }
     } catch { Start-Sleep -Seconds 2 }
   }
   return $false
@@ -77,30 +113,43 @@ function Stop-Tree($proc) {
 }
 
 $needNlp = ($Suites -contains 'nlp') -or ($Suites -contains 'backend')
-$needBackend = $Suites -contains 'backend'
+# The gateway suite needs core behind the gateway (baseline has no gateway: suite skipped).
+$runGateway = ($Suites -contains 'gateway') -and ($Target -eq 'current')
+$needBackend = ($Suites -contains 'backend') -or $runGateway
+
+if ($needNlp) { Assert-PortFree $nlpPort 'NLP' }
+if ($needBackend) { Assert-PortFree $bePort 'backend core' }
+if ($runGateway) { Assert-PortFree $gwPort 'gateway' }
 
 try {
   if ($needNlp) {
     Write-Host "== starting NLP ($Target) on $nlpPort"
     # Deterministic set ordering (see ISSUES I-0015) and no model downloads.
     $env:PYTHONHASHSEED = '0'; $env:HF_HUB_OFFLINE = '1'; $env:TRANSFORMERS_OFFLINE = '1'
-    $p = Start-Process -FilePath $python -PassThru -WindowStyle Hidden `
-      -WorkingDirectory (Join-Path $tree 'nlp-engine') `
-      -ArgumentList @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$nlpPort") `
-      -RedirectStandardOutput (Join-Path $out "$Target-nlp.out.log") `
-      -RedirectStandardError (Join-Path $out "$Target-nlp.err.log")
+    $p = Start-Child $python @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$nlpPort") `
+      (Join-Path $tree 'nlp-engine') "$Target-nlp"
     $started += $p
-    if (-not (Wait-Http "$nlpUrl/" 240)) { throw "NLP did not become healthy on $nlpUrl (see tests\.out\$Target-nlp.err.log)" }
+    if (-not (Wait-Http "$nlpUrl/" 240 $p)) { throw "NLP did not become healthy on $nlpUrl, or exited (port taken?) (see tests\.out\$Target-nlp.err.log)" }
   }
 
   if ($needBackend) {
-    Write-Host "== starting backend ($Target) on $bePort"
-    $p = Start-Process -FilePath 'node' -PassThru -WindowStyle Hidden `
-      -WorkingDirectory (Join-Path $tree 'backend') -ArgumentList @('index.js') `
-      -RedirectStandardOutput (Join-Path $out "$Target-backend.out.log") `
-      -RedirectStandardError (Join-Path $out "$Target-backend.err.log")
+    Write-Host "== starting backend core ($Target) on $bePort"
+    # PORT is explicit for current (core's own default is also 5001). For baseline the copied
+    # backend\.env sets PORT and wins (override:true), so passing it changes nothing there.
+    # R-04: core refuses to start without a SESSION_SECRET of >= 32 characters. The harness
+    # gives core a clearly fake, test-only one (the process environment wins over backend\.env,
+    # backend\Config\supabase.js), so the suites do not depend on the owner's secret.
+    $p = Start-Child 'node' @('index.js') (Join-Path $tree 'backend') "$Target-backend" @{ PORT = "$bePort"; SESSION_SECRET = 'test-only-session-secret-not-for-real-use-0000' }
     $started += $p
-    if (-not (Wait-Http "$beUrl/api/health" 60)) { throw "Backend did not become healthy on $beUrl (see tests\.out\$Target-backend.*.log)" }
+    if (-not (Wait-Http "$beUrl/api/health" 60 $p)) { throw "Backend core did not become healthy on $beUrl/api/health, or exited (port taken?) (see tests\.out\$Target-backend.*.log)" }
+  }
+
+  if ($runGateway) {
+    Write-Host "== starting gateway on $gwPort (core at $beUrl)"
+    $p = Start-Child 'node' @('index.js') (Join-Path $tree 'gateway') "$Target-gateway" @{ PORT = "$gwPort"; CORE_URL = $beUrl }
+    $started += $p
+    # Gateway /health answers 200 only when it can reach core (gateway\health.js).
+    if (-not (Wait-Http "$gwUrl/health" 60 $p)) { throw "Gateway did not become healthy on $gwUrl/health, or exited (port taken?) (see tests\.out\$Target-gateway.*.log)" }
   }
 
   if ($Suites -contains 'nlp') {
@@ -111,13 +160,13 @@ try {
   }
 
   if ($Suites -contains 'backend') {
-    Write-Host "== backend suite"
-    $env:BACKEND_BASE_URL = $beUrl
+    Write-Host "== backend suite (core direct: $beUrl)"
+    $env:BACKEND_BASE_URL = $beUrl; $env:CORE_BASE_URL = $beUrl
     $files = @((Join-Path $tests 'backend\smoke.test.mjs'))
     # Offline unit tests (T-0014): explainability layer and the github-evidence client against a
     # local stub. They import this repo's backend modules, so they mean nothing for baseline.
     if ($Target -eq 'current') {
-      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim', 'upload-limits', 'applicant-identity', 'assessment-service-client', 'backend-cruft') {
+      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim', 'upload-limits', 'applicant-identity', 'assessment-service-client', 'backend-cruft', 'error-contract', 'auth-session') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
       # T-0024/T-0025 route guards (T-0023): no session, no assessment service, no LLM. Baseline has no route.
@@ -142,6 +191,19 @@ try {
     }
     & node --test --test-concurrency=1 @files 2>&1 | Tee-Object (Join-Path $out "$Target-backend-tests.log")
     $results['backend'] = $LASTEXITCODE
+  }
+
+  if ($Suites -contains 'gateway') {
+    Write-Host "== gateway suite (offline + live against $gwUrl)"
+    if (-not $runGateway) {
+      Write-Host "skipped (no gateway in $Target)"
+      $results['gateway'] = 0
+    } else {
+      $env:GATEWAY_BASE_URL = $gwUrl; $env:CORE_BASE_URL = $beUrl
+      $gwFiles = @(Get-ChildItem (Join-Path $tests 'gateway') -Filter '*.test.mjs' | Sort-Object Name | ForEach-Object { $_.FullName })
+      & node --test --test-concurrency=1 @gwFiles 2>&1 | Tee-Object (Join-Path $out "$Target-gateway-tests.log")
+      $results['gateway'] = $LASTEXITCODE
+    }
   }
 
   if ($Suites -contains 'docs') {

@@ -1,6 +1,7 @@
 import supabase from '../Config/supabase.js';
 import { isUuid } from '../Services/validation.js';
 import { sendNotification } from '../Controllers/notification.controller.js';
+import { sendError } from '../Middlewares/errorHandler.js';
 
 const formatJob = (job) => ({
   id: job.id,
@@ -68,7 +69,11 @@ export const createJob = async (req, res) => {
     .select()
     .single();
 
-  if (error) return res.status(400).json({ message: error.message });
+  // R-03: status stays 400 (bad field values are the usual cause); the database's
+  // own text goes to the log only.
+  if (error) {
+    return sendError(req, res, { status: 400, error: 'job_not_created', message: 'Could not create the job. Check the fields and try again.', cause: error, context: 'create job' });
+  }
 
   return res.status(201).json(formatJob(data));
 };
@@ -167,12 +172,12 @@ export const getMyApplications = async (req, res) => {
       .order('submitted_at', { ascending: false });
 
     if (applicationsError) {
-      return res.status(500).json({ message: 'Failed to load applications', error: applicationsError.message });
+      return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load applications', cause: applicationsError, context: 'my applications' });
     }
 
     return res.json(applicationRows || []);
   } catch (err) {
-    return res.status(500).json({ message: 'Failed to load applications', error: String(err?.message || err) });
+    return sendError(req, res, { status: 500, error: 'internal_error', message: 'Failed to load applications', cause: err, context: 'my applications' });
   }
 };
 

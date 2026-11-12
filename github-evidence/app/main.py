@@ -171,7 +171,10 @@ def create_app(environ: Optional[Mapping[str, str]] = None,
 
     @app.get("/health")
     async def health() -> Health:
-        return Health(status="ok", service=SERVICE_NAME, contract_version=CONTRACT_VERSION, token_configured=True)
+        # Read from the live settings, never a constant (R-06). Only the boolean leaves; the token never does.
+        configured = bool(app.state.settings.token.strip())
+        return Health(status="ok" if configured else "degraded", service=SERVICE_NAME,
+                      contract_version=CONTRACT_VERSION, token_configured=configured)
 
     @app.post("/v1/evidence")
     async def evidence(body: EvidenceRequest, request: Request):

@@ -63,6 +63,46 @@ const safeErrorCode = (text) => {
   }
 };
 
+const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
+
+/**
+ * R-03 (D§9): a fetch with a hard timeout over the whole call, headers AND body.
+ * The body is read inside the timeout and handed back as a buffered Response, so
+ * no timer outlives the call. A caller's own abort signal still works and is not
+ * counted as a timeout. On timeout: `onTimeout()` runs, then the call rejects
+ * with an Error (name AbortError) whose `code` is `timeoutCode` and whose
+ * message names no URL.
+ * Used as the Supabase client's fetch (Config/supabase.js).
+ */
+export function createTimeoutFetch({ timeoutMs, onTimeout, timeoutCode = 'FETCH_TIMEOUT', label = 'request', fetchImpl = globalThis.fetch }) {
+  return async (input, init = {}) => {
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+    const signal = init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal;
+    try {
+      const res = await fetchImpl(input, { ...init, signal });
+      const buf = await res.arrayBuffer();
+      const body = NULL_BODY_STATUSES.has(res.status) || buf.byteLength === 0 ? null : buf;
+      return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+    } catch (err) {
+      if (timedOut && !init.signal?.aborted) {
+        try { onTimeout?.(); } catch { /* never mask the timeout */ }
+        const e = new Error(`${label} timed out after ${timeoutMs} ms`);
+        // Named AbortError on purpose: supabase-js (postgrest-js 2.112) retries a
+        // failed GET up to 3 times with 1/2/4 s back-off unless the error is an
+        // AbortError. The timeout is the whole budget for the call, not per attempt.
+        e.name = 'AbortError';
+        e.code = timeoutCode;
+        throw e;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
 /**
  * POST `body` as JSON to `url` and return the parsed 2xx JSON body.
  * Throws InternalHttpError on anything else.

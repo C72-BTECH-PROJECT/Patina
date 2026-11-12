@@ -9,24 +9,42 @@ import assessmentRoutes from './Routes/assessment.routes.js';
 
 import session from 'express-session';
 import { requestIdMiddleware } from './Middlewares/requestId.js';
+import {
+  createHealthHandler,
+  errorContract,
+  errorHandler,
+  notFoundHandler,
+} from './Middlewares/errorHandler.js';
+import { configuredSessionSecret, probeDatabase } from './Config/supabase.js';
 
-if (!process.env.SESSION_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('SESSION_SECRET environment variable must be set in production.');
-  }
-  console.warn('[WARNING] SESSION_SECRET is not set. Using an insecure default — set SESSION_SECRET in backend/.env before deploying.');
+// R-04 (D§2): no fallback secret. Core refuses to start unless SESSION_SECRET is
+// set and at least 32 characters long. The value is never printed.
+const MIN_SESSION_SECRET_LENGTH = 32;
+const SESSION_SECRET = configuredSessionSecret();
+if (!SESSION_SECRET) {
+  console.error(`[core] cannot start: SESSION_SECRET is not set. Set it in backend/.env to a random value of at least ${MIN_SESSION_SECRET_LENGTH} characters.`);
+  process.exit(1);
+}
+if (SESSION_SECRET.length < MIN_SESSION_SECRET_LENGTH) {
+  console.error(`[core] cannot start: SESSION_SECRET is too short. It must be at least ${MIN_SESSION_SECRET_LENGTH} characters; set a new random value in backend/.env.`);
+  process.exit(1);
 }
 
 const app = express();
+app.disable('x-powered-by');
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5001;
+// R-02 (D§1): loopback by default so core is reachable only through the gateway.
+const HOST = process.env.HOST || '127.0.0.1';
 
 app.use(requestIdMiddleware);
+// R-03: every error response is { error, message, requestId } from here on.
+app.use(errorContract);
 app.use(express.json());
 
 app.use(session({
   name: 'patina_session', // must match res.clearCookie("patina_session") in auth.controller.js logout
-  secret: process.env.SESSION_SECRET || 'patina-development-session-secret',
+  secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -37,12 +55,8 @@ app.use(session({
   },
 }));
 
-
-// Debug routing (safe)
-app.use((req, _res, next) => {
-  console.log(`[API] ${req.method} ${req.url}`);
-  next();
-});
+// (R-03: the old "[API] METHOD url" debug line is gone; requestIdMiddleware already
+// logs one line per request with id, status and latency.)
 
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobsRoutes);
@@ -60,27 +74,21 @@ app.use('/api/notifications', notificationRoutes);
 // POST /generate (T-0024: generate-only, no persistence)
 app.use('/api/assessment', assessmentRoutes);
 
-app.get('/api/health', async (_req, res) => {
-  // cheap readiness check
-  try {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-  } catch (e) {
-    res.status(503).json({ status: 'error' });
-  }
-});
+// R-03 (D§9): checks the database within 2 s; 200 with status ok | degraded.
+app.get('/api/health', createHealthHandler({ probe: probeDatabase, timeoutMs: 2000 }));
 
-// Catch-all
-app.use((req, res) => {
-  res.status(404).json({ message: `Cannot ${req.method} ${req.originalUrl}` });
-});
+// Catch-all: JSON 404, then the final JSON error handler (malformed JSON -> 400,
+// database timeout -> 503, anything thrown -> 500; never a stack trace).
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Keep a module-level reference and register success/error separately. Passing
 // the callback directly to Express can invoke it for a listen error as well,
 // which previously printed a false "Server running" message on EADDRINUSE.
-const server = app.listen(PORT);
+const server = app.listen(PORT, HOST);
 
 server.once('listening', () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://${HOST}:${PORT}`);
   console.log(
     `API endpoints:\n- GET  /api/jobs\n- POST /api/jobs\n- POST /api/analyze\n- GET  /api/candidate-analysis\n- GET  /api/candidates`
   );

@@ -60,6 +60,7 @@
     ]
   },
   "filename": "f2_dev_github.docx",
+  "parser_version": "nlp-engine@2.0.0",
   "preprocessing": {
     "noun_chunks_preview": [
       "arjun mehta",
@@ -98,7 +99,9 @@
       "docker"
     ]
   },
+  "raw_text": "Arjun Mehta\narjun.mehta@example.com | +91 98765 01234 | Pune, India\ngithub.com/example-arjunm\nSummary\nJava and Node.js developer with 4 years in product companies.\nTechnical Skills\nJava, Spring Boot, Node.js, Express, MongoDB, MySQL, Kubernetes,\nDocker, Git, Jenkins, Microservices\nWork Experience\nSenior Developer - Contoso Retail Tech (Aug 2021 - Present)\nSplit a monolith into six Spring Boot microservices on Kubernetes.\nOwned the order service: 99.95% availability over 12 months.\nDeveloper - Fabrikam Software (Jul 2019 - Jul 2021)\nBuilt Express APIs backed by MongoDB for a logistics dashboard.\nProjects\nRateLimiter - token-bucket middleware for Express\ngithub.com/example-arjunm/ratelimiter\nEducation\nB.E. in Information Technology - Example University of Pune (2015 - 2019)",
   "raw_text_preview": "Arjun Mehta\narjun.mehta@example.com | +91 98765 01234 | Pune, India\ngithub.com/example-arjunm\nSummary\nJava and Node.js developer with 4 years in product companies.\nTechnical Skills\nJava, Spring Boot, Node.js, Express, MongoDB, MySQL, Kubernetes,\nDocker, Git, Jenkins, Microservices\nWork Experience\nSe",
+  "raw_text_truncated": false,
   "semantic_analysis": {
     "component_weights": {
       "semantic_score": 0.4,

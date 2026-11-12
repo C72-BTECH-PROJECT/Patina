@@ -9,7 +9,7 @@ uvicorn
 # ── Data Validation ────────────────────────────
 pydantic
 
-# ── LLM Provider (OpenRouter via OpenAI-compatible SDK) ──
+# ── LLM Provider (Gemini via the OpenAI-compatible SDK) ──
 openai
 
 # ── Config ─────────────────────────────────────

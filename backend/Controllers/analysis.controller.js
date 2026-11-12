@@ -11,6 +11,7 @@ import { loadApplicantIdentities } from '../Services/applicantIdentity.js';
 import { isUuid } from '../Services/validation.js';
 import { MAX_RESUME_BYTES } from '../Config/uploadLimits.js';
 import { resumeUpload } from '../Middlewares/resumeUpload.js';
+import { logError, sendError } from '../Middlewares/errorHandler.js';
 
 const NLP_PARSE_URL = process.env.NLP_PARSE_URL || 'http://localhost:8000/parse';
 const PARSER_VERSION = 'nlp-engine@1.0.0';
@@ -243,12 +244,12 @@ export const getCandidateResume = async (req, res) => {
       .createSignedUrl(storagePath, 60);
 
     if (signedError || !signed?.signedUrl) {
-      return res.status(500).json({ message: 'Could not generate resume link.' });
+      return sendError(req, res, { status: 500, error: 'storage_error', message: 'Could not generate resume link.', cause: signedError || 'no signed URL returned', context: 'resume signed URL' });
     }
 
     return res.json({ url: signed.signedUrl, fileName: resumeFile.name });
   } catch (err) {
-    return res.status(500).json({ message: 'Failed to load resume', error: String(err?.message || err) });
+    return sendError(req, res, { status: 500, error: 'internal_error', message: 'Failed to load resume', cause: err, context: 'resume link' });
   }
 };
 
@@ -324,10 +325,12 @@ export const analyzeResume = [
 
       const response = await fetch(NLP_PARSE_URL, { method: 'POST', body: form });
       if (!response.ok) {
+        // R-03: the parser's own error text stays in the server log.
         const txt = await response.text().catch(() => '');
+        logError(req, `[analyze] NLP parse returned HTTP ${response.status}`, txt.slice(0, 200));
         return res.status(502).json({
-          message: 'NLP parsing failed',
-          error: `FastAPI error: ${response.status} ${txt}`,
+          error: 'parser_failed',
+          message: 'The resume parser could not process this file. Please try again.',
         });
       }
       const nlpJson = await response.json();
@@ -383,11 +386,7 @@ export const analyzeResume = [
         .single();
       if (resumeError) {
         logPersistenceError('resumes insert', resumeError);
-        return res.status(500).json({
-          message: 'Failed to persist parsed resume',
-          error: resumeError.message,
-          code: resumeError.code ?? null,
-        });
+        return res.status(500).json({ error: 'database_error', message: 'Failed to persist parsed resume' });
       }
 
       // GitHub evidence (GF-4: optional). Never throws: any failure comes back as
@@ -431,11 +430,7 @@ export const analyzeResume = [
         .single();
       if (scoreError) {
         logPersistenceError('scores insert', scoreError);
-        return res.status(500).json({
-          message: 'Failed to persist score',
-          error: scoreError.message,
-          code: scoreError.code ?? null,
-        });
+        return res.status(500).json({ error: 'database_error', message: 'Failed to persist score' });
       }
 
       return res.json(
@@ -443,7 +438,7 @@ export const analyzeResume = [
       );
     } catch (err) {
       console.error('[analyze] unhandled failure:', err);
-      return res.status(500).json({ message: 'Analyze failed', error: String(err?.message || err) });
+      return sendError(req, res, { status: 500, error: 'internal_error', message: 'Analyze failed', cause: err, context: '[analyze]' });
     }
   },
 ];
@@ -459,7 +454,7 @@ export const getCandidateAnalysis = async (req, res) => {
       .limit(1)
       .maybeSingle();
     if (error) {
-      return res.status(500).json({ message: 'Failed to load analysis', error: error.message });
+      return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load analysis', cause: error, context: 'candidate analysis' });
     }
     if (!score) {
       return res.status(404).json({ message: 'No analysis yet. Upload a resume first.' });
@@ -468,9 +463,7 @@ export const getCandidateAnalysis = async (req, res) => {
       serializeCandidate({ score, resume: score.resume, job: score.job, profile: null })
     );
   } catch (err) {
-    return res
-      .status(500)
-      .json({ message: 'Failed to load analysis', error: String(err?.message || err) });
+    return sendError(req, res, { status: 500, error: 'internal_error', message: 'Failed to load analysis', cause: err, context: 'candidate analysis' });
   }
 };
 
@@ -483,7 +476,7 @@ export const getAllCandidates = async (req, res) => {
       .select('id, title, location')
       .eq('recruiter_id', recruiterId);
     if (jobsError) {
-      return res.status(500).json({ message: 'Failed to load jobs', error: jobsError.message });
+      return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load jobs', cause: jobsError, context: 'recruiter jobs' });
     }
     if (!jobRows?.length) {
       return res.json([]);
@@ -496,9 +489,7 @@ export const getAllCandidates = async (req, res) => {
       .in('job_id', jobRows.map((j) => j.id))
       .order('created_at', { ascending: false });
     if (scoresError) {
-      return res
-        .status(500)
-        .json({ message: 'Failed to load candidate scores', error: scoresError.message });
+      return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load candidate scores', cause: scoresError, context: 'candidate scores' });
     }
 
     // One row per candidate (their most recent score), ranked by composite.
@@ -522,9 +513,7 @@ export const getAllCandidates = async (req, res) => {
 
     return res.json(candidates);
   } catch (err) {
-    return res
-      .status(500)
-      .json({ message: 'Failed to load candidates', error: String(err?.message || err) });
+    return sendError(req, res, { status: 500, error: 'internal_error', message: 'Failed to load candidates', cause: err, context: 'candidates' });
   }
 };
 
@@ -537,7 +526,7 @@ export const getAllApplicants = async (req, res) => {
       .select('id, title, location')
       .eq('recruiter_id', recruiterId);
     if (jobsError) {
-      return res.status(500).json({ message: 'Failed to load jobs', error: jobsError.message });
+      return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load jobs', cause: jobsError, context: 'recruiter jobs' });
     }
     if (!jobRows?.length) {
       return res.json([]);
@@ -550,7 +539,7 @@ export const getAllApplicants = async (req, res) => {
       .order('submitted_at', { ascending: false });
 
     if (applicationsError) {
-      return res.status(500).json({ message: 'Failed to load applications', error: applicationsError.message });
+      return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load applications', cause: applicationsError, context: 'recruiter applications' });
     }
 
     const jobsById = new Map(jobRows.map((j) => [j.id, j]));
@@ -596,7 +585,6 @@ export const getAllApplicants = async (req, res) => {
 
     return res.json(enriched);
   } catch (err) {
-    console.error('getAllApplicants failed:', err);
-    return res.status(500).json({ message: 'Failed to load applicants', error: String(err?.message || err) });
+    return sendError(req, res, { status: 500, error: 'internal_error', message: 'Failed to load applicants', cause: err, context: 'applicants' });
   }
 };

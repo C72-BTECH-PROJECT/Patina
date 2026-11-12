@@ -3,6 +3,7 @@ import {
   signup,
   login,
   me,
+  session,
   logout,
   resendConfirmation,
   requestPasswordReset,
@@ -15,6 +16,8 @@ const router = express.Router();
 router.post('/signup', signup);
 router.post('/login', login);
 router.get('/me', requireAuth, me);
+// R-04: the gateway's pre-check. In-memory session only, no Supabase call.
+router.get('/session', session);
 router.post('/logout', logout);
 router.post('/resend-confirmation', resendConfirmation);
 router.post('/request-password-reset', requestPasswordReset);

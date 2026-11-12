@@ -1,5 +1,9 @@
 # Assessment Service — Implementation Plan
 
+> **Historical plan (Oct 2026).** Since R-07 (2026-11-12) the service uses Gemini only;
+> the earlier second provider was removed (REBUILD/DECISIONS.md §6.1, Y3). Current
+> behaviour is described in `README.md`.
+
 **Project:** Patina  
 **Component:** `assessment-service/`  
 **Status:** Phase 1 implementation exists; testing, hardening, and integration remain.  
@@ -46,7 +50,7 @@ The latest repository README describes the service as standalone and not yet int
 | `app/config.py` | Loads `.env`, model configuration, timeout/retry values, service name, and prompt version. |
 | `app/schemas.py` | Pydantic request, question, answer-key, and output schemas. |
 | `app/prompts.py` | Builds the prompt and treats supplied job/resume/project/GitHub content as untrusted data. |
-| `app/llm_client.py` | Calls OpenRouter through the OpenAI-compatible SDK, with model fallback and retry handling. |
+| `app/llm_client.py` | Calls Gemini through the OpenAI-compatible SDK, with model fallback and retry handling. |
 | `app/validators.py` | Checks question counts/types/IDs and consistency between questions and answer keys. |
 | `app/generator.py` | Orchestrates normalization, prompt creation, generation, validation, and MCQ option shuffling. |
 | `app/main.py` | FastAPI app, health endpoint, and generation endpoint. |
@@ -79,7 +83,7 @@ Expected output:
 - The generation endpoint returns the answer key.
 - Anti-cheating controls are not implemented.
 - The request path is synchronous and has no queueing or caching.
-- `.env.example` uses `openrouter/free`, while the in-code default model list differs. Configuration should be made consistent and verified against current provider availability.
+- `.env.example` and the in-code default model list differed. Configuration should be made consistent and verified against current provider availability.
 
 ---
 
@@ -105,12 +109,12 @@ Node.js / Express Backend
 FastAPI Assessment Service
   - validates request
   - builds prompt
-  - calls OpenRouter
+  - calls Gemini
   - validates generated output
   - returns structured result to backend
           |
           v
-OpenRouter model provider
+Gemini model provider
 ```
 
 The assessment service should remain stateless in the initial design: it receives its required context in the request and does not connect directly to the Patina database. The Node/Express backend remains the trusted integration and persistence boundary.
@@ -136,7 +140,7 @@ The existing `nlp-engine/` remains a separate component. Integration should cons
 
 ### Phase 1 — Stabilize the generator and provider connection
 
-- [ ] Verify the OpenRouter API key is loaded from the service-local `.env`.
+- [ ] Verify the Gemini API key is loaded from the service-local `.env`.
 - [ ] Test the configured model ID/router independently of assessment generation.
 - [ ] Confirm the configured model can return JSON through the OpenAI-compatible endpoint.
 - [ ] Make model configuration a single source of truth; document model fallback behaviour.
@@ -150,7 +154,7 @@ The existing `nlp-engine/` remains a separate component. Integration should cons
 
 ### Phase 2 — Automated tests
 
-Create tests under `assessment-service/tests/`. Tests should not require a live OpenRouter call unless explicitly marked as integration tests.
+Create tests under `assessment-service/tests/`. Tests should not require a live Gemini call unless explicitly marked as integration tests.
 
 #### Unit tests
 - [ ] Request schema accepts a valid payload.
@@ -176,7 +180,7 @@ Create tests under `assessment-service/tests/`. Tests should not require a live 
 - [ ] Candidate-safe response does not include the answer key.
 
 #### Live provider smoke test
-- [ ] Run a small number of manual requests against OpenRouter.
+- [ ] Run a small number of manual requests against Gemini.
 - [ ] Record selected model, latency, success/failure, and validation outcome.
 - [ ] Keep API keys and sensitive resume text out of test logs and committed fixtures.
 
@@ -201,7 +205,7 @@ Create tests under `assessment-service/tests/`. Tests should not require a live 
 
 ### Phase 4 — Backend integration (Node/Express)
 
-Keep all provider credentials in the assessment service. The Node backend calls the service over HTTP; it does not need the OpenRouter API key.
+Keep all provider credentials in the assessment service. The Node backend calls the service over HTTP; it does not need the Gemini API key.
 
 #### 4.1 Integration design
 - [ ] Identify the existing backend controller/service/route that should initiate an assessment.
@@ -248,7 +252,7 @@ The service itself remains stateless; persistence belongs in the backend/databas
 - [ ] Add or connect the recruiter action that triggers assessment generation through the Node backend.
 - [ ] Display loading, success, retry, and failure states.
 - [ ] Render MCQs and short-answer questions from the response schema rather than hard-coded question types.
-- [ ] Submit candidate responses to the backend, not directly to FastAPI/OpenRouter.
+- [ ] Submit candidate responses to the backend, not directly to FastAPI/Gemini.
 - [ ] Do not include answer keys in frontend bundles, network responses, or client state.
 - [ ] Confirm that candidates cannot choose arbitrary candidate/job IDs to access another assessment.
 - [ ] Test empty, slow, failed, and expired assessment states.
@@ -375,7 +379,7 @@ When automated tests are added, install the test dependencies and run the servic
 The initial assessment-service milestone is complete when:
 
 - [ ] The service starts reproducibly from documented instructions.
-- [ ] A configured available OpenRouter model can generate valid output.
+- [ ] A configured available Gemini model can generate valid output.
 - [ ] Output validation guarantees the required 20-question structure and answer-key mapping.
 - [ ] Automated unit/API tests pass without needing live model access.
 - [ ] The backend can call the service with trusted job/candidate context.
@@ -394,7 +398,7 @@ The initial assessment-service milestone is complete when:
 1. Keep assessment logic inside `assessment-service/`.
 2. Do not edit `nlp-engine/app/main.py` or otherwise modify the existing NLP engine as part of this plan.
 3. Make and test changes in small steps; do not integrate untested generation logic into the backend.
-4. Keep OpenRouter credentials only in the assessment service's environment.
+4. Keep Gemini credentials only in the assessment service's environment.
 5. Treat model output as untrusted until validated.
 6. Never expose the answer key to the candidate.
 7. Prefer mocked automated tests for predictable development; use live provider calls only for smoke/integration testing.

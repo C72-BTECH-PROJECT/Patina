@@ -26,7 +26,16 @@ export function readEnvFile(path) {
 
 export const testEnv = () => ({ ...readEnvFile(join(TESTS_DIR, '.env')), ...process.env });
 
-export const backendBaseUrl = () =>
-  (process.env.BACKEND_BASE_URL || 'http://localhost:5000').replace(/\/+$/, '');
+// Ports (I-0080, kept by the rebuild): the gateway owns :5000 and is the only public entry;
+// backend core listens on 127.0.0.1:5001. Core binds loopback only, so its default is the
+// literal 127.0.0.1, not "localhost" (which may resolve to ::1 first).
 export const coreBaseUrl = () =>
-  (process.env.CORE_BASE_URL || 'http://localhost:5001').replace(/\/+$/, '');
+  (process.env.CORE_BASE_URL || 'http://127.0.0.1:5001').replace(/\/+$/, '');
+export const gatewayBaseUrl = () =>
+  (process.env.GATEWAY_BASE_URL || 'http://localhost:5000').replace(/\/+$/, '');
+// The black-box backend tests (smoke, assessment smoke, live-*) assert core's own behaviour,
+// so they target core directly. Through the gateway, deny-by-default answers 401 first and
+// those assertions prove nothing about core. Set BACKEND_BASE_URL only to point them elsewhere
+// (e.g. the baseline worktree's backend on :5100).
+export const backendBaseUrl = () =>
+  (process.env.BACKEND_BASE_URL || coreBaseUrl()).replace(/\/+$/, '');

@@ -9,7 +9,7 @@ Four components, each in [0, 1]:
 Default weights 0.25 / 0.25 / 0.20 / 0.30 and the saturation points (200 commits, 26 weeks, 5 repos) are
 PROVISIONAL starting values (owner, 2026-10-15). P3-12 calibrates them against human ratings.
 The weights are renormalised over the components that are available. A component with no data is
-unavailable (value null, weight 0), never 0 (GF-4).
+unavailable (value null, weight 0), never 0 (GF-4). Zero commits in the window is also no data (R-06).
 """
 import json
 import math
@@ -85,13 +85,26 @@ def corroboration(evidenced: int, not_found: int) -> Optional[float]:
 def compute_subscore(*, owned_nonfork: int, authored_commits: Optional[int], active_weeks: Optional[int],
                      owned_with_commits: Optional[int], evidenced: int, not_found: int,
                      weights: Weights, partial: bool = False) -> dict:
-    """The `sub_score` object of contract v1. `None` commit data means it could not be fetched."""
+    """The `sub_score` object of contract v1. `None` commit data means it could not be fetched.
+
+    No recent activity (R-06, REBUILD/DECISIONS.md §5): when commit data was fetched but holds zero
+    authored commits in the window, the whole sub-score is unavailable with reason_code
+    `no_recent_public_activity`, and every component is unavailable with that reason (value null,
+    weight 0), whether or not claims are checkable. Linking an inactive account must never give a lower
+    composite than linking none. The claims and metrics stay in the rest of the response for display.
+    """
     base = {"weights_source": weights.source, "partial": partial}
     if owned_nonfork <= 0:
         return {"available": False, "value": None, "reason_code": "no_public_repositories",
                 "components": [], **base}
 
     have_commits = authored_commits is not None and active_weeks is not None and owned_with_commits is not None
+    if have_commits and authored_commits == 0:  # fetched and empty: absence of evidence, never a score
+        reason = "no_recent_public_activity"
+        return {"available": False, "value": None, "reason_code": reason,
+                "components": [{"key": k, "value": None, "weight": 0, "available": False, "reason": reason}
+                               for k in KEYS], **base}
+
     raw = {
         "activity": (activity(authored_commits) if have_commits else None, "no_commit_data"),
         "consistency": (consistency(active_weeks) if have_commits else None, "no_commit_data"),

@@ -12,6 +12,7 @@ import {
 import { InternalHttpError, resolveRequestId } from '../Services/internalHttp.js';
 import { isUuid } from '../Services/validation.js';
 import { fetchGithubEvidence, normaliseGithubLogin } from '../Services/githubEvidence.js';
+import { sendError } from '../Middlewares/errorHandler.js';
 
 // Standalone generation service (T-0024/T-0025). The service holds the LLM
 // key and mints the answer key; this proxy forwards the candidate/job
@@ -112,7 +113,7 @@ const parseStoredResume = async (candidateId, job, fileName) => {
 // Resolve the resume text for assessment generation from Supabase: the
 // latest stored parse result, parsed on demand from the uploaded file when
 // there is none yet (or the file was updated after it). Returns
-// { resume, resumeText } on success or { error: { status, message } }.
+// { resume, resumeText } on success or { failure: { status, message } } (fixed messages).
 const resolveResumeForAssessment = async (candidateId, job) => {
   const { data: row, error: resumeError } = await supabase
     .from('resumes')
@@ -122,7 +123,7 @@ const resolveResumeForAssessment = async (candidateId, job) => {
     .limit(1)
     .maybeSingle();
   if (resumeError) {
-    return { error: { status: 500, message: 'Failed to load your resume' } };
+    return { failure: { status: 500, message: 'Failed to load your resume' } };
   }
 
   let resume = row;
@@ -146,7 +147,7 @@ const resolveResumeForAssessment = async (candidateId, job) => {
       } else {
         console.error('[assessment] on-demand resume parse failed:', parseErr.message);
         return {
-          error: {
+          failure: {
             status: 502,
             message: 'Could not read your resume — start the NLP parser service (port 8000) and try again.',
           },
@@ -157,9 +158,9 @@ const resolveResumeForAssessment = async (candidateId, job) => {
 
   if (!resumeText) {
     if (listError) {
-      return { error: { status: 500, message: 'Failed to check your resume. Please try again.' } };
+      return { failure: { status: 500, message: 'Failed to check your resume. Please try again.' } };
     }
-    return { error: { status: 400, message: 'Upload a resume first — assessments are generated from it.' } };
+    return { failure: { status: 400, message: 'Upload a resume first — assessments are generated from it.' } };
   }
   return { resume, resumeText: resumeText.slice(0, 20000) };
 };
@@ -206,7 +207,7 @@ export const generateAssessment = async (req, res) => {
       .in('status', ['generated', 'grading'])
       .maybeSingle();
     if (openError) {
-      return res.status(500).json({ message: 'Failed to load your assessment attempt', error: openError.message });
+      return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load your assessment attempt', cause: openError, context: '[assessment] open attempt lookup' });
     }
     if (openAttempt?.status === 'grading') {
       return res.status(409).json({
@@ -229,7 +230,7 @@ export const generateAssessment = async (req, res) => {
       .eq('status', 'completed')
       .order('completed_at', { ascending: false });
     if (completedError) {
-      return res.status(500).json({ message: 'Failed to load your attempts', error: completedError.message });
+      return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load your attempts', cause: completedError, context: '[assessment] completed attempts lookup' });
     }
     if (completed.length >= MAX_ATTEMPTS) {
       const latest = completed[0];
@@ -243,8 +244,8 @@ export const generateAssessment = async (req, res) => {
     }
 
     const resolved = await resolveResumeForAssessment(candidateId, job);
-    if (resolved.error) {
-      return res.status(resolved.error.status).json({ message: resolved.error.message });
+    if (resolved.failure) {
+      return res.status(resolved.failure.status).json({ message: resolved.failure.message });
     }
     const { resume, resumeText } = resolved;
 
@@ -331,8 +332,8 @@ export const generateAssessment = async (req, res) => {
         return res.json({ assessmentId: stored.id, ...stored.questions });
       }
       return res.status(500).json({
+        error: 'database_error',
         message: 'Assessment generated but could not be saved. Please retry.',
-        error: insertError.message,
       });
     }
 
@@ -351,8 +352,7 @@ export const generateAssessment = async (req, res) => {
     console.log(`[assessment] generated ${inserted.id} model=${questionBundle.model_used ?? 'unknown'}`);
     return res.json({ assessmentId: inserted.id, ...stripKey(data) });
   } catch (err) {
-    console.error('[assessment] unhandled failure:', err);
-    return res.status(500).json({ message: 'Assessment generation failed', error: String(err?.message || err) });
+    return sendError(req, res, { status: 500, error: 'internal_error', message: 'Assessment generation failed', cause: err, context: '[assessment] generate unhandled failure' });
   }
 };
 
@@ -392,7 +392,7 @@ export const evaluateAssessment = async (req, res) => {
       .eq('id', assessmentId)
       .maybeSingle();
     if (loadError) {
-      return res.status(500).json({ message: 'Failed to load the assessment', error: loadError.message });
+      return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load the assessment', cause: loadError, context: '[assessment] evaluate load' });
     }
     if (!assessment || assessment.candidate_id !== candidateId) {
       return res.status(404).json({ message: 'Assessment not found' });
@@ -526,7 +526,6 @@ export const evaluateAssessment = async (req, res) => {
       results: evaluation.results,
     });
   } catch (err) {
-    console.error('[assessment] unhandled failure:', err);
-    return res.status(500).json({ message: 'Assessment evaluation failed', error: String(err?.message || err) });
+    return sendError(req, res, { status: 500, error: 'internal_error', message: 'Assessment evaluation failed', cause: err, context: '[assessment] evaluate unhandled failure' });
   }
 };

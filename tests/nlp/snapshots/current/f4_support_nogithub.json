@@ -49,6 +49,7 @@
     ]
   },
   "filename": "f4_support_nogithub.docx",
+  "parser_version": "nlp-engine@2.0.0",
   "preprocessing": {
     "noun_chunks_preview": [
       "samuel adeyemi",
@@ -87,7 +88,9 @@
       "sql"
     ]
   },
+  "raw_text": "Samuel Adeyemi\nsamuel.adeyemi@example.com | +44 7700 900123 | Leeds, UK\nProfile\nProduction support and maintenance engineer. Keeps legacy\nbilling systems running; most work is internal and not on GitHub.\nCore Skills\nSQL, Oracle, PL/SQL, Shell Scripting, Python, Splunk,\nAWS CloudWatch, Jenkins, Root Cause Analysis, On-call\nEmployment\nProduction Support Engineer - Litware Billing (May 2020 - Present)\nPrimary on-call for a 15-year-old Oracle billing platform.\nAutomated nightly health checks in Python and Splunk alerts.\nLed 20+ root-cause analyses; reduced repeat incidents by 40%.\nMaintenance Engineer - Adventure Works IT (Jun 2017 - Apr 2020)\nPatched and maintained PL/SQL batch jobs and shell scripts.\nEducation\nHND in Computing - Example College Leeds (2015 - 2017)",
   "raw_text_preview": "Samuel Adeyemi\nsamuel.adeyemi@example.com | +44 7700 900123 | Leeds, UK\nProfile\nProduction support and maintenance engineer. Keeps legacy\nbilling systems running; most work is internal and not on GitHub.\nCore Skills\nSQL, Oracle, PL/SQL, Shell Scripting, Python, Splunk,\nAWS CloudWatch, Jenkins, Root ",
+  "raw_text_truncated": false,
   "semantic_analysis": {
     "component_weights": {
       "semantic_score": 0.4,
