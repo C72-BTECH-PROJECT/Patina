@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node --test --test-concurrency=1 ../tests/backend/error-contract.test.mjs ../tests/backend/auth-session.test.mjs ../tests/backend/explainability.test.mjs ../tests/backend/github-evidence-client.test.mjs ../tests/backend/migration-guards.test.mjs ../tests/backend/signup-profile.test.mjs ../tests/backend/grading-claim.test.mjs ../tests/backend/upload-limits.test.mjs ../tests/backend/applicant-identity.test.mjs ../tests/backend/assessment-service-client.test.mjs ../tests/backend/backend-cruft.test.mjs"
+    "test": "node --test --test-concurrency=1 --experimental-test-module-mocks ../tests/backend/error-contract.test.mjs ../tests/backend/auth-session.test.mjs ../tests/backend/explainability.test.mjs ../tests/backend/github-evidence-client.test.mjs ../tests/backend/migration-guards.test.mjs ../tests/backend/signup-profile.test.mjs ../tests/backend/grading-claim.test.mjs ../tests/backend/upload-limits.test.mjs ../tests/backend/applicant-identity.test.mjs ../tests/backend/assessment-service-client.test.mjs ../tests/backend/backend-cruft.test.mjs ../tests/backend/resume-pipeline.test.mjs ../tests/backend/score-on-apply.test.mjs ../tests/backend/assessment-orchestration.test.mjs ../tests/backend/assessment-time-reset.test.mjs ../tests/backend/apply-scoring-throws.test.mjs ../tests/backend/recruiter-applications.test.mjs"
   },
   "keywords": [],
   "author": "",

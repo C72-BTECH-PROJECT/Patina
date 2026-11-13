@@ -79,6 +79,10 @@ export const GITHUB_REASONS = {
   github_user_not_found: 'The GitHub account named on the resume does not exist.',
   no_public_repositories: 'The GitHub account has no public repositories of its own to check.',
   insufficient_evidence: "The GitHub account's repositories gave too little data to score.",
+  // R-06/R-10 (D§5): repositories but no commits in the window. Weight 0, so an
+  // inactive account counts exactly like no account.
+  no_recent_public_activity:
+    'The GitHub account has public repositories but no commits by the candidate in the last year, so GitHub evidence was not scored. An inactive account counts the same as no account, never as a zero.',
   github_rate_limited:
     "GitHub's request limit was reached, so repository activity was not checked for this score.",
   service_unavailable:
@@ -87,10 +91,66 @@ export const GITHUB_REASONS = {
   service_error: 'The GitHub evidence check failed, so repository activity was not checked.',
   service_disabled:
     'No GitHub evidence was collected for this candidate. The GitHub Aggregator service is not part of this deployment yet, so repository activity has not been checked.',
-  // Only from rebuildScoreRecord(), for a stored score with no GitHub entry or one
-  // written before T-0014 (see storedGithubSubScore).
+  // Historical: written by the removed rebuildScoreRecord() (T-0025 to R-10) into
+  // rows updated in place. Kept so those stored rows still name a known code; no
+  // code path writes it any more (R-11).
   not_collected_for_score:
     'This score was computed before GitHub evidence was collected, so repository activity was not checked. Re-analysing the resume would include it.',
+};
+
+// R-10 (D§4.1, B1): why the parsing sub-score is unavailable. A parse with no
+// job-match similarity is "not measured", never an available 0.
+export const PARSING_REASONS = {
+  no_similarity:
+    'The resume parser returned no résumé-to-job similarity for this application, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+  // R-11 (lead's ruling 2026-11-14): after an assessment is graded the score is
+  // recomputed; if the résumé cannot be parsed then, the row is anchored to the
+  // newest stored parse and alignment is unavailable with the pipeline's code.
+  no_resume:
+    'No résumé file was found when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+  storage_error:
+    'The stored résumé could not be read when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+  unreadable_document:
+    'The résumé could not be read as text when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+  unsupported_file_type:
+    'The résumé file type is not supported, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+  parser_unavailable:
+    'The résumé parser was not available when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero. Scoring again once the parser is back would include it.',
+  parser_failed:
+    'The résumé parser failed when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+  database_error:
+    'The parsed résumé could not be saved when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+};
+
+/** Parsing with no measurement: weight 0, value null, the reason in words and as a code. */
+export const parsingUnavailableSubScore = (reasonCode) => {
+  const code = Object.hasOwn(PARSING_REASONS, reasonCode) ? reasonCode : 'parser_failed';
+  return {
+    ...unavailableSubScore(SUBSCORE_KEYS.PARSING, PARSING_REASONS[code]),
+    components: { reason_code: code },
+  };
+};
+
+// D§5, D§7: the GitHub login is read from the résumé link; nothing proves the
+// candidate owns that account (verifying it is stretch S-3).
+export const GITHUB_OWNERSHIP_NOTE =
+  'The GitHub account was taken from the link on the résumé. Ownership of that account is not verified, so its evidence may not be the candidate\'s own work.';
+
+// D§7 (F25): the one place the score bands are defined. Presentation labels
+// with no calibration behind them; the frontend renders `band` and never
+// re-derives it from the number.
+export const SCORE_BAND_THRESHOLDS = Object.freeze({ high: 80, medium: 60 });
+export const SCORE_BAND_NOTE =
+  'Bands are presentation labels (high at 80 or more, medium at 60 or more, low below 60). They are not calibrated.';
+
+/** 'high' | 'medium' | 'low' for a 0-100 composite, or null when there is no composite. */
+export const scoreBand = (composite) => {
+  if (composite === null || composite === undefined || composite === '') return null;
+  const n = Number(composite);
+  if (!Number.isFinite(n)) return null;
+  if (n >= SCORE_BAND_THRESHOLDS.high) return 'high';
+  if (n >= SCORE_BAND_THRESHOLDS.medium) return 'medium';
+  return 'low';
 };
 
 // Why a source has no evidence. Surfaced to the recruiter verbatim so an empty
@@ -163,8 +223,20 @@ export const unavailableSubScore = (key, reason = UNAVAILABLE_REASONS[key] || nu
  * the composite a black box.
  */
 export const buildParsingSubScore = (semanticAnalysis) => {
-  const sa = semanticAnalysis || {};
-  const similarity = clamp01(sa.similarity_score ?? 0);
+  // B1 (R-10): no similarity block, or one without a numeric similarity, means
+  // the alignment was not measured. Unavailable with a reason, never a 0.
+  const rawSimilarity = semanticAnalysis && typeof semanticAnalysis === 'object'
+    ? semanticAnalysis.similarity_score
+    : undefined;
+  if (rawSimilarity === null || rawSimilarity === undefined || rawSimilarity === ''
+    || !Number.isFinite(Number(rawSimilarity))) {
+    return {
+      ...unavailableSubScore(SUBSCORE_KEYS.PARSING, PARSING_REASONS.no_similarity),
+      components: { reason_code: 'no_similarity' },
+    };
+  }
+  const sa = semanticAnalysis;
+  const similarity = clamp01(rawSimilarity);
   const semanticScore = sa.semantic_score == null ? null : clamp01(sa.semantic_score);
   const skillCoverage = sa.skill_coverage == null ? null : clamp01(sa.skill_coverage);
 
@@ -403,7 +475,7 @@ export const buildGithubSubScore = (result) => {
   const partial = ev.status === 'partial' || sub.partial === true;
   const extra = limitations.filter((l) => !STANDARD_GITHUB_LIMITATIONS.has(l));
   const lead =
-    GITHUB_PRIVATE_WORK_NOTE +
+    `${GITHUB_OWNERSHIP_NOTE} ${GITHUB_PRIVATE_WORK_NOTE}` +
     (partial ? ' Partial result: some repository data could not be fetched.' : '') +
     (extra.length ? ` Limits of this check: ${extra.join(', ')}.` : '');
   if (evidence.length) {
@@ -419,6 +491,8 @@ export const buildGithubSubScore = (result) => {
     reason: null,
     components: {
       username: ev.username ?? null,
+      account_source: 'resume_link',
+      ownership_verified: false,
       request_id: result.requestId ?? ev.request_id ?? null,
       fetched_at: ev.fetched_at ?? null,
       contract_version: ev.contract_version ?? null,
@@ -455,6 +529,25 @@ export const buildGithubSubScore = (result) => {
   };
 };
 
+// D§6.2: identity, second devices, AI-written answers and tab switching are not
+// controlled, and the recruiter view says so.
+export const UNPROCTORED_NOTE = 'Unproctored online assessment.';
+
+/**
+ * One row per graded question with only candidate-safe fields (R-11). Anything
+ * else in a result (feedback, the correct option, the ideal answer) is dropped.
+ */
+export const questionOutcomes = (results) => asArray(results)
+  .filter((r) => r && typeof r === 'object')
+  .map((r) => ({
+    question_id: typeof r.question_id === 'string' ? r.question_id : null,
+    question_type: r.question_type === 'mcq' || r.question_type === 'short_answer' ? r.question_type : null,
+    skill: typeof r.skill === 'string' ? r.skill : null,
+    correct: r.correct === true,
+    points: Number.isFinite(Number(r.points)) ? Number(r.points) : 0,
+    max_points: Number.isFinite(Number(r.max_points)) ? Number(r.max_points) : 1,
+  }));
+
 /**
  * Assessment Results (CHECKLIST 3.7 / 4.1, GF-5).
  *
@@ -475,6 +568,8 @@ export const buildAssessmentSubScore = (evaluation) => {
   const mcqCorrect = mcqResults.filter(
     (r) => Number(r.points) >= Number(r.max_points || 1) - 0.001
   ).length;
+  const outcomes = questionOutcomes(results);
+  const fullMarks = outcomes.filter((o) => o.correct).length;
 
   const gradedNote =
     evaluation.short_answer_graded === false
@@ -489,7 +584,7 @@ export const buildAssessmentSubScore = (evaluation) => {
       value: clamp01(score / 100),
       display: asPercent(score / 100),
       direction: score >= 50 ? 'positive' : 'negative',
-      note: `Scored server-side against the answer key generated with the questions: ${evaluation.points_earned} of ${evaluation.points_possible} points.${gradedNote}`,
+      note: `${UNPROCTORED_NOTE} Scored server-side against the answer key generated with the questions: ${evaluation.points_earned} of ${evaluation.points_possible} points.${gradedNote}`,
     },
     {
       type: 'metric',
@@ -515,6 +610,22 @@ export const buildAssessmentSubScore = (evaluation) => {
           : 'Each answer was graded against its ideal answer and key points (0, 0.5 or 1).',
     });
   }
+  if (outcomes.length) {
+    // R-11: per-question outcomes for the recruiter drill-down. Only fields that
+    // are also safe for the candidate (who can read their own score row): no
+    // correct option, ideal answer, key points or grader feedback.
+    evidence.push({
+      type: 'question_outcomes',
+      key: 'assessment_question_outcomes',
+      label: 'Per-question outcomes',
+      value: null,
+      display: `${fullMarks} of ${outcomes.length} question${outcomes.length === 1 ? '' : 's'} with full marks`,
+      direction: null,
+      note: 'Right or wrong and points per question, in the order served. Short answers can earn 0, 0.5 or 1.',
+      items: outcomes,
+      count: outcomes.length,
+    });
+  }
 
   return {
     key: SUBSCORE_KEYS.ASSESSMENT,
@@ -532,6 +643,8 @@ export const buildAssessmentSubScore = (evaluation) => {
       mcq_total: mcqResults.length,
       short_answer_total: shortResults.length,
       short_answer_graded: evaluation.short_answer_graded ?? null,
+      question_outcomes: outcomes,
+      proctoring: 'unproctored_online',
       match_reason: `Scored ${Math.round(score)}% across ${results.length} generated question${results.length === 1 ? '' : 's'}.`,
     },
     evidence,
@@ -710,7 +823,15 @@ export const buildExplanation = (subScores, composite) => {
     version: 1,
     generated_at: new Date().toISOString(),
     composite,
+    band: scoreBand(composite),
+    band_thresholds: { ...SCORE_BAND_THRESHOLDS, note: SCORE_BAND_NOTE },
     summary: buildSummary(subScores, composite),
+    // D§5/D§7: always stated, whether or not GitHub evidence was used.
+    github_account: {
+      source: 'resume_link',
+      ownership_verified: false,
+      note: GITHUB_OWNERSHIP_NOTE,
+    },
     factors,
     unavailable_evidence: factors
       .filter((f) => !f.available)
@@ -733,17 +854,31 @@ export const buildExplanation = (subScores, composite) => {
  * github-evidence result (`fetchGithubEvidence()`) and the latest completed
  * assessment's evaluation (CHECKLIST 3.7). Without `github` the GitHub
  * sub-score is unavailable with `service_disabled`; without
- * `assessmentEvaluation` the assessment sub-score is unavailable.
+ * `assessmentEvaluation` the assessment sub-score is unavailable. With
+ * `parsingUnavailable` (a resume-pipeline reason code, R-11) parsing is
+ * unavailable with that reason whatever `nlpJson` holds.
  */
-export const buildScoreRecord = (nlpJson, { github, assessmentEvaluation } = {}) => {
+export const buildScoreRecord = (nlpJson, { github, assessmentEvaluation, parsingUnavailable = null } = {}) => {
   const subscores = {
-    [SUBSCORE_KEYS.PARSING]: buildParsingSubScore(nlpJson?.semantic_analysis),
+    [SUBSCORE_KEYS.PARSING]: parsingUnavailable
+      ? parsingUnavailableSubScore(parsingUnavailable)
+      : buildParsingSubScore(nlpJson?.semantic_analysis),
     [SUBSCORE_KEYS.GITHUB]:
       github === undefined ? githubUnavailable('service_disabled') : buildGithubSubScore(github),
     [SUBSCORE_KEYS.ASSESSMENT]: buildAssessmentSubScore(assessmentEvaluation),
   };
+  return finishRecord(subscores);
+};
 
-  const composite = aggregate(subscores);
+/**
+ * Weights, composite, band and explanation for a set of sub-scores. With no
+ * available source the composite and band are null (R-10): "nothing measured"
+ * is never a 0, and callers must not store such a record as a score.
+ */
+const finishRecord = (subscores) => {
+  const anyAvailable = Object.values(subscores).some((s) => s?.available);
+  const weighted = aggregate(subscores); // also sets every sub-score's weight
+  const composite = anyAvailable ? weighted : null;
   const explanation = buildExplanation(subscores, composite);
 
   const weights = Object.fromEntries(
@@ -752,6 +887,7 @@ export const buildScoreRecord = (nlpJson, { github, assessmentEvaluation } = {})
 
   return {
     composite,
+    band: scoreBand(composite),
     subscores,
     weights,
     explanation,
@@ -759,49 +895,7 @@ export const buildScoreRecord = (nlpJson, { github, assessmentEvaluation } = {})
   };
 };
 
-/**
- * A stored GitHub entry for a rebuild. An unavailable entry with no reason code
- * dates from before T-0014, and its "not part of this deployment" text is no
- * longer true, so it is replaced in the rebuild. The stored row itself stays as
- * written (I-0065, D3).
- */
-const storedGithubSubScore = (entry) => {
-  if (!entry || (entry.available === false && !entry.components?.reason_code)) {
-    return githubUnavailable('not_collected_for_score');
-  }
-  return entry;
-};
-
-/**
- * Rebuild a stored score once new evidence arrives (T-0025: a candidate
- * completes their assessment after the résumé was already analysed).
- *
- * `storedSubscores` is the `scores.subscores` object as persisted — every
- * source keeps its value/components/evidence (the GitHub snapshot is never
- * re-fetched), only the weights and the composite are recomputed against the
- * new evidence set.
- */
-export const rebuildScoreRecord = (storedSubscores, assessmentEvaluation) => {
-  const stored = storedSubscores || {};
-  const subscores = {
-    [SUBSCORE_KEYS.PARSING]:
-      stored[SUBSCORE_KEYS.PARSING] ?? unavailableSubScore(SUBSCORE_KEYS.PARSING),
-    [SUBSCORE_KEYS.GITHUB]: storedGithubSubScore(stored[SUBSCORE_KEYS.GITHUB]),
-    [SUBSCORE_KEYS.ASSESSMENT]: buildAssessmentSubScore(assessmentEvaluation),
-  };
-
-  const composite = aggregate(subscores);
-  const explanation = buildExplanation(subscores, composite);
-
-  const weights = Object.fromEntries(
-    Object.values(SUBSCORE_KEYS).map((key) => [key, subscores[key].weight])
-  );
-
-  return {
-    composite,
-    subscores,
-    weights,
-    explanation,
-    evidence_limited: explanation.evidence_limited,
-  };
-};
+// R-11: rebuildScoreRecord (which recomputed a stored row so the assessment
+// controller could UPDATE it in place) is gone. A graded attempt now inserts a
+// new row through the scoring pipeline (scoringPipeline.js); rows are never
+// updated in place (D§3).

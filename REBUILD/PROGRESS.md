@@ -2,7 +2,19 @@
 
 Resume a fresh session with: "Read REBUILD/KICKOFF.md, REBUILD/CHECKPOINT1_ANSWERS.md and REBUILD/PROGRESS.md and continue."
 
-## Current state
+## Current state (2026-11-13; this block is newer than the 2026-11-12 block below and wins where they differ)
+- Batches 1 and 2 are committed and pushed (`8fc9712`), working tree was clean at session start. `SESSION_SECRET` is set (O-4 done) and the sweep has run (O-3 done).
+- **Batch 3 is COMPLETE: R-09..R-13 all DONE and verified live (2026-11-14, see `LOG.md`); batch smoke NOT BELOW BASELINE (`inventory/baseline_after_batch3.md`).** All of it is uncommitted in the working tree; Anthony was told "ready to commit". **Stopped here: his instruction covered batch 3 only. Next: batch 4 on his go-ahead, R-14 first** (frontend foundation; the recruiter pages call removed routes and are broken at runtime until R-14/R-18). Recruiter-side assessment states for R-18: `not_prepared`, `preparing`, `unavailable`, `ready`, `in_progress`, `grading_pending`, `completed`, `attempts_used`, plus `voided` per attempt.
+- API facts later cards need (detail in `LOG.md` R-09..R-12): upload parses before storing; `scoreApplication` inserts score rows and never throws; assessment routes `GET /api/assessment/status`, `POST /start` (alias `/generate`), `PUT /:id/answers`, `POST /evaluate` (no answers = grade saved = retry), `POST /:id/reset`, `GET /attempts`; unstarted pool questions live only in `assessment_keys`; flag `ASSESSMENT_PREPARE_ON_APPLY` must NOT be set in `backend/.env` (it would override the harness's `false`).
+- Open for Anthony: should the candidate's reset notification include the recruiter's reason text (it does not today)? Sweep: leftover test rows are listed per card in `LOG.md`.
+- History of this line: R-09 was handed to an implementer on 2026-11-13. Card status in `TASKS.md` is the record; a card with no `LOG.md` entry must be re-checked from the working tree.
+- Anthony's corrections of 2026-11-13 are recorded as `DECISIONS.md` §0 amendments A1 to A3:
+  - A1: assessment pools are prepared in the background after apply; start time is `started_at` inside `assessments.answers`, not `created_at`. Written into R-11, R-12, R-13, R-17, R-19.
+  - A2: `GEMINI_MODELS` in `assessment-service/.env` stays. Model-id check passed: the code default and the ids Anthony named are all listed for the key on both endpoints, so the code default was not changed. Not checked: that each id answers a generation call.
+  - A3: email confirmation is on; demo GitHub account is `anthonyjennis`.
+- Open for Anthony: Y5 admin reset screen and Y1 stored failure reason (questions 3 and 4 below); hand out TM-1..TM-5. The per-call-timeout override in `assessment-service/.env` is his call; with A1 it no longer affects any candidate request.
+
+## State on 2026-11-12 (history)
 - **Phase:** 3 (Execute), started 2026-11-12 after Checkpoint 2 approval. `DECISIONS.md`, `CUT.md` and `TASKS.md` are APPROVED; Anthony's conditions are in `DECISIONS.md` §0 and in the affected cards.
 - **In flight (batches 1 and 2, first wave, six implementers):** R-01; R-02 (then R-03 → R-04 in the same lane); R-05; R-06; R-07 (then R-08); R-20. Card status in `TASKS.md` is the record: a card still marked `doing` with no `LOG.md` entry was interrupted and must be re-checked from the working tree before continuing.
 - **State after the usage-limit reset (2026-11-12, about 16:45).** Five agents were cut off by the limit and resumed from their saved state. If this session ends again, re-check every card below from the working tree before trusting it.

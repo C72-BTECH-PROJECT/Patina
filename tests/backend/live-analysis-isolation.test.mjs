@@ -1,8 +1,9 @@
 // T-0007 / I-0022 (live): regression guard. One user's analysis must never be
 // served to another user (the pre-baseline in-memory globals did exactly that).
 //
-// Accounts (tests/.env): candidate t0001_cand (C) runs a real /api/analyze on
-// f1_dev_github.pdf (needs the NLP service); candidate t0001_cand2 (C2) has
+// Accounts (tests/.env): candidate t0001_cand (C) uploads f1_dev_github.pdf and
+// applies to R's job, which scores it (R-10; POST /api/analyze is removed; needs
+// the NLP service); candidate t0001_cand2 (C2) has
 // none and must see "no analysis"; recruiters t0001_recr (R, owns the job) and
 // t0001_recr2 (R2, no jobs) must not see C's data either.
 //
@@ -50,12 +51,13 @@ before(async () => {
   cookieR2 = await login(cfg.recruiter2Username, cfg.recruiter2Password);
 
   const form = new FormData();
-  form.append('jobId', jobId);
   form.append('resume', new Blob([readFileSync(join(TESTS_DIR, 'fixtures', 'f1_dev_github.pdf'))], { type: 'application/pdf' }), 'f1_dev_github.pdf');
-  const r = await fetch(`${BASE}/api/analyze`, { method: 'POST', body: form, headers: { Cookie: cookieC } });
-  const text = await r.text();
-  assert.equal(r.status, 200, `analyze as C failed: HTTP ${r.status} ${text.slice(0, 300)}`);
-  assert.equal(JSON.parse(text).candidateId, ids.C);
+  const up = await fetch(`${BASE}/api/resume/upload`, { method: 'POST', body: form, headers: { Cookie: cookieC } });
+  assert.equal(up.status, 201, `upload as C failed: HTTP ${up.status} ${(await up.text()).slice(0, 300)}`);
+  const r = await api(cookieC, 'POST', `/api/jobs/${jobId}/apply`);
+  assert.equal(r.status, 201, `apply as C failed: HTTP ${r.status} ${r.text.slice(0, 300)}`);
+  assert.equal(r.body.candidate_id, ids.C);
+  assert.deepEqual(r.body.scoring, { status: 'scored', reason: null }, 'C must have a score for this test to mean anything');
 });
 
 after(async () => {
@@ -87,7 +89,7 @@ test('recruiters cannot use the candidate endpoint (403) and recruiter 2 sees no
     assert.equal(r.status, 403, `${name}: HTTP ${r.status}`);
     assert.deepEqual(leaks(r.text), []);
   }
-  const apps = await api(cookieR2, 'GET', '/api/recruiter/applicants');
+  const apps = await api(cookieR2, 'GET', '/api/recruiter/applications');
   assert.equal(apps.status, 200, apps.text.slice(0, 200));
   assert.deepEqual(apps.body, []);
 });

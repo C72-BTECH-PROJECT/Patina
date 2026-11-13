@@ -101,7 +101,10 @@ export function mcqBundles(assessmentId, count = 4) {
 // Seed one attempt for candidate C on jobId. Works on every schema step:
 // before M2 the key goes into assessments.answer_key; from M2 on it goes into
 // assessment_keys (and assessments.answer_key is left out).
-export async function seedAssessment(sb, { candidateId, jobId, status = 'generated', gradingStartedAt = null }) {
+// R-11: by default the attempt is STARTED (`answers = { started_at, responses: [] }`),
+// because an unstarted pool (`answers` null) cannot be graded; pass started: false
+// to seed a prepared, unstarted pool (questions [] in the row, the pool in the key row).
+export async function seedAssessment(sb, { candidateId, jobId, status = 'generated', gradingStartedAt = null, started = true }) {
   const id = crypto.randomUUID();
   const b = mcqBundles(id);
   const split = await keyTableExists(sb);
@@ -109,20 +112,28 @@ export async function seedAssessment(sb, { candidateId, jobId, status = 'generat
     id,
     candidate_id: candidateId,
     job_id: jobId,
-    questions: b.questions,
+    // R-11 rework: an unstarted pool keeps its questions only in the key row until Start.
+    questions: started ? b.questions : [],
     status,
     model_used: 't0029-seed',
     prompt_version: 't0029',
+    ...(started ? { answers: { started_at: new Date().toISOString(), responses: [] } } : {}),
     ...(gradingStartedAt ? { grading_started_at: gradingStartedAt } : {}),
     ...(split ? {} : { answer_key: b.answerKey }),
   };
   const { error } = await sb.from('assessments').insert(row);
   if (error) throw new Error(`seed assessment failed: ${error.message}`);
   if (split) {
-    const { error: keyError } = await sb.from('assessment_keys').insert({ assessment_id: id, answer_key: b.answerKey });
+    const { error: keyError } = await sb.from('assessment_keys').insert({ assessment_id: id, answer_key: started ? b.answerKey : { ...b.answerKey, pool_questions: b.questions } });
     if (keyError) throw new Error(`seed assessment key failed: ${keyError.message}`);
   }
   return { id, ...b };
+}
+
+// R-11: start/generate require an application for the job. Swept with the candidate's rows.
+export async function seedApplication(sb, { candidateId, jobId }) {
+  const { error } = await sb.from('applications').insert({ candidate_id: candidateId, job_id: jobId, status: 'submitted' });
+  if (error) throw new Error(`seed application failed: ${error.message}`);
 }
 
 // A resumes row plus a parsing-only scores row for C/job, built by the real

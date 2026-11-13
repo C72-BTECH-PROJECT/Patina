@@ -10,7 +10,7 @@ import { api, login } from './lib/session.mjs';
 import {
   client, counts, insertTestJob, isZero, liveConfig, resolveAccounts, snapshotProfiles, sweep,
 } from './lib/testdb.mjs';
-import { assessmentServiceUp, seedAssessment, seedScore } from './lib/assessment.mjs';
+import { assessmentServiceUp, seedApplication, seedAssessment, seedScore } from './lib/assessment.mjs';
 
 const cfg = liveConfig();
 let skip = cfg.missing.length ? `tests/.env missing ${cfg.missing.join(', ')}` : false;
@@ -59,8 +59,12 @@ test('I-0069: 5 concurrent submits -> exactly one 200, four 409, one completion 
   const ok = results.find((r) => r.status === 200);
   assert.equal(ok.body.score, 50);
   assert.equal((await row(a.id)).status, 'completed');
-  const { data: score } = await sb.from('scores').select('subscores').eq('id', scoreId).single();
-  assert.equal(score.subscores.assessment_results.components.score, ok.body.score);
+  // R-11: the seeded row is left as it was; the completion inserts a NEW score row.
+  const { data: seeded } = await sb.from('scores').select('subscores').eq('id', scoreId).single();
+  assert.equal(seeded.subscores.assessment_results.available, false, 'the prior row is not updated in place');
+  const { data: rows } = await sb.from('scores').select('id, subscores').eq('candidate_id', ids.C).eq('job_id', jobId).order('created_at', { ascending: true });
+  assert.equal(rows.length, 2, `expected one new score row (scoring: ${JSON.stringify(ok.body.scoring)})`);
+  assert.equal(rows[1].subscores.assessment_results.components.score, ok.body.score);
   // A submit after completion is refused too.
   assert.equal((await evaluate(a.id, a.responses)).status, 409);
 });
@@ -72,6 +76,7 @@ test('I-0069: a fresh grading claim is respected by evaluate and by generate', {
   });
   const e = await evaluate(a.id, a.responses);
   assert.equal(e.status, 409, e.text.slice(0, 200));
+  await seedApplication(sb, { candidateId: ids.C, jobId }); // R-11: start/generate need an application
   const g = await api(cookieC, 'POST', '/api/assessment/generate', { jobId });
   assert.equal(g.status, 409, g.text.slice(0, 200));
   assert.equal(g.body.error, 'grading_in_progress');

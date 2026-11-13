@@ -38,15 +38,20 @@ after(async () => {
   assert.ok(isZero(remaining), `teardown left data behind: ${JSON.stringify(remaining)}`);
 });
 
-test('I-0069: grading fails -> 502, claim released, a retry claims it again', { skip }, async () => {
+// R-12: a grader that cannot be reached is 503 grading_unavailable, and the attempt
+// reads "submitted, grading pending" (answers.submitted_at set, status 'generated').
+test('I-0069: grading fails -> 503, claim released, a retry claims it again', { skip }, async () => {
   const cookie = await login(cfg.candidateUsername, cfg.candidatePassword);
   const jobId = await insertTestJob(sb, ids.R);
   const a = await seedAssessment(sb, { candidateId: ids.C, jobId });
   const first = await api(cookie, 'POST', '/api/assessment/evaluate', { assessmentId: a.id, answers: a.responses });
-  assert.equal(first.status, 502, first.text.slice(0, 200));
+  assert.equal(first.status, 503, first.text.slice(0, 200));
+  assert.equal(first.body.error, 'grading_unavailable');
+  assert.equal(first.body.state, 'grading_pending');
   const { data } = await sb.from('assessments').select('*').eq('id', a.id).single();
   assert.equal(data.status, 'generated');
   assert.equal(data.grading_started_at ?? null, null);
-  const second = await api(cookie, 'POST', '/api/assessment/evaluate', { assessmentId: a.id, answers: a.responses });
-  assert.equal(second.status, 502, 'a released attempt is claimable again (502, not 409)');
+  assert.ok(data.answers.submitted_at, 'the submission is kept');
+  const second = await api(cookie, 'POST', '/api/assessment/evaluate', { assessmentId: a.id });
+  assert.equal(second.status, 503, 'a released attempt is claimable again (503, not 409)');
 });

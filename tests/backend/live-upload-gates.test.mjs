@@ -3,8 +3,9 @@
 //
 // Bucket safety (owner, 2026-11-04: no 10 MB upload to the shared bucket). Each
 // over-limit case stops before storage even if the cap regresses: the
-// /api/resume/upload case is named .txt, so the extension gate refuses it, and
-// the /api/analyze case has no jobId, so it never reaches the NLP or storage steps.
+// /api/resume/upload case is named .txt, so the extension gate refuses it.
+// R-10: POST /api/analyze is removed (Y1), so its cases moved to /api/resume/upload,
+// the only core route that still takes a file.
 //
 // Accounts: t0001_cand (C), t0001_recr (R). Job tagged "[T-0001 TEST]"; the sweep
 // removes everything. See lib/testdb.mjs.
@@ -73,12 +74,6 @@ test('I-0025: 10 MB + 1 byte to /api/resume/upload -> 413 JSON', { skip }, async
   }));
 });
 
-test('I-0025: 10 MB + 1 byte to /api/analyze -> 413 JSON', { skip }, async () => {
-  assert413(await post('/api/analyze', {
-    content: new Uint8Array(OVER_LIMIT), name: 'over-limit.pdf', type: 'application/pdf',
-  }));
-});
-
 test('I-0025: /api/resume/status returns maxResumeBytes', { skip }, async () => {
   const r = await api(cookieC, 'GET', '/api/resume/status');
   assert.equal(r.status, 200, r.text.slice(0, 200));
@@ -86,9 +81,9 @@ test('I-0025: /api/resume/status returns maxResumeBytes', { skip }, async () => 
 });
 
 for (const [label, type] of [['plain', 'text/plain'], ['declared as application/pdf', 'application/pdf']]) {
-  test(`I-0072: .txt (${label}) to /api/analyze -> 400, no new resumes row`, { skip }, async () => {
+  test(`I-0072: .txt (${label}) to /api/resume/upload -> 400, no new resumes row`, { skip }, async () => {
     const rowsBefore = await resumeRows();
-    const r = await post('/api/analyze', { content: TXT_RESUME, name: 'resume.txt', type, job: jobId });
+    const r = await post('/api/resume/upload', { content: TXT_RESUME, name: 'resume.txt', type });
     const state = { http: r.status, newRows: (await resumeRows()) - rowsBefore };
     assert.deepEqual(state, { http: 400, newRows: 0 }, `got ${JSON.stringify(state)}: ${r.text.slice(0, 200)}`);
     assert.equal(JSON.parse(r.text).message, 'Only PDF or DOCX resumes are supported.');

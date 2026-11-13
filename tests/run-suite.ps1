@@ -21,8 +21,9 @@
              live-*.test.mjs against the started gateway (GATEWAY_BASE_URL). Writes nothing.
   Every port the run needs must be free before it starts; the script refuses to test a process
   it did not start, and stops everything it started.
-  -Live adds tests\backend\live-analyze.test.mjs, which writes to the shared
-  Supabase project (scoped to the t0001_ test accounts; see tests\README.md).
+  -Live adds tests\backend\live-analyze.test.mjs (current only since R-10: upload, apply,
+  score-again), which writes to the shared Supabase project (scoped to the t0001_ test
+  accounts; see tests\README.md).
   backend (current only, T-0014): explainability + github-evidence-client unit tests and the
              assessment route-guard smoke (T-0023) always; -Live adds live-analyze-github.test.mjs,
              which binds a github-evidence stub on :8001, and assessment-evaluate-live.test.mjs.
@@ -139,7 +140,9 @@ try {
     # R-04: core refuses to start without a SESSION_SECRET of >= 32 characters. The harness
     # gives core a clearly fake, test-only one (the process environment wins over backend\.env,
     # backend\Config\supabase.js), so the suites do not depend on the owner's secret.
-    $p = Start-Child 'node' @('index.js') (Join-Path $tree 'backend') "$Target-backend" @{ PORT = "$bePort"; SESSION_SECRET = 'test-only-session-secret-not-for-real-use-0000' }
+    # R-11: ASSESSMENT_PREPARE_ON_APPLY=false so live apply tests spend no LLM generation (status
+    # and start still prepare lazily). It holds unless backend\.env itself sets that name.
+    $p = Start-Child 'node' @('index.js') (Join-Path $tree 'backend') "$Target-backend" @{ PORT = "$bePort"; SESSION_SECRET = 'test-only-session-secret-not-for-real-use-0000'; ASSESSMENT_PREPARE_ON_APPLY = 'false' }
     $started += $p
     if (-not (Wait-Http "$beUrl/api/health" 60 $p)) { throw "Backend core did not become healthy on $beUrl/api/health, or exited (port taken?) (see tests\.out\$Target-backend.*.log)" }
   }
@@ -162,26 +165,32 @@ try {
   if ($Suites -contains 'backend') {
     Write-Host "== backend suite (core direct: $beUrl)"
     $env:BACKEND_BASE_URL = $beUrl; $env:CORE_BASE_URL = $beUrl
+    # R-10: smoke.test.mjs expects 401 for the removed POST /api/analyze on baseline, 404 on current.
+    $env:HARNESS_TARGET = $Target
     $files = @((Join-Path $tests 'backend\smoke.test.mjs'))
     # Offline unit tests (T-0014): explainability layer and the github-evidence client against a
     # local stub. They import this repo's backend modules, so they mean nothing for baseline.
     if ($Target -eq 'current') {
-      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim', 'upload-limits', 'applicant-identity', 'assessment-service-client', 'backend-cruft', 'error-contract', 'auth-session') {
+      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim', 'upload-limits', 'applicant-identity', 'assessment-service-client', 'backend-cruft', 'error-contract', 'auth-session', 'resume-pipeline', 'score-on-apply', 'assessment-orchestration', 'assessment-time-reset', 'apply-scoring-throws', 'recruiter-applications') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
       # T-0024/T-0025 route guards (T-0023): no session, no assessment service, no LLM. Baseline has no route.
       $files += (Join-Path $tests 'backend\assessment-generate.smoke.mjs')
     }
     if ($Live) {
-      $files += (Join-Path $tests 'backend\live-analyze.test.mjs')
-      # T-0014: analyze with a github-evidence stub on :8001 (needs :8001 free). Not in baseline.
+      # R-10: live-analyze* now exercise upload, apply and score-again (POST /api/analyze is
+      # removed), which the baseline worktree does not have, so they run for current only.
+      if ($Target -eq 'current') { $files += (Join-Path $tests 'backend\live-analyze.test.mjs') }
+      # T-0014: scoring with a github-evidence stub on :8001 (needs :8001 free). Not in baseline.
       if ($Target -eq 'current') { $files += (Join-Path $tests 'backend\live-analyze-github.test.mjs') }
       # T-0025 evaluate input guards (no LLM call, no writes). Not in baseline.
       if ($Target -eq 'current') { $files += (Join-Path $tests 'backend\assessment-evaluate-live.test.mjs') }
       # Cross-user authorization tests (T-0004..T-0007); they skip if the second accounts are not in tests\.env.
-      foreach ($f in 'live-shortlist-authz', 'live-notifications-authz', 'live-auth-failclosed', 'live-analysis-isolation') {
+      foreach ($f in 'live-shortlist-authz', 'live-notifications-authz', 'live-auth-failclosed') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
+      # R-10: its setup now uploads and applies (scored on apply); baseline does not score on apply.
+      if ($Target -eq 'current') { $files += (Join-Path $tests 'backend\live-analysis-isolation.test.mjs') }
       # T-0029 security batch (B1). Not in baseline. They skip without their accounts or services.
       if ($Target -eq 'current') {
         foreach ($f in 'live-resume-authz', 'live-answer-key-access', 'live-evaluate-once', 'live-evaluate-release', 'live-signup-role', 'live-applicants', 'live-upload-gates') {
@@ -189,7 +198,8 @@ try {
         }
       }
     }
-    & node --test --test-concurrency=1 @files 2>&1 | Tee-Object (Join-Path $out "$Target-backend-tests.log")
+    # R-11: apply-scoring-throws uses node:test module mocks, which need this flag.
+    & node --test --test-concurrency=1 --experimental-test-module-mocks @files 2>&1 | Tee-Object (Join-Path $out "$Target-backend-tests.log")
     $results['backend'] = $LASTEXITCODE
   }
 

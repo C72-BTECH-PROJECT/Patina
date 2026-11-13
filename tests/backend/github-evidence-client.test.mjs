@@ -93,6 +93,8 @@ test('maps every service outcome', async (t) => {
     ['200 without sub_score', (q, s) => json(s, 200, { contract_version: '1' }), 'service_error'],
     ['200 sub_score unavailable: no_public_repositories', (q, s) => json(s, 200, subUnavailable('no_public_repositories')), 'no_public_repositories'],
     ['200 sub_score unavailable: insufficient_evidence (D1)', (q, s) => json(s, 200, subUnavailable('insufficient_evidence')), 'insufficient_evidence'],
+    ['200 sub_score unavailable: no_recent_public_activity (R-06, mapped through since R-10)', (q, s) => json(s, 200, subUnavailable('no_recent_public_activity')), 'no_recent_public_activity'],
+    ['200 sub_score unavailable: an unknown code', (q, s) => json(s, 200, subUnavailable('made_up_code')), 'service_error'],
   ];
   for (const [name, handler, expected] of cases) {
     await t.test(name, () =>

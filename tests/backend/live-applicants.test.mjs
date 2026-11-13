@@ -72,13 +72,15 @@ const authEmail = async (id) => {
   return data.user.email;
 };
 
-test('I-0028: /api/recruiter/applicants returns the Auth email for an applicant with a profile', { skip }, async () => {
-  const r = await api(cookieR, 'GET', '/api/recruiter/applicants');
+// R-13 (Y2): moved from the removed GET /api/recruiter/applicants to GET /api/recruiter/applications.
+test('I-0028: /api/recruiter/applications returns the Auth email for an applicant with a profile', { skip }, async () => {
+  const r = await api(cookieR, 'GET', '/api/recruiter/applications');
   assert.equal(r.status, 200, r.text.slice(0, 200));
-  const row = r.body.find((a) => a.applicationId === applicationId);
+  const row = r.body.find((a) => a.id === applicationId);
   assert.ok(row, 'the seeded application is not in the list');
-  assert.equal(row.candidateInfo.email, await authEmail(ids.C));
-  assert.ok(row.candidateInfo.name, 'expected a name');
+  assert.equal(row.candidate.email, await authEmail(ids.C));
+  assert.ok(row.candidate.name === null || typeof row.candidate.name === 'string', 'name is the profile name or null');
+  assert.notEqual(row.candidate.name, 'Candidate', 'no placeholder name');
 });
 
 // I-0079. Each recruiter owns a job with one applicant, so the applications query
@@ -95,12 +97,12 @@ test('I-0079: two recruiters with applicants each see only their own candidates'
     { name: 'R2', cookie: cookieR2, ownApp: applicationId2, ownEmail: emailC2, otherApp: applicationId, otherEmail: emailC },
   ];
   for (const { name, cookie, ownApp, ownEmail, otherApp, otherEmail } of cases) {
-    const r = await api(cookie, 'GET', '/api/recruiter/applicants');
+    const r = await api(cookie, 'GET', '/api/recruiter/applications');
     assert.equal(r.status, 200, `${name}: HTTP ${r.status}`);
     const state = {
       rows: r.body.length,
-      ownApplicantWithEmail: r.body.some((a) => a.applicationId === ownApp && a.candidateInfo.email === ownEmail),
-      rowsForAnyoneElse: r.body.filter((a) => a.candidateInfo.email !== ownEmail).length,
+      ownApplicantWithEmail: r.body.some((a) => a.id === ownApp && a.candidate.email === ownEmail),
+      rowsForAnyoneElse: r.body.filter((a) => a.candidate.email !== ownEmail).length,
       otherApplication: r.text.includes(otherApp),
       otherEmail: r.text.includes(otherEmail),
     };

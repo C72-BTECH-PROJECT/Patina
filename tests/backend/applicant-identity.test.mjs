@@ -39,13 +39,6 @@ function fakeClient({ profiles = [], profilesError = null, emails = [], rpcError
   };
 }
 
-const captureErrors = async (fn) => {
-  const original = console.error;
-  const lines = [];
-  console.error = (...args) => lines.push(args.join(' '));
-  try { return { result: await fn(), lines }; } finally { console.error = original; }
-};
-
 test('one profiles query, one RPC, zero getUserById, for any number of applicants', async () => {
   const { loadApplicantIdentities } = await load();
   const client = fakeClient({
@@ -61,28 +54,31 @@ test('one profiles query, one RPC, zero getUserById, for any number of applicant
   assert.deepEqual(identities.get(B), { name: 'Bo', email: 'b@example.com' });
 });
 
-test('an RPC error is logged, the email stays blank, and nothing throws', async () => {
+// R-13 (B8): an email lookup error is an error, never a blank email.
+test('an RPC error throws, so the handler answers an error instead of blank emails', async () => {
   const { loadApplicantIdentities } = await load();
   const client = fakeClient({
     profiles: [{ id: A, first_name: 'Asha', last_name: 'Rao' }],
     rpcError: { message: 'permission denied for function applicant_emails', code: '42501' },
   });
-  const { result, lines } = await captureErrors(() => loadApplicantIdentities(client, [A]));
-
-  assert.deepEqual(result.get(A), { name: 'Asha Rao', email: '' });
-  assert.equal(lines.length, 1, 'the RPC error must be logged once');
-  assert.match(lines[0], /applicant_emails/);
+  await assert.rejects(() => loadApplicantIdentities(client, [A]), (err) => {
+    assert.equal(err.code, 'database_error');
+    assert.match(err.message, /applicant emails/);
+    assert.ok(!err.message.includes('permission denied'), 'the database text stays in `cause`');
+    return true;
+  });
 });
 
-test('a profile with no name falls back to "Candidate"; a candidate with no profile row still gets an entry', async () => {
+// R-13 (B3): no "Candidate" placeholder; a missing name or email is null.
+test('a profile with no name gives name null; a candidate with no profile row still gets an entry', async () => {
   const { loadApplicantIdentities } = await load();
   const client = fakeClient({
-    profiles: [{ id: A, first_name: '', last_name: '' }],
+    profiles: [{ id: A, first_name: '', last_name: '  ' }],
     emails: [{ id: B, email: 'b@example.com' }],
   });
   const identities = await loadApplicantIdentities(client, [A, B]);
-  assert.deepEqual(identities.get(A), { name: 'Candidate', email: '' });
-  assert.deepEqual(identities.get(B), { name: 'Candidate', email: 'b@example.com' });
+  assert.deepEqual(identities.get(A), { name: null, email: null });
+  assert.deepEqual(identities.get(B), { name: null, email: 'b@example.com' });
 });
 
 test('a profiles error throws, so the handler answers an error instead of a list of blank names', async () => {

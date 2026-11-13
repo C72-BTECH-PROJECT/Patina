@@ -1,15 +1,27 @@
 import express from 'express';
-import { analyzeResume, getCandidateAnalysis, getAllCandidates, getAllApplicants, getMyResumeStatus, uploadResume, getCandidateResume } from '../Controllers/analysis.controller.js';
+import {
+  getCandidateAnalysis,
+  getMyResumeStatus,
+  uploadResume,
+  getCandidateResume,
+  rescoreApplication,
+  listRecruiterApplications,
+  getRecruiterApplication,
+} from '../Controllers/analysis.controller.js';
 import { requireRole } from '../Middlewares/auth.Middleware.js';
 
 const router = express.Router();
 
-router.post('/analyze', requireRole('CANDIDATE'), analyzeResume);
+// R-10 (Y1): POST /analyze is removed; scoring runs on apply and on score-again.
 router.get('/candidate-analysis', requireRole('CANDIDATE'), getCandidateAnalysis);
-router.get('/candidates', requireRole('RECRUITER'), getAllCandidates);
-router.get('/recruiter/applicants', requireRole('RECRUITER'), getAllApplicants);
+// R-13 (Y2): one recruiter applications API. GET /candidates and
+// GET /recruiter/applicants are removed (404).
+router.get('/recruiter/applications', requireRole('RECRUITER'), listRecruiterApplications);
+router.get('/recruiter/applications/:id', requireRole('RECRUITER'), getRecruiterApplication);
 router.get('/resume/status', requireRole('CANDIDATE'), getMyResumeStatus);
 router.post('/resume/upload', requireRole('CANDIDATE'), uploadResume);
 router.get('/resume/candidate/:candidateId', requireRole('RECRUITER'), getCandidateResume);
+// The owning candidate or the job's recruiter; ownership is checked in the handler.
+router.post('/applications/:id/score', requireRole('CANDIDATE', 'RECRUITER'), rescoreApplication);
 
 export default router;

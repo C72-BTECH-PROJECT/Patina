@@ -14,7 +14,8 @@ delete process.env.CREDIBILITY_WEIGHTS;
 const X = await import(
   new URL(`file:///${join(REPO_DIR, 'backend', 'Services', 'explainability.js').replace(/\\/g, '/')}`)
 );
-const { buildScoreRecord, buildGithubSubScore, rebuildScoreRecord, GITHUB_REASONS, SUBSCORE_KEYS } = X;
+const { buildScoreRecord, buildGithubSubScore, GITHUB_REASONS, SUBSCORE_KEYS } = X;
+const { buildParsingSubScore, scoreBand, SCORE_BAND_THRESHOLDS, PARSING_REASONS, GITHUB_OWNERSHIP_NOTE } = X;
 
 const NLP = JSON.parse(readFileSync(join(TESTS_DIR, 'nlp', 'snapshots', 'current', 'f1_dev_github.json'), 'utf8'));
 const FIXTURE = JSON.parse(readFileSync(join(TESTS_DIR, 'backend', 'fixtures', 'github-evidence-example-mokafor.json'), 'utf8'));
@@ -25,6 +26,8 @@ const REASON_CODES = [
   'no_github_link', 'invalid_github_link', 'github_user_not_found', 'no_public_repositories',
   'insufficient_evidence', 'github_rate_limited', 'service_unavailable', 'timeout', 'service_error',
   'service_disabled',
+  // R-06's code, mapped through by core since R-10 (was service_error).
+  'no_recent_public_activity',
 ];
 
 const P = SUBSCORE_KEYS.PARSING;
@@ -215,54 +218,68 @@ test('combines parsing, GitHub and assessment when each is available', () => {
   }
 });
 
-test('rebuildScoreRecord keeps the stored GitHub sub-score', () => {
-  // As persisted: a JSON round trip of scores.subscores from an analyze with GitHub.
-  const stored = JSON.parse(JSON.stringify(buildScoreRecord(NLP, { github: GITHUB_OK }).subscores));
-  const rebuilt = rebuildScoreRecord(stored, EVALUATION);
-
-  const { weight: _w, ...githubAfter } = rebuilt.subscores[G];
-  const { weight: _s, ...githubBefore } = JSON.parse(JSON.stringify(stored[G]));
-  assert.deepEqual(githubAfter, githubBefore, 'value, components and evidence unchanged');
-  assert.equal(rebuilt.subscores[A].available, true);
-  near(rebuilt.weights[G], 0.35, 1e-4, 'github weight');
-  near(weightSum(rebuilt), 1, 1e-3, 'weights sum to 1');
-  near(rebuilt.composite, weightedSum(rebuilt), 0.01, 'composite is the weighted sum');
+// R-11: rebuildScoreRecord (in-place UPDATE of a stored score) is gone; a graded
+// attempt inserts a new row through the scoring pipeline.
+test('R-11: rebuildScoreRecord no longer exists', () => {
+  assert.equal(X.rebuildScoreRecord, undefined);
 });
 
-test('rebuildScoreRecord on a score stored without a GitHub entry', () => {
-  const stored = JSON.parse(JSON.stringify(buildScoreRecord(NLP).subscores));
-  delete stored[G];
-  const rebuilt = rebuildScoreRecord(stored, EVALUATION);
-  const sub = rebuilt.subscores[G];
-  assert.equal(sub.available, false);
-  assert.equal(sub.weight, 0);
-  assert.equal(sub.components.reason_code, 'not_collected_for_score');
-  assert.equal(sub.reason, GITHUB_REASONS.not_collected_for_score);
-  assert.match(sub.reason, /before GitHub evidence was collected/);
-  assert.match(sub.reason, /Re-analysing the resume would include it/);
-  assert.doesNotMatch(sub.reason, /not part of this deployment/);
-  near(weightSum(rebuilt), 1, 1e-3, 'weights sum to 1');
+// R-11 (lead's ruling 2026-11-14): parsing unavailable at grading time.
+test('R-11: parsingUnavailable -> parsing unavailable with the pipeline code; composite from the rest, evidence-limited', () => {
+  const record = buildScoreRecord(NLP, {
+    github: { ok: false, reasonCode: 'no_github_link' },
+    assessmentEvaluation: EVALUATION,
+    parsingUnavailable: 'parser_unavailable',
+  });
+  const p = record.subscores[P];
+  assert.equal(p.available, false);
+  assert.equal(p.value, null);
+  assert.equal(p.weight, 0);
+  assert.equal(p.components.reason_code, 'parser_unavailable');
+  assert.equal(p.reason, PARSING_REASONS.parser_unavailable);
+  assert.equal(record.weights[A], 1);
+  assert.equal(record.composite, record.subscores[A].value);
+  assert.equal(record.evidence_limited, true);
+  assert.equal(record.band, scoreBand(record.composite));
+
+  const withGithub = buildScoreRecord(null, { github: GITHUB_OK, assessmentEvaluation: EVALUATION, parsingUnavailable: 'storage_error' });
+  near(withGithub.weights[G], 0.35 / 0.60, 1e-4, 'github weight');
+  near(withGithub.weights[A], 0.25 / 0.60, 1e-4, 'assessment weight');
+  assert.equal(withGithub.subscores[P].components.reason_code, 'storage_error');
+
+  const unknown = buildScoreRecord(null, { assessmentEvaluation: EVALUATION, parsingUnavailable: 'not_a_code' });
+  assert.equal(unknown.subscores[P].components.reason_code, 'parser_failed');
 });
 
-test('I-0065: rebuild replaces the stale text on a stored pre-T-0014 entry', () => {
-  // As the 4 live rows are stored: unavailable, components null, no reason_code.
-  const stored = JSON.parse(JSON.stringify(buildScoreRecord(NLP).subscores));
-  stored[G] = { ...stored[G], components: null };
-  assert.match(stored[G].reason, /not part of this deployment/, 'the fixture must hold the old text');
-
-  const sub = rebuildScoreRecord(stored, EVALUATION).subscores[G];
-  assert.equal(sub.available, false);
-  assert.equal(sub.components.reason_code, 'not_collected_for_score');
-  assert.equal(sub.reason, GITHUB_REASONS.not_collected_for_score);
-  assert.doesNotMatch(sub.reason, /not part of this deployment/);
-});
-
-test('I-0065 control: rebuild keeps a stored entry that has a reason code', () => {
-  const stored = JSON.parse(JSON.stringify(buildScoreRecord(NLP).subscores));
-  assert.equal(stored[G].components.reason_code, 'service_disabled');
-  const sub = rebuildScoreRecord(stored, EVALUATION).subscores[G];
-  assert.equal(sub.components.reason_code, 'service_disabled');
-  assert.equal(sub.reason, stored[G].reason);
+// R-11: recruiter-facing explanation gains per-question outcomes, with only the
+// fields a candidate may also see (candidates read their own score rows).
+test('R-11: per-question outcomes in the explanation carry no key material', () => {
+  const evaluation = {
+    ...EVALUATION,
+    results: [
+      { question_id: 'q1', question_type: 'mcq', skill: 'python', correct: true, points: 1, max_points: 1,
+        candidate_feedback: 'Correct.', recruiter_feedback: 'Correct answer: B. KEY-EXPLANATION-q1', correct_option: 'B' },
+      { question_id: 'q2', question_type: 'short_answer', skill: 'sql', correct: false, points: 0.5, max_points: 1,
+        candidate_feedback: 'Partially correct.', recruiter_feedback: '0.5/1. IDEAL-ANSWER-q2', ideal_answer: 'IDEAL-ANSWER-q2' },
+    ],
+  };
+  const record = buildScoreRecord(NLP, { assessmentEvaluation: evaluation });
+  const factor = record.explanation.factors.find((f) => f.key === A);
+  const item = factor.evidence.find((e) => e.key === 'assessment_question_outcomes');
+  assert.ok(item, 'per-question outcomes are in the explanation');
+  assert.deepEqual(item.items, [
+    { question_id: 'q1', question_type: 'mcq', skill: 'python', correct: true, points: 1, max_points: 1 },
+    { question_id: 'q2', question_type: 'short_answer', skill: 'sql', correct: false, points: 0.5, max_points: 1 },
+  ]);
+  assert.equal(item.count, 2);
+  assert.match(item.display, /1 of 2/);
+  assert.deepEqual(record.subscores[A].components.question_outcomes, item.items);
+  assert.equal(record.subscores[A].components.proctoring, 'unproctored_online');
+  assert.match(factor.evidence[0].note, /Unproctored online assessment/);
+  const text = JSON.stringify(record);
+  for (const s of ['KEY-EXPLANATION', 'IDEAL-ANSWER', 'recruiter_feedback', 'candidate_feedback', 'correct_option', 'ideal_answer']) {
+    assert.ok(!text.includes(s), `score record carries ${s}`);
+  }
 });
 
 test('every factor has an evidence array', () => {
@@ -325,9 +342,9 @@ test('R-06: an inactive linked account gives the same composite as no account', 
       assert.equal(record.weights[G], 0, name);
       assert.deepEqual(record.weights, none.weights, `${name}: same weights as no account`);
       assert.equal(record.composite, none.composite, `${name}: composite must equal the no-account composite`);
-      // NOTE: core does not know `no_recent_public_activity` yet (githubEvidence.js:90 reasonForBody,
-      // explainability.js:75 GITHUB_REASONS), so it is mapped to service_error: same weight 0 and
-      // composite, but the stated reason text is service_error's. The backend card adds the code.
+      // R-10: core maps the code through instead of service_error, with its own text.
+      assert.equal(record.subscores[G].components.reason_code, 'no_recent_public_activity', name);
+      assert.equal(record.subscores[G].reason, GITHUB_REASONS.no_recent_public_activity, name);
     }
   } finally {
     await stub.close();
@@ -344,4 +361,67 @@ test('R-06: an inactive linked account gives the same composite as no account', 
   };
   const old = buildScoreRecord(NLP, { github: { ok: true, evidence: before, requestId: 'r06' } });
   assert.ok(old.composite < buildScoreRecord(NLP).composite, 'the control must show the old defect');
+});
+
+// R-10 (D§4.1, B1): a parse without similarity is "not measured", never an available 0.
+test('R-10: missing similarity -> parsing unavailable with a reason; weights redistribute', () => {
+  for (const sa of [null, undefined, {}, { similarity_score: null }, { similarity_score: 'n/a' }, 'x']) {
+    const sub = buildParsingSubScore(sa);
+    assert.equal(sub.available, false, JSON.stringify(sa));
+    assert.equal(sub.value, null);
+    assert.equal(sub.weight, 0);
+    assert.equal(sub.reason, PARSING_REASONS.no_similarity);
+    assert.equal(sub.components.reason_code, 'no_similarity');
+    assert.deepEqual(sub.evidence, []);
+  }
+  // A real 0 similarity is a measurement, and stays available.
+  const zero = buildParsingSubScore({ similarity_score: 0 });
+  assert.equal(zero.available, true);
+  assert.equal(zero.value, 0);
+
+  const record = buildScoreRecord({ semantic_analysis: null }, { github: GITHUB_OK });
+  assert.equal(record.subscores[P].available, false);
+  assert.equal(record.weights[P], 0);
+  assert.equal(record.weights[G], 1);
+  assert.equal(record.composite, record.subscores[G].value);
+  assert.equal(record.explanation.factors.find((f) => f.key === P).direction, 'unavailable');
+  assert.deepEqual(record.explanation.skill_evidence, []);
+
+  // Nothing available at all: no composite and no band, never 0.
+  const nothing = buildScoreRecord({ semantic_analysis: null }, { github: { ok: false, reasonCode: 'no_github_link' } });
+  assert.equal(nothing.composite, null);
+  assert.equal(nothing.band, null);
+  assert.equal(nothing.explanation.band, null);
+  for (const key of [P, G, A]) assert.equal(nothing.weights[key], 0);
+});
+
+// R-10 (D§7, F25): one band, thresholds 80 / 60, defined in explainability.js only.
+test('R-10: the composite carries a band (80 / 60), stored in the explanation', () => {
+  assert.deepEqual({ ...SCORE_BAND_THRESHOLDS }, { high: 80, medium: 60 });
+  const cases = [[100, 'high'], [80, 'high'], [79.99, 'medium'], [60, 'medium'], [59.99, 'low'], [0, 'low'], ['84.84', 'high'],
+    [null, null], [undefined, null], ['', null], [Number.NaN, null]];
+  for (const [value, band] of cases) assert.equal(scoreBand(value), band, String(value));
+
+  const record = buildScoreRecord(NLP, { github: GITHUB_OK });
+  assert.equal(record.band, scoreBand(record.composite));
+  assert.equal(record.explanation.band, record.band);
+  assert.equal(record.explanation.band_thresholds.high, 80);
+  assert.equal(record.explanation.band_thresholds.medium, 60);
+  assert.match(record.explanation.band_thresholds.note, /not calibrated/);
+  const withAssessment = buildScoreRecord(NLP, { github: GITHUB_OK, assessmentEvaluation: EVALUATION });
+  assert.equal(withAssessment.band, scoreBand(withAssessment.composite));
+});
+
+// R-10 (D§5, D§7): the GitHub account comes from the résumé; ownership is not verified.
+test('R-10: the explanation states the GitHub account came from the résumé and is not verified', () => {
+  for (const github of [GITHUB_OK, { ok: false, reasonCode: 'no_github_link' }, undefined]) {
+    const { explanation } = buildScoreRecord(NLP, { github });
+    assert.deepEqual(explanation.github_account, { source: 'resume_link', ownership_verified: false, note: GITHUB_OWNERSHIP_NOTE });
+  }
+  assert.match(GITHUB_OWNERSHIP_NOTE, /résumé/);
+  assert.match(GITHUB_OWNERSHIP_NOTE, /not verified/);
+  const sub = buildGithubSubScore(GITHUB_OK);
+  assert.equal(sub.components.account_source, 'resume_link');
+  assert.equal(sub.components.ownership_verified, false);
+  assert.ok(sub.evidence[0].note.startsWith(GITHUB_OWNERSHIP_NOTE), 'the first GitHub evidence item leads with the note');
 });

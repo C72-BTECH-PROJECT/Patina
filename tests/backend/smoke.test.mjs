@@ -94,11 +94,21 @@ test('POST /api/auth/login with unknown username -> 401, no session cookie', asy
     'must not issue a session for a failed login');
 });
 
-test('POST /api/analyze without session -> 401', async () => {
+// R-10 (Y1): POST /api/analyze is removed. The baseline worktree still has it
+// (401 without a session); the current tree answers 404. tests/run-suite.ps1 sets
+// HARNESS_TARGET; run by hand, the current tree is assumed.
+const BASELINE = process.env.HARNESS_TARGET === 'baseline';
+
+test(`POST /api/analyze without session -> ${BASELINE ? '401 (baseline)' : '404 (removed in R-10)'}`, async () => {
   const form = new FormData();
   form.append('jobId', '00000000-0000-0000-0000-000000000000');
   form.append('resume', new Blob(['%PDF-1.4'], { type: 'application/pdf' }), 'x.pdf');
   const r = await fetch(`${BASE}/api/analyze`, { method: 'POST', body: form });
+  assert.equal(r.status, BASELINE ? 401 : 404);
+});
+
+test('POST /api/applications/:id/score without session -> 401 (R-10)', { skip: BASELINE && 'route added in R-10' }, async () => {
+  const r = await fetch(`${BASE}/api/applications/00000000-0000-4000-8000-000000000000/score`, { method: 'POST' });
   assert.equal(r.status, 401);
 });
 

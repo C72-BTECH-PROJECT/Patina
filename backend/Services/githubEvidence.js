@@ -24,6 +24,7 @@ export const REASON_CODES = [
   'github_user_not_found',
   'no_public_repositories',
   'insufficient_evidence',
+  'no_recent_public_activity',
   'github_rate_limited',
   'service_unavailable',
   'timeout',
@@ -87,7 +88,9 @@ const reasonForBody = (body) => {
   if (sub.available === true) {
     return Number.isFinite(sub.value) && sub.value >= 0 && sub.value <= 1 ? null : 'service_error';
   }
-  if (sub.reason_code === 'no_public_repositories' || sub.reason_code === 'insufficient_evidence') {
+  // The service's own "unavailable" reasons (github-evidence/README.md); R-10 adds
+  // R-06's no_recent_public_activity, which used to fall through to service_error.
+  if (['no_public_repositories', 'insufficient_evidence', 'no_recent_public_activity'].includes(sub.reason_code)) {
     return sub.reason_code;
   }
   return 'service_error';

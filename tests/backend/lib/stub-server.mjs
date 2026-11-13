@@ -6,7 +6,7 @@
 //
 //   const stub = await startStub({ port: 0, handler: (req, res, rec) => json(res, 200, {...}) });
 //   stub.url       http://localhost:<port>
-//   stub.requests  [{ method, path, headers, body }]  (body parsed as JSON when possible)
+//   stub.requests  [{ method, path, headers, body, rawBody }]  (body parsed as JSON when possible)
 //   stub.connections  number of TCP connections accepted
 //   await stub.close()
 import http from 'node:http';
@@ -45,10 +45,12 @@ export async function startStub({ port = 0, handler } = {}) {
     const chunks = [];
     req.on('data', (c) => chunks.push(c));
     req.on('end', () => {
-      const text = Buffer.concat(chunks).toString('utf8');
+      const rawBody = Buffer.concat(chunks);
+      const text = rawBody.toString('utf8');
       let body = text;
       try { body = text ? JSON.parse(text) : null; } catch { /* keep the raw text */ }
-      const rec = { method: req.method, path: req.url, headers: req.headers, body };
+      // rawBody: the exact bytes (R-09: uploads and multipart bodies are binary).
+      const rec = { method: req.method, path: req.url, headers: req.headers, body, rawBody };
       requests.push(rec);
       handler(req, res, rec);
     });

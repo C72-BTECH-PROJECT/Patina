@@ -63,9 +63,40 @@ test('a sentinel upstream body reaches neither the error nor the client answer',
     assert.ok(err, 'expected a rejection');
     assert.equal(err.kind, 'bad_status');
     assert.ok(!JSON.stringify({ ...err, message: err.message }).includes(SENTINEL), 'error carries the body');
-    const failure = assessmentFailure(err, 'Assessment generation failed');
+    const failure = assessmentFailure(err, 'generate');
     assert.equal(failure.status, 502);
-    assert.deepEqual(failure.body, { message: 'Assessment generation failed' });
+    assert.deepEqual(failure.body, { error: 'assessment_service_error', message: 'The assessment service failed. Please try again later.' });
+  }
+});
+
+// R-11 (ISSUES R-07/R-08 batch smoke): the service's error codes reach the client as
+// fixed codes with fixed messages; the upstream message never does.
+test('R-11: assessment-service error codes are surfaced as fixed codes, never upstream text', async () => {
+  const { generateAssessment, evaluateAnswers, assessmentFailure, assessmentErrorCode } = await load();
+  const cases = [
+    [generateAssessment, 'generate', 502, { error: 'llm_unavailable', message: `gemini-x 503 ${SENTINEL}` }, 502, 'llm_unavailable'],
+    [generateAssessment, 'generate', 502, { error: 'llm_invalid_output', message: SENTINEL }, 502, 'llm_invalid_output'],
+    [generateAssessment, 'generate', 503, { error: 'llm_not_configured', message: SENTINEL }, 503, 'llm_not_configured'],
+    // R-12 (D§6.2 outage row): grading_unavailable is answered as 503.
+    [evaluateAnswers, 'evaluate', 502, { error: 'grading_unavailable', message: SENTINEL }, 503, 'grading_unavailable'],
+    [evaluateAnswers, 'evaluate', 422, { error: 'invalid_evaluate_input', message: SENTINEL }, 422, 'invalid_evaluate_input'],
+    // FastAPI's own 422 names no code and echoes the input: still a fixed code.
+    [evaluateAnswers, 'evaluate', 422, { detail: [{ input: SENTINEL }] }, 422, 'invalid_evaluate_input'],
+    [generateAssessment, 'generate', 422, { detail: [{ input: SENTINEL }] }, 502, 'assessment_service_error'],
+    // A code the service does not define is not passed through.
+    [generateAssessment, 'generate', 500, { error: 'some_new_code', message: SENTINEL }, 502, 'assessment_service_error'],
+  ];
+  for (const [call, op, upstream, body, status, code] of cases) {
+    await useStub((_q, res) => json(res, upstream, body));
+    const err = await call({}, { requestId: REQUEST_ID }).then(() => null, (e) => e);
+    assert.equal(assessmentErrorCode(err, op), code, JSON.stringify(body));
+    const failure = assessmentFailure(err, op);
+    assert.equal(failure.status, status, code);
+    assert.equal(failure.body.error, code);
+    assert.ok(!JSON.stringify(failure.body).includes(SENTINEL), `${code}: upstream text reached the answer`);
+    assert.ok(!/gemini/i.test(failure.body.message));
+    await stub.close();
+    stub = null;
   }
 });
 
@@ -77,15 +108,29 @@ test('one retry on a connection error, then the answer', async () => {
   assert.equal(stub.requests.length, 2);
 });
 
-test('no retry on a timeout, and the client answer is the "unavailable" 502', async () => {
+test('no retry on a timeout, and the client answer is the 504 assessment_service_timeout', async () => {
   const { generateAssessment, assessmentFailure } = await load();
   await useStub(hang);
   const err = await generateAssessment({}, { requestId: REQUEST_ID, timeoutMs: 150 }).then(() => null, (e) => e);
   assert.equal(err.kind, 'timeout');
   assert.equal(stub.requests.length, 1);
-  const failure = assessmentFailure(err, 'Assessment generation failed');
-  assert.equal(failure.status, 502);
-  assert.match(failure.body.message, /unavailable/i);
+  const failure = assessmentFailure(err, 'generate');
+  assert.equal(failure.status, 504);
+  assert.equal(failure.body.error, 'assessment_service_timeout');
+  assert.match(failure.body.message, /did not answer in time/i);
+});
+
+test('an unreachable service is 503 assessment_service_unavailable', async () => {
+  const { generateAssessment, assessmentFailure } = await load();
+  await useStub((_q, res) => json(res, 200, {}));
+  const url = stub.url;
+  await stub.close();
+  stub = null;
+  process.env.ASSESSMENT_SERVICE_URL = url;
+  const err = await generateAssessment({}, { requestId: REQUEST_ID, timeoutMs: 2000 }).then(() => null, (e) => e);
+  assert.equal(err.kind, 'unreachable');
+  assert.deepEqual(assessmentFailure(err, 'generate').body.error, 'assessment_service_unavailable');
+  assert.equal(assessmentFailure(err, 'generate').status, 503);
 });
 
 test('a non-JSON 200 is a bad_body 502, not a crash', async () => {
@@ -93,8 +138,9 @@ test('a non-JSON 200 is a bad_body 502, not a crash', async () => {
   await useStub((_q, res) => raw(res, 200, `<html>${SENTINEL}</html>`, 'text/html'));
   const err = await evaluateAnswers({}, { requestId: REQUEST_ID }).then(() => null, (e) => e);
   assert.equal(err.kind, 'bad_body');
-  const failure = assessmentFailure(err, 'Assessment evaluation failed');
+  const failure = assessmentFailure(err, 'evaluate');
   assert.equal(failure.status, 502);
+  assert.equal(failure.body.error, 'assessment_service_error');
   assert.ok(!JSON.stringify(failure.body).includes(SENTINEL));
 });
 

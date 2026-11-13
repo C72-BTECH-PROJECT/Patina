@@ -40,6 +40,14 @@ These are the decisions that delete a feature or a file, or change auth. Everyth
 
 `CUT.md` and `TASKS.md` were approved by the same go-ahead.
 
+### Amendments after Checkpoint 2
+
+| # | Date | Amendment (Anthony) | Where it lands |
+|---|---|---|---|
+| A1 | 2026-11-13 | **No live generation on the demo path.** The question pool is generated and stored in the background right after apply. The candidate sees a "preparing" state if it is not ready, and every candidate request answers at once (no request waits on the LLM; the former worst case was about 210 s). Consequences, with no schema change: a prepared pool is an `assessments` row with status `generated` and `answers` null; the 15-minute clock starts when the candidate presses Start and is stored as `started_at` inside `answers` (this replaces "start time = `assessments.created_at`" wherever it is written, including §6.2's "started when the questions are issued": issued now means at Start); in-flight and failed preparation state lives in core memory only and is never presented as a stored fact. | `TASKS.md` R-11, R-12, R-13, R-17, R-19 |
+| A2 | 2026-11-13 | `GEMINI_MODELS` in `assessment-service/.env` stays (owner's choice). A verifier listed the key's models on both the native and the OpenAI-compatible endpoint: the code default (`gemini-3.5-flash`, `gemini-3.1-flash-lite`) and `gemini-3.5-flash-lite`, `gemini-3.8-flash` are all listed, as are all three configured ids. The code default was left unchanged. Listed is not the same as callable; no generation call was made in that check. | `LOG.md` |
+| A3 | 2026-11-13 | O-5 answered: email confirmation is on; the demo GitHub account is `anthonyjennis`. | `TASKS.md` O-5, R-19, TM-4 |
+
 ## 1. Architecture and gateway (GR-2)
 
 **The one target architecture, as built and as it will be presented:**

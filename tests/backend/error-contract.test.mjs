@@ -123,10 +123,11 @@ before(async () => {
   app.get('/t/my-applications', mods.jobs.getMyApplications);
   app.post('/t/jobs', mods.jobs.createJob);
   app.get('/t/candidate-analysis', mods.analysis.getCandidateAnalysis);
-  app.get('/t/candidates', mods.analysis.getAllCandidates);
-  app.get('/t/applicants', mods.analysis.getAllApplicants);
+  // R-13: the recruiter applications API replaced /api/candidates and /api/recruiter/applicants.
+  app.get('/t/applications', mods.analysis.listRecruiterApplications);
+  app.get('/t/applications/:id', mods.analysis.getRecruiterApplication);
+  app.get('/t/jobs-mine', mods.jobs.getMyJobs);
   app.get('/t/resume/:candidateId', mods.analysis.getCandidateResume);
-  app.post('/t/analyze', ...mods.analysis.analyzeResume);
   app.get('/t/health', createHealthHandler({ probe: mods.supabase.probeDatabase, timeoutMs: 2000 }));
   app.use(notFoundHandler);
   app.use(errorHandler);
@@ -197,8 +198,9 @@ test('stubbed Supabase errors: no Supabase text in any response body', async () 
   const cases = [
     ['/t/my-applications', {}, 500],
     ['/t/candidate-analysis', {}, 500],
-    ['/t/candidates', { headers: { 'X-Test-Role': 'RECRUITER' } }, 500],
-    ['/t/applicants', { headers: { 'X-Test-Role': 'RECRUITER' } }, 500],
+    ['/t/applications', { headers: { 'X-Test-Role': 'RECRUITER' } }, 500],
+    ['/t/applications/44444444-4444-4444-8444-444444444444', { headers: { 'X-Test-Role': 'RECRUITER' } }, 500],
+    ['/t/jobs-mine', { headers: { 'X-Test-Role': 'RECRUITER' } }, 500],
     ['/t/resume/33333333-3333-4333-8333-333333333333', { headers: { 'X-Test-Role': 'RECRUITER' } }, 500],
     ['/t/jobs', {
       method: 'POST',
@@ -216,17 +218,8 @@ test('stubbed Supabase errors: no Supabase text in any response body', async () 
   assert.ok(supa.requests.length > before, 'the stub was never called');
 });
 
-test('O1: an NLP error body is never echoed by analyze', async () => {
-  mode = 'ok';
-  const form = new FormData();
-  form.append('jobId', 'job-1');
-  form.append('resume', new Blob(['%PDF-1.4 test'], { type: 'application/pdf' }), 'x.pdf');
-  const { res, text, body } = await call('/t/analyze', { method: 'POST', body: form });
-  assert.ok(body, `not JSON: ${text}`);
-  assertContract(body, res, { status: 502, error: 'parser_failed' });
-  assertNoLeak(text);
-  assert.ok(nlp.requests.length >= 1, 'the NLP stub was never called');
-});
+// O1 (an NLP error body is never echoed) moved with POST /api/analyze's removal (R-10) to
+// tests/backend/score-on-apply.test.mjs: "parser crash -> failed parser_failed ...".
 
 test('Supabase timeout -> 503 database_timeout, fixed message', async () => {
   mode = 'hang';

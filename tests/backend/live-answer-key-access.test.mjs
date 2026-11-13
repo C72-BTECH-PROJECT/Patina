@@ -15,7 +15,7 @@ import { api, login } from './lib/session.mjs';
 import {
   client, counts, insertTestJob, isZero, liveConfig, resolveAccounts, snapshotProfiles, sweep,
 } from './lib/testdb.mjs';
-import { allKeys, directAccessToken, restGet, seedAssessment } from './lib/assessment.mjs';
+import { allKeys, directAccessToken, restGet, seedApplication, seedAssessment } from './lib/assessment.mjs';
 
 const cfg = liveConfig();
 const missing = [...cfg.missing, ...(cfg.recruiterPassword ? [] : ['TEST_RECRUITER_PASSWORD'])];
@@ -39,6 +39,7 @@ before(async () => {
   console.log('pre-run sweep removed:', await sweep(sb, ids));
   jobId = await insertTestJob(sb, ids.R);
   seeded = await seedAssessment(sb, { candidateId: ids.C, jobId });
+  await seedApplication(sb, { candidateId: ids.C, jobId }); // R-11: start/generate need an application
   tokenC = await directAccessToken(sb, ids.C, cfg.candidatePassword);
   tokenR = await directAccessToken(sb, ids.R, cfg.recruiterPassword);
 });
