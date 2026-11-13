@@ -1,19 +1,19 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FileUp, LogOut, Mail, MapPin, User } from "lucide-react";
+import { FileUp, LogOut, Mail, User, AtSign } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
+// R-15 (F24): the account has no location field, so the permanent "Location not
+// set" row is gone. Only fields the backend sends (auth.controller.js formatProfile)
+// are shown.
 function CandidateProfile() {
   const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/', { replace: true });
-    } catch (error) {
-      alert(error.message || 'Could not sign out.');
-    }
+    // AuthContext.logout never throws; it clears the user whatever the server says.
+    await logout();
+    navigate('/', { replace: true });
   };
 
   if (loading) {
@@ -30,16 +30,16 @@ function CandidateProfile() {
 
       <div className="space-y-4 mb-8">
         <div className="flex items-center gap-3 text-foreground">
-          <User className="w-5 h-5" />
-          <span>{user.name || "Unnamed Candidate"}</span>
+          <User className="w-5 h-5" aria-hidden="true" />
+          <span>{user.name || <span className="text-muted-foreground">No name on this account</span>}</span>
         </div>
         <div className="flex items-center gap-3 text-foreground">
-          <Mail className="w-5 h-5" />
+          <AtSign className="w-5 h-5" aria-hidden="true" />
+          <span>{user.username}</span>
+        </div>
+        <div className="flex items-center gap-3 text-foreground">
+          <Mail className="w-5 h-5" aria-hidden="true" />
           <span>{user.email}</span>
-        </div>
-        <div className="flex items-center gap-3 text-foreground">
-          <MapPin className="w-5 h-5" />
-          <span>{user.location || "Location not set"}</span>
         </div>
       </div>
 
@@ -54,7 +54,7 @@ function CandidateProfile() {
         <button
           type="button"
           onClick={handleLogout}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background text-foreground font-medium text-body-sm hover:bg-accent transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background text-foreground font-medium text-body-sm hover:bg-muted transition-colors"
         >
           <LogOut className="w-4 h-4" />
           Sign out

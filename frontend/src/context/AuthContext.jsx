@@ -1,56 +1,22 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { api } from "../lib/api";
+import { checkSession } from "./sessionCheck";
 
 const AuthContext = createContext(null);
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-
-const withCredentialsFetch = async (input, init = {}) => {
-  const mergedInit = { ...init };
-  if (!mergedInit.credentials) {
-    mergedInit.credentials = "include";
-  }
-  return fetch(input, mergedInit);
-};
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || window.__patinaFetchWrapped) {
-      return;
-    }
-
-    const originalFetch = window.fetch.bind(window);
-    window.fetch = (input, init = {}) => {
-      const url = typeof input === "string" ? input : input?.url || "";
-      // Only force credentials on requests to our own API. Patching every
-      // fetch call app-wide would also attach credentials to third-party
-      // requests, which breaks outright for any API using
-      // Access-Control-Allow-Origin: "*" (incompatible with credentialed
-      // requests per the CORS spec — the browser rejects the response).
-      if (url.startsWith(API_BASE_URL)) {
-        return originalFetch(input, { credentials: "include", ...init });
-      }
-      return originalFetch(input, init);
-    };
-    window.__patinaFetchWrapped = true;
-  }, []);
+  // True when the last /me check got no answer about the session (server unreachable,
+  // gateway 503, a 5xx). Only 401/403 mean signed out (sessionCheck.js); RequireRole
+  // shows a retry screen for this state instead of sending the user to /login.
+  const [unreachable, setUnreachable] = useState(false);
 
   const refreshUser = useCallback(async () => {
-    try {
-      const response = await withCredentialsFetch(`${API_BASE_URL}/api/auth/me`);
-      if (!response.ok) {
-        setUser(null);
-        return null;
-      }
-
-      const data = await response.json();
-      setUser(data.user || null);
-      return data.user || null;
-    } catch (error) {
-      setUser(null);
-      return null;
-    }
+    const outcome = await checkSession(() => api.get("/api/auth/me"));
+    setUser(outcome.user);
+    setUnreachable(outcome.status === "unreachable");
+    return outcome.user;
   }, []);
 
   useEffect(() => {
@@ -69,52 +35,44 @@ export function AuthProvider({ children }) {
     };
   }, [refreshUser]);
 
+  // The retry screen's button: check the session again, showing the loading state meanwhile.
+  const retrySession = useCallback(async () => {
+    setLoading(true);
+    await refreshUser();
+    setLoading(false);
+  }, [refreshUser]);
+
+  // Throws the client's ApiError on failure; a suspended account carries
+  // `err.body.code === 'ACCOUNT_SUSPENDED'`.
   const login = useCallback(async (payload) => {
-    const response = await withCredentialsFetch(`${API_BASE_URL}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      const error = new Error(data.message || "Login failed");
-      error.code = data.code;
-      throw error;
-    }
-
-    setUser(data.user || null);
+    const data = await api.post("/api/auth/login", payload);
+    setUser(data?.user || null);
+    setUnreachable(false);
     return data;
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      const response = await withCredentialsFetch(`${API_BASE_URL}/api/auth/logout`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        console.warn('Logout endpoint returned non-OK status');
-      }
+      await api.post("/api/auth/logout");
     } catch (error) {
-      console.warn('Logout request failed:', error);
+      console.warn("Logout request failed:", error.message);
     } finally {
       setUser(null);
+      setUnreachable(false);
     }
   }, []);
-
-  const authFetch = useCallback(withCredentialsFetch, []);
 
   const contextValue = useMemo(
     () => ({
       user,
       loading,
+      unreachable,
       login,
       logout,
       refreshUser,
-      authFetch,
+      retrySession,
     }),
-    [user, loading, login, logout, refreshUser, authFetch]
+    [user, loading, unreachable, login, logout, refreshUser, retrySession]
   );
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;

@@ -336,6 +336,75 @@ export const rescoreApplication = async (req, res) => {
   return res.status(200).json({ applicationId: application.id, scoring: scoringSummary(result) });
 };
 
+// R-16 (lead's ruling, D§8.2 "Results is per application"): GET /api/applications/:id/result
+// (CANDIDATE). The candidate's own result for ONE application.
+//   200 { application: { id, job_id, job_title, status, submitted_at },
+//         scoring: { state: 'scored' | 'pending' },
+//         score: <serializeCandidate shape, as GET /api/candidate-analysis> | null }
+//       `score` is the NEWEST `scores` row for this candidate and job (rows are inserted,
+//       never updated; D§3); null with state `pending` when there is none (Y1).
+//   400 invalid_application_id · 404 not_found (no such application, or another
+//   candidate's: the same answer, so ids cannot be probed) · 500 database_error
+// The score row is candidate-safe as stored: its assessment evidence carries only
+// question outcomes (explainability.js questionOutcomes); recruiter feedback and the
+// answer key live in `assessment_keys`, which this handler never reads.
+export const getApplicationResult = async (req, res) => {
+  const applicationId = req.params.id;
+  if (!isUuid(applicationId)) {
+    return res.status(400).json({ error: 'invalid_application_id', message: 'The application id must be a UUID.' });
+  }
+  const failed = (cause, context) => sendError(req, res, {
+    status: 500, error: 'database_error', message: 'Could not load this result. Please try again.', cause, context,
+  });
+
+  try {
+    const { data: app, error: appError } = await supabase
+      .from('applications')
+      .select('id, candidate_id, job_id, status, submitted_at, job:jobs(id, title)')
+      .eq('id', applicationId)
+      .maybeSingle();
+    if (appError) return failed(appError, 'application result: application lookup');
+    if (!app || app.candidate_id !== req.session.userId) {
+      return res.status(404).json({ error: 'not_found', message: 'Application not found.' });
+    }
+
+    const { data: score, error: scoreError } = await supabase
+      .from('scores')
+      .select('*')
+      .eq('candidate_id', app.candidate_id)
+      .eq('job_id', app.job_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (scoreError) return failed(scoreError, 'application result: score lookup');
+
+    let resume = null;
+    if (score?.resume_id) {
+      const { data: resumeRow, error: resumeError } = await supabase
+        .from('resumes')
+        .select('*')
+        .eq('id', score.resume_id)
+        .maybeSingle();
+      if (resumeError) return failed(resumeError, 'application result: resume lookup');
+      resume = resumeRow || null;
+    }
+
+    return res.json({
+      application: {
+        id: app.id,
+        job_id: app.job_id,
+        job_title: app.job?.title ?? null,
+        status: app.status,
+        submitted_at: app.submitted_at ?? null,
+      },
+      scoring: { state: score ? 'scored' : 'pending' },
+      score: score ? serializeCandidate({ score, resume, job: app.job }) : null,
+    });
+  } catch (err) {
+    return sendError(req, res, { status: 500, error: 'internal_error', message: 'Could not load this result. Please try again.', cause: err, context: 'application result' });
+  }
+};
+
 export const getCandidateAnalysis = async (req, res) => {
   try {
     const candidateId = req.session.userId;

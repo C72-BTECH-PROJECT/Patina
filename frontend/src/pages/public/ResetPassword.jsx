@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, ArrowRight, ShieldAlert, MailCheck } from 'lucide-react';
-
-const API_BASE_URL = 'http://localhost:5000';
+import { api, isNetworkError } from '../../lib/api';
 
 // Pull the Supabase recovery credentials out of the URL that the reset email
 // links to. Supabase either appends `#access_token=...&refresh_token=...&type=recovery`
@@ -61,22 +60,15 @@ function ResetPassword() {
     setError('');
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/request-password-reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: identifier }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.message || 'Could not send a reset link. Try again shortly.');
-      } else {
-        setMessage(
-          data.message ||
-            'If an account matches that information, a reset link is on its way. Check your inbox and spam folder.'
-        );
-      }
-    } catch {
-      setError('Failed to connect to the server.');
+      const data = await api.post('/api/auth/request-password-reset', { username: identifier });
+      setMessage(
+        data?.message ||
+          'If an account matches that information, a reset link is on its way. Check your inbox and spam folder.'
+      );
+    } catch (err) {
+      setError(isNetworkError(err)
+        ? 'Failed to connect to the server.'
+        : err.message || 'Could not send a reset link. Try again shortly.');
     } finally {
       setIsLoading(false);
     }
@@ -98,26 +90,21 @@ function ResetPassword() {
 
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          newPassword,
-          tokenHash: recovery.tokenHash,
-          accessToken: recovery.accessToken,
-          refreshToken: recovery.refreshToken,
-        }),
+      const data = await api.post('/api/auth/reset-password', {
+        newPassword,
+        tokenHash: recovery.tokenHash,
+        accessToken: recovery.accessToken,
+        refreshToken: recovery.refreshToken,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.message || 'Failed to update password.');
-        if (res.status === 400) setRecovery(null);
+      setMessage(data?.message || 'Password updated. You can now sign in.');
+      setRecovery(null);
+    } catch (err) {
+      if (isNetworkError(err)) {
+        setError('Failed to connect to the server.');
       } else {
-        setMessage(data.message || 'Password updated. You can now sign in.');
-        setRecovery(null);
+        setError(err.message || 'Failed to update password.');
+        if (err.status === 400) setRecovery(null);
       }
-    } catch {
-      setError('Failed to connect to the server.');
     } finally {
       setIsLoading(false);
     }

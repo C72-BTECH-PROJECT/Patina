@@ -4,17 +4,22 @@ import {
   ArrowDownRight, ArrowUpRight, CheckCircle2, Circle, Info, Minus, ShieldAlert, XCircle,
 } from 'lucide-react';
 import Badge from '../Badge';
+import { subscoreTestId } from './applicationsLogic';
 
 /**
  * ScoreBreakdown — the composite -> sub-score -> evidence drill-down
  * (FR-13, GF-5, CHECKLIST 4.5 / 5.7 / 5.8 / 5.9 / 5.10 / 5.11).
  *
  * Everything here is read straight from the `explanation` record the backend
- * persisted with the score, so what a recruiter reads is what was stored at
- * scoring time. Nothing is re-derived in the browser, and a source with no
- * evidence renders its stored reason instead of a zero.
+ * persisted with the score (backend/Services/explainability.js buildExplanation),
+ * so what a reader sees is what was stored at scoring time. Nothing is
+ * re-derived in the browser, and a source with no evidence renders its stored
+ * reason instead of a zero.
  *
- * Expects the `analysis` shape from `analysis.controller.serializeCandidate`.
+ * Two callers:
+ *   recruiter drill-down  <ScoreBreakdown explanation={detail.explanation}
+ *                                         evidenceLimited={detail.score.evidence_limited} showFlags={false} />
+ *   candidate Results     <ScoreBreakdown analysis={score} />  (the serializeCandidate shape)
  */
 
 const DIRECTION_STYLES = {
@@ -43,6 +48,17 @@ const SKILL_STATUS = {
   },
 };
 
+/** A known status's badge; an unknown or missing one is shown as unknown with its raw value, never as a real category. */
+export const skillStatusView = (status) => {
+  if (Object.prototype.hasOwnProperty.call(SKILL_STATUS, status)) return SKILL_STATUS[status];
+  const raw = typeof status === 'string' && status.trim() ? status.trim().replace(/_/g, ' ') : '';
+  return {
+    variant: 'outline',
+    label: raw ? `Unknown status: ${raw}` : 'Unknown status',
+    hint: 'The server sent a skill status this page does not know.',
+  };
+};
+
 /** Explicit "we have no evidence here" panel — never a zero, never a blank. */
 function EvidenceUnavailable({ title, reason }) {
   return (
@@ -51,13 +67,32 @@ function EvidenceUnavailable({ title, reason }) {
         <Info className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
         <span className="text-body-sm font-medium text-muted-foreground">{title}</span>
       </div>
-      <p className="text-caption text-muted-foreground leading-relaxed">{reason}</p>
+      {reason && <p className="text-caption text-muted-foreground leading-relaxed">{reason}</p>}
     </div>
   );
 }
 
+/**
+ * The honest flags panel (DECISIONS.md §7: inconsistency flags are not built, stretch
+ * S-2). It never lists flags and never reads as an all-clear. `storedReason` is the
+ * explanation's own `flags_unavailable_reason`, shown when present.
+ */
+function FlagsPanel({ storedReason }) {
+  return (
+    <section data-testid="flags-panel">
+      <h3 className="text-body font-medium text-foreground mb-3">Inconsistency flags</h3>
+      <EvidenceUnavailable
+        title="Not built yet: no flags are shown"
+        reason={storedReason
+          || 'Checks that compare résumé claims against GitHub or assessment evidence are not built, so no inconsistency flags are shown. This is not a finding that the claims are consistent.'}
+      />
+    </section>
+  );
+}
+
 function MetricEvidence({ item }) {
-  const pct = Math.round((Number(item.value) || 0) * 100);
+  const hasValue = item.value !== null && item.value !== undefined && Number.isFinite(Number(item.value));
+  const pct = hasValue ? Math.max(0, Math.min(100, Number(item.value) * 100)) : 0;
   return (
     <div className="py-2">
       <div className="flex items-baseline justify-between gap-3 mb-1.5">
@@ -66,21 +101,23 @@ function MetricEvidence({ item }) {
           {item.display}
         </span>
       </div>
-      <div className="h-1.5 rounded-full bg-border overflow-hidden">
-        <motion.div
-          className={`h-full rounded-full ${
-            item.direction === 'negative' ? 'bg-destructive' : 'bg-primary'
-          }`}
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-        />
-      </div>
+      {hasValue && (
+        <div className="h-1.5 rounded-full bg-border overflow-hidden">
+          <motion.div
+            className={`h-full rounded-full ${
+              item.direction === 'negative' ? 'bg-destructive' : 'bg-primary'
+            }`}
+            initial={{ width: 0 }}
+            animate={{ width: `${pct}%` }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          />
+        </div>
+      )}
       <p className="text-caption text-muted-foreground mt-1.5 leading-relaxed">
         {item.note}
         {item.weight_within_factor != null && item.weight_within_factor > 0 && (
           <span className="text-foreground">
-            {' '}Weighted {Math.round(item.weight_within_factor * 100)}% of this factor.
+            {' '}Weight within this factor: {item.weight_within_factor}.
           </span>
         )}
       </p>
@@ -90,6 +127,7 @@ function MetricEvidence({ item }) {
 
 function SkillSetEvidence({ item }) {
   const positive = item.direction === 'positive';
+  const list = Array.isArray(item.items) ? item.items : [];
   return (
     <div className="py-2">
       <div className="flex items-center gap-2 mb-2">
@@ -101,9 +139,9 @@ function SkillSetEvidence({ item }) {
         <span className="text-body-sm text-foreground">{item.label}</span>
         <span className="text-caption text-muted-foreground">({item.count})</span>
       </div>
-      {item.items.length ? (
+      {list.length ? (
         <div className="flex flex-wrap gap-1.5">
-          {item.items.map((skill) => (
+          {list.map((skill) => (
             <Badge key={skill} variant={positive ? 'success' : 'destructive'}>
               {skill}
             </Badge>
@@ -116,12 +154,50 @@ function SkillSetEvidence({ item }) {
   );
 }
 
+/** Per-question outcomes stored with the score (candidate-safe fields only). */
+function QuestionOutcomes({ item }) {
+  const list = Array.isArray(item.items) ? item.items : [];
+  return (
+    <div className="py-2">
+      <div className="flex items-baseline justify-between gap-3 mb-1.5">
+        <span className="text-body-sm text-foreground">{item.label}</span>
+        <span className="text-body-sm font-semibold text-foreground tabular-nums">{item.display}</span>
+      </div>
+      {item.note && <p className="text-caption text-muted-foreground mb-2">{item.note}</p>}
+      <ol className="space-y-1">
+        {list.map((q, i) => (
+          <li key={q.question_id || i} className="flex items-center justify-between gap-3 text-caption">
+            <span className="text-foreground">
+              {i + 1}. {q.skill || 'Unnamed skill'}
+              <span className="text-muted-foreground"> ({q.question_type === 'mcq' ? 'multiple choice' : q.question_type === 'short_answer' ? 'short answer' : 'type not recorded'})</span>
+            </span>
+            <span className={`tabular-nums ${q.correct ? 'text-success' : 'text-destructive'}`}>
+              {q.correct ? 'Right' : 'Not right'} · {q.points} of {q.max_points}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function EvidenceItem({ item }) {
+  if (item.type === 'skill_set') return <SkillSetEvidence item={item} />;
+  if (item.type === 'question_outcomes') return <QuestionOutcomes item={item} />;
+  return <MetricEvidence item={item} />;
+}
+
 function Factor({ factor }) {
   const direction = DIRECTION_STYLES[factor.direction] || DIRECTION_STYLES.neutral;
   const DirectionIcon = direction.icon;
+  const evidence = Array.isArray(factor.evidence) ? factor.evidence : [];
 
   return (
-    <div className="rounded-lg border border-border bg-background p-4">
+    <div
+      className="rounded-lg border border-border bg-background p-4"
+      data-testid={subscoreTestId(factor.key) || undefined}
+      data-available={factor.available ? 'true' : 'false'}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -133,20 +209,20 @@ function Factor({ factor }) {
 
         <div className="flex items-center gap-4 text-right">
           <div>
-            <div className="text-body font-semibold text-foreground tabular-nums">
+            <div className="text-body font-semibold text-foreground tabular-nums" data-testid="subscore-value">
               {factor.available ? `${factor.value}/100` : '—'}
             </div>
             <div className="text-caption text-muted-foreground">Sub-score</div>
           </div>
           <div>
             <div className="text-body font-semibold text-foreground tabular-nums">
-              {factor.weight_pct}%
+              {factor.available ? `${factor.weight} (${factor.weight_pct}%)` : '—'}
             </div>
-            <div className="text-caption text-muted-foreground">Weight</div>
+            <div className="text-caption text-muted-foreground">Weight used</div>
           </div>
           <div>
             <div className="text-body font-semibold text-foreground tabular-nums">
-              {factor.available ? `${factor.contribution}` : '0'}
+              {factor.available ? `${factor.contribution}` : '—'}
             </div>
             <div className="text-caption text-muted-foreground">Points</div>
           </div>
@@ -154,17 +230,15 @@ function Factor({ factor }) {
       </div>
 
       {factor.available ? (
-        <div className="divide-y divide-border border-t border-border">
-          {factor.evidence.map((item) =>
-            item.type === 'skill_set' ? (
-              <SkillSetEvidence key={item.key} item={item} />
-            ) : (
-              <MetricEvidence key={item.key} item={item} />
-            )
-          )}
-        </div>
+        evidence.length ? (
+          <div className="divide-y divide-border border-t border-border">
+            {evidence.map((item, i) => <EvidenceItem key={item.key || i} item={item} />)}
+          </div>
+        ) : (
+          <p className="text-caption text-muted-foreground">No evidence items were stored for this factor.</p>
+        )
       ) : (
-        <EvidenceUnavailable title="Evidence not available" reason={factor.reason} />
+        <EvidenceUnavailable title="Not available for this score" reason={factor.reason} />
       )}
     </div>
   );
@@ -187,7 +261,7 @@ function SkillEvidenceTable({ rows }) {
         </thead>
         <tbody>
           {rows.map((row) => {
-            const status = SKILL_STATUS[row.status] || SKILL_STATUS.claimed_only;
+            const status = skillStatusView(row.status);
             return (
               <tr key={`${row.name}-${row.status}`} className="border-b border-border last:border-0">
                 <td className="py-2 pr-3 text-body-sm text-foreground">{row.name}</td>
@@ -209,32 +283,40 @@ function SkillEvidenceTable({ rows }) {
   );
 }
 
-function ScoreBreakdown({ analysis }) {
-  const explanation = analysis?.explanation;
+function ScoreBreakdown({
+  analysis,
+  explanation: explanationProp,
+  evidenceLimited: evidenceLimitedProp,
+  showFlags = true,
+}) {
+  const explanation = explanationProp ?? analysis?.explanation ?? null;
+  const evidenceLimited = evidenceLimitedProp ?? analysis?.evidenceLimited ?? explanation?.evidence_limited ?? false;
 
   if (!explanation?.factors?.length) {
     return (
       <EvidenceUnavailable
-        title="No score explanation stored"
-        reason="This score predates the explainability layer, or was written by an older version of the pipeline. Re-run the analysis to produce an auditable breakdown."
+        title="No explanation stored with this score"
+        reason="This score row has no stored factor breakdown, so the evidence behind it cannot be shown."
       />
     );
   }
 
-  const skillRows = analysis.skillEvidence || [];
+  const skillRows = Array.isArray(explanation.skill_evidence)
+    ? explanation.skill_evidence
+    : (analysis?.skillEvidence || []);
+  const availableCount = explanation.factors.filter((f) => f.available).length;
 
   return (
     <div className="space-y-6">
-      {/* Plain-language summary of the composite */}
+      {/* Plain-language summary of the composite, as stored */}
       <div className="p-4 rounded-lg bg-muted border border-border">
         <p className="text-body-sm text-foreground leading-relaxed">{explanation.summary}</p>
-        {analysis.evidenceLimited && (
-          <div className="flex items-center gap-2 mt-3">
+        {evidenceLimited && (
+          <div className="flex items-center gap-2 mt-3" data-testid="evidence-limited">
             <ShieldAlert className="w-4 h-4 text-warning" aria-hidden="true" />
-            <span className="text-caption text-warning">
-              Evidence-limited: scored on {explanation.factors.filter((f) => f.available).length} of{' '}
-              {explanation.factors.length} evidence sources. Missing sources had their weight
-              redistributed, not counted as zero.
+            <span className="text-caption text-warning-text">
+              Evidence-limited: scored on {availableCount} of {explanation.factors.length} evidence
+              sources. Missing sources had their weight redistributed, not counted as zero.
             </span>
           </div>
         )}
@@ -264,33 +346,7 @@ function ScoreBreakdown({ analysis }) {
         </section>
       )}
 
-      {/* Flagged inconsistencies */}
-      <section>
-        <h3 className="text-body font-medium text-foreground mb-3">Flagged inconsistencies</h3>
-        {analysis.flagsAvailable && analysis.flags.length > 0 ? (
-          <div className="space-y-2">
-            {analysis.flags.map((flag, i) => (
-              <div key={i} className="p-3 rounded-lg bg-warning/10 border border-warning/20">
-                <p className="text-body-sm text-foreground">{flag.description}</p>
-                {flag.severity && (
-                  <Badge variant="warning" className="mt-2">
-                    {flag.severity} severity
-                  </Badge>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : analysis.flagsAvailable ? (
-          <p className="text-body-sm text-muted-foreground">
-            No contradictions were found between this candidate's claims and the available evidence.
-          </p>
-        ) : (
-          <EvidenceUnavailable
-            title="Inconsistency detection not available"
-            reason={analysis.flagsUnavailableReason}
-          />
-        )}
-      </section>
+      {showFlags && <FlagsPanel storedReason={explanation.flags_unavailable_reason ?? analysis?.flagsUnavailableReason ?? null} />}
 
       <p className="text-caption text-muted-foreground">
         {explanation.generated_at
@@ -302,5 +358,5 @@ function ScoreBreakdown({ analysis }) {
   );
 }
 
-export { EvidenceUnavailable };
+export { EvidenceUnavailable, FlagsPanel };
 export default ScoreBreakdown;

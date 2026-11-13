@@ -1,4 +1,9 @@
 /** @type {import('tailwindcss').Config} */
+
+// R-14: the semantic colours read the CSS variables defined once in
+// src/index.css, so Tailwind classes and SVG/chart attributes share one value.
+const token = (name) => `hsl(var(--${name}) / <alpha-value>)`;
+
 module.exports = {
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
@@ -7,13 +12,13 @@ module.exports = {
     extend: {
       colors: {
         background: {
-          DEFAULT: '#ffffff',
+          DEFAULT: token('background'),
           primary: '#fafafa',
           secondary: '#f5f5f5',
           tertiary: '#e5e5e5',
         },
         foreground: {
-          DEFAULT: '#0a0a0a',
+          DEFAULT: token('foreground'),
           muted: '#737373',
         },
         surface: {
@@ -22,7 +27,7 @@ module.exports = {
           elevated: '#f5f5f5',
         },
         border: {
-          DEFAULT: '#e5e5e5',
+          DEFAULT: token('border'),
           hover: '#d4d4d4',
           glow: '#0a0a0a',
         },
@@ -41,30 +46,32 @@ module.exports = {
           emerald: 'rgba(34, 197, 94, 0.1)',
         },
         primary: {
-          DEFAULT: '#0a0a0a',
-          foreground: '#ffffff',
+          DEFAULT: token('primary'),
+          foreground: token('primary-foreground'),
         },
         muted: {
-          DEFAULT: '#f5f5f5',
-          foreground: '#737373',
+          DEFAULT: token('muted'),
+          foreground: token('muted-foreground'),
         },
         destructive: {
-          DEFAULT: '#ef4444',
-          foreground: '#ffffff',
+          DEFAULT: token('destructive'),
+          foreground: token('destructive-foreground'),
         },
         success: {
-          DEFAULT: '#22c55e',
-          foreground: '#ffffff',
+          DEFAULT: token('success'),
+          foreground: token('success-foreground'),
         },
         warning: {
-          DEFAULT: '#f59e0b',
-          foreground: '#ffffff',
+          DEFAULT: token('warning'),
+          foreground: token('warning-foreground'),
+          // `text-warning-text`: amber text on light backgrounds (index.css --warning-text).
+          text: token('warning-text'),
         },
-        ring: '#0a0a0a',
-        input: '#e5e5e5',
+        ring: token('ring'),
+        input: token('input'),
         secondary: {
-          DEFAULT: '#f5f5f5',
-          foreground: '#0a0a0a',
+          DEFAULT: token('secondary'),
+          foreground: token('secondary-foreground'),
         },
       },
       fontFamily: {

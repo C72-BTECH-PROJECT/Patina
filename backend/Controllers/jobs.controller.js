@@ -6,6 +6,7 @@ import { resolveRequestId } from '../Services/internalHttp.js';
 import { ResumePipelineError, findStoredResume } from '../Services/resumePipeline.js';
 import { scoreApplication, scoringSummary } from '../Services/scoringPipeline.js';
 import { prepareOnApply, triggerPreparation } from '../Services/assessmentService.js';
+import { scoreBand } from '../Services/explainability.js';
 
 const formatJob = (job) => ({
   id: job.id,
@@ -224,9 +225,10 @@ export const getMyApplications = async (req, res) => {
   try {
     const candidateId = req.session.userId;
 
+    // R-16: the job title comes with each row (the embed reads closed jobs too).
     const { data: applicationRows, error: applicationsError } = await supabase
       .from('applications')
-      .select('id, job_id, status, submitted_at')
+      .select('id, job_id, status, submitted_at, job:jobs(title)')
       .eq('candidate_id', candidateId)
       .order('submitted_at', { ascending: false });
 
@@ -237,25 +239,38 @@ export const getMyApplications = async (req, res) => {
     // R-10 (Y1): the scoring state is derived from whether a score row exists for
     // this candidate and job: `scored` or `pending` ("not scored yet"). No failure
     // reason is stored, so none is shown here. A lookup error is an error, never
-    // "pending".
+    // "pending". R-16: `score` is { composite, band } of the NEWEST row for that job,
+    // from one query for all rows, or null.
     const rows = applicationRows || [];
-    const scoredJobs = new Set();
+    const newestByJob = new Map();
     if (rows.length) {
       const { data: scoreRows, error: scoresError } = await supabase
         .from('scores')
-        .select('job_id')
+        .select('id, job_id, composite_score, created_at')
         .eq('candidate_id', candidateId)
-        .in('job_id', rows.map((r) => r.job_id));
+        .in('job_id', rows.map((r) => r.job_id))
+        .order('created_at', { ascending: false });
       if (scoresError) {
         return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load applications', cause: scoresError, context: 'my applications: scores' });
       }
-      for (const s of scoreRows || []) scoredJobs.add(s.job_id);
+      const stamp = (v) => Date.parse(v || '') || 0;
+      const newestFirst = [...(scoreRows || [])].sort((a, b) => stamp(b.created_at) - stamp(a.created_at)
+        || String(b.id).localeCompare(String(a.id)));
+      for (const s of newestFirst) if (!newestByJob.has(s.job_id)) newestByJob.set(s.job_id, s);
     }
 
-    return res.json(rows.map((r) => ({
-      ...r,
-      scoring: { state: scoredJobs.has(r.job_id) ? 'scored' : 'pending' },
-    })));
+    return res.json(rows.map((r) => {
+      const newest = newestByJob.get(r.job_id);
+      return {
+        id: r.id,
+        job_id: r.job_id,
+        status: r.status,
+        submitted_at: r.submitted_at,
+        job_title: r.job?.title ?? null,
+        scoring: { state: newest ? 'scored' : 'pending' },
+        score: newest ? { composite: Number(newest.composite_score), band: scoreBand(newest.composite_score) } : null,
+      };
+    }));
   } catch (err) {
     return sendError(req, res, { status: 500, error: 'internal_error', message: 'Failed to load applications', cause: err, context: 'my applications' });
   }
@@ -314,7 +329,7 @@ export const shortlistCandidate = async (req, res) => {
     notified = await sendNotification(
       data.candidate_id,
       'shortlisted',
-      'You have been shortlisted for a job!',
+      `You have been shortlisted for ${owned.job.title}.`,
       { applicationId: data.id, jobId: data.job_id }
     );
   }

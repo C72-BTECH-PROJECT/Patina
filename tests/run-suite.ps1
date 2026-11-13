@@ -41,15 +41,32 @@
   backend (T-0031): upload-limits, applicant-identity, assessment-service-client and backend-cruft
              (offline) always; -Live adds live-applicants (needs applicant_emails pushed) and
              live-upload-gates.
+  e2e     = (current only, R-19) tests\e2e: Playwright (`npx playwright test`) against the stack
+             ALREADY running from scripts\start-all.ps1 (frontend :3000, gateway :5000). Starts and
+             stops nothing, sets no service environment (the e2e stack is the real one), and returns
+             Playwright's exit code. Not in the default suites; run it alone (it cannot share a run
+             with nlp/backend/gateway, which need those ports free):
+               powershell -File tests\run-suite.ps1 -Suites e2e      (-Target defaults to current here)
+             It writes to Supabase through the app as the t0001_ test accounts and ends by printing
+             the rows it created.
   Logs go to tests\.out\ (git-ignored).
 #>
 param(
-  [Parameter(Mandatory = $true)][ValidateSet('baseline', 'current')][string]$Target,
-  [ValidateSet('nlp', 'backend', 'gateway', 'frontend', 'docs', 'github', 'assessment')][string[]]$Suites = @('nlp', 'backend', 'gateway', 'frontend', 'docs', 'github', 'assessment'),
+  [ValidateSet('baseline', 'current')][string]$Target,
+  [ValidateSet('nlp', 'backend', 'gateway', 'frontend', 'docs', 'github', 'assessment', 'e2e')][string[]]$Suites = @('nlp', 'backend', 'gateway', 'frontend', 'docs', 'github', 'assessment'),
   [switch]$Live
 )
 
 $ErrorActionPreference = 'Stop'
+# -Target is required, except for an e2e-only run (R-19 check line), which is always the current tree.
+if (-not $Target) {
+  if (@($Suites | Where-Object { $_ -ne 'e2e' }).Count -eq 0) { $Target = 'current' }
+  else { throw '-Target baseline|current is required (only -Suites e2e may omit it).' }
+}
+# R-19: e2e runs against the already-running stack; the suites that start services need its ports free.
+if (($Suites -contains 'e2e') -and @($Suites | Where-Object { $_ -in @('nlp', 'backend', 'gateway') }).Count) {
+  throw 'Run -Suites e2e on its own: it needs the stack from scripts\start-all.ps1 running, while nlp/backend/gateway need those ports free.'
+}
 $repo = Split-Path -Parent $PSScriptRoot
 $tests = $PSScriptRoot
 $out = Join-Path $tests '.out'
@@ -171,7 +188,7 @@ try {
     # Offline unit tests (T-0014): explainability layer and the github-evidence client against a
     # local stub. They import this repo's backend modules, so they mean nothing for baseline.
     if ($Target -eq 'current') {
-      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim', 'upload-limits', 'applicant-identity', 'assessment-service-client', 'backend-cruft', 'error-contract', 'auth-session', 'resume-pipeline', 'score-on-apply', 'assessment-orchestration', 'assessment-time-reset', 'apply-scoring-throws', 'recruiter-applications') {
+      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim', 'upload-limits', 'applicant-identity', 'assessment-service-client', 'backend-cruft', 'error-contract', 'auth-session', 'resume-pipeline', 'score-on-apply', 'assessment-orchestration', 'assessment-time-reset', 'apply-scoring-throws', 'recruiter-applications', 'candidate-results') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
       # T-0024/T-0025 route guards (T-0023): no session, no assessment service, no LLM. Baseline has no route.
@@ -252,6 +269,24 @@ try {
       $asTests = Join-Path $tests 'assessment'
       & cmd.exe /c "`"$asPython`" -m pytest `"$asTests`" -v -p no:cacheprovider 2>&1" | Tee-Object (Join-Path $out "$Target-assessment.log")
       $results['assessment'] = $LASTEXITCODE
+    }
+  }
+
+  if ($Suites -contains 'e2e') {
+    Write-Host "== e2e suite (Playwright against the running stack)"
+    if ($Target -ne 'current') {
+      Write-Host "skipped (e2e runs against the current tree's stack only)"
+      $results['e2e'] = 0
+    } else {
+      $e2eDir = Join-Path $tests 'e2e'
+      if (-not (Test-Path (Join-Path $e2eDir 'node_modules\@playwright\test'))) { throw "Playwright missing: cd tests\e2e; npm ci; npx playwright install chromium" }
+      # No service is started or configured here: global-setup.mjs fails in one sentence if the
+      # frontend or the gateway is down. cmd.exe merges stderr (PowerShell 5.1 NativeCommandError).
+      Push-Location $e2eDir
+      try {
+        & cmd.exe /c "npx playwright test 2>&1" | Tee-Object (Join-Path $out "$Target-e2e.log")
+        $results['e2e'] = $LASTEXITCODE
+      } finally { Pop-Location }
     }
   }
 

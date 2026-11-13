@@ -5,6 +5,7 @@ import {
   uploadResume,
   getCandidateResume,
   rescoreApplication,
+  getApplicationResult,
   listRecruiterApplications,
   getRecruiterApplication,
 } from '../Controllers/analysis.controller.js';
@@ -23,5 +24,7 @@ router.post('/resume/upload', requireRole('CANDIDATE'), uploadResume);
 router.get('/resume/candidate/:candidateId', requireRole('RECRUITER'), getCandidateResume);
 // The owning candidate or the job's recruiter; ownership is checked in the handler.
 router.post('/applications/:id/score', requireRole('CANDIDATE', 'RECRUITER'), rescoreApplication);
+// R-16: the owning candidate's result for one application (404 for anyone else's).
+router.get('/applications/:id/result', requireRole('CANDIDATE'), getApplicationResult);
 
 export default router;

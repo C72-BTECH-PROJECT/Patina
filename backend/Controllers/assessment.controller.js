@@ -69,6 +69,7 @@ import {
   startedAtOf,
   submittedAtOf,
   summariseAttempts,
+  timeLimitMinutes,
   timingOf,
   triggerPreparation,
   voidAttempt,
@@ -272,9 +273,20 @@ const graderFailure = (err) => {
   return { status: 503, body: { error: 'grading_unavailable', reason: code, message: ASSESSMENT_ERRORS.grading_unavailable.message } };
 };
 
-/** The candidate's result: total, per-skill summary, right/wrong per question with safe feedback. */
-const candidateResult = (row, evaluation, scoring) => {
-  const results = evaluation.results;
+/** Question text by id from the row's served questions: the text only, never options or a key field. */
+const questionTextById = (row) => new Map(servedQuestions(row)
+  .filter((q) => typeof q?.question_id === 'string')
+  .map((q) => [q.question_id, typeof q.question === 'string' ? q.question : null]));
+
+/**
+ * The candidate's result: total, per-skill summary, right/wrong per question with
+ * safe feedback and the question's text (null when the row holds none). Built from
+ * a storedEvaluation() shape and the row's served questions only, so the evaluate
+ * answer and a later status read (R-17) are the same function over the same fields.
+ */
+const candidateResult = (row, evaluation) => {
+  const texts = questionTextById(row);
+  const results = evaluation.results.map((r) => ({ ...r, question: texts.get(r.question_id) ?? null }));
   const bySkill = new Map();
   for (const r of results) {
     const key = r.skill || 'unspecified';
@@ -293,7 +305,6 @@ const candidateResult = (row, evaluation, scoring) => {
     points_possible: evaluation.points_possible,
     skills: [...bySkill.values()],
     results,
-    scoring,
     submitted_at: submittedAtOf(row),
     late_submission: row.answers?.late_submission === true,
     ...timingOf(row),
@@ -421,7 +432,7 @@ async function gradeSubmitted({ assessmentId, candidateId, jobId, requestId }) {
     result = { status: 'failed', reason: 'internal_error' };
   }
   const graded = { ...row, answers: { ...(row.answers || {}), submitted_at: submittedAtOf(row) || iso(serverNow()) } };
-  return { status: 200, body: candidateResult(graded, evaluation, scoringSummary(result)) };
+  return { status: 200, body: { ...candidateResult(graded, evaluation), scoring: scoringSummary(result) } };
 }
 
 /** Start the attempt's one grading run in the background (or join it). Never throws. */
@@ -506,11 +517,29 @@ export async function candidateView(req, { candidateId, jobId, s }, { observeOnl
 }
 
 /**
+ * R-17: the score of record's candidate result, rebuilt from the stored (candidate-safe)
+ * `evaluation` by the same function as the evaluate answer; null when nothing is stored.
+ * An older attempt without per-question results yields empty `results` and `skills`.
+ * Voided rows are never counted, so they never show here.
+ */
+const completedResult = async (s) => {
+  const row = s.counted[0];
+  if (!row || !row.evaluation || typeof row.evaluation !== 'object') return null;
+  // The attempt list does not load the served questions; read them for this one row.
+  const { data, error } = await supabase.from('assessments').select('questions').eq('id', row.id).maybeSingle();
+  if (error) throw dbFailure('assessment questions', error);
+  return candidateResult({ ...row, questions: data?.questions ?? null }, storedEvaluation(row.evaluation));
+};
+
+/**
  * GET /api/assessment/status?jobId=
  *   200 { jobId, state, assessmentId?, started_at?, expires_at?, submitted_at?, reason?,
- *         retry_after_seconds?, server_time, attempts: { used, max }, scoreOfRecord }
+ *         retry_after_seconds?, server_time, attempts: { used, max }, scoreOfRecord,
+ *         time_limit_minutes (R-17: ASSESSMENT_TIME_LIMIT_MINUTES, the limit the server enforces),
+ *         result (state 'completed' only: the evaluate result without `scoring`, or null) }
  *   400 invalid_job_id · 404 job_not_found · 500 database_error
- * Answers at once; never returns questions; never waits on the LLM.
+ * Answers at once; never returns the question set (a completed `result` carries each
+ * graded question's text only); never waits on the LLM.
  */
 export const getAssessmentStatus = async (req, res) => {
   try {
@@ -525,7 +554,14 @@ export const getAssessmentStatus = async (req, res) => {
     const applied = await hasApplication(candidateId, jobId);
     const s = summariseAttempts(applied ? await loadAttempts(candidateId, jobId) : [], maxAttempts());
     const view = applied ? await candidateView(req, { candidateId, jobId, s }) : { state: 'not_applied', ...serverTime() };
-    return res.json({ jobId, ...view, attempts: attemptsOf(s), scoreOfRecord: s.scoreOfRecord });
+    return res.json({
+      jobId,
+      ...view,
+      attempts: attemptsOf(s),
+      scoreOfRecord: s.scoreOfRecord,
+      time_limit_minutes: timeLimitMinutes(),
+      ...(view.state === 'completed' ? { result: await completedResult(s) } : {}),
+    });
   } catch (err) {
     return databaseError(req, res, err, '[assessment] status');
   }

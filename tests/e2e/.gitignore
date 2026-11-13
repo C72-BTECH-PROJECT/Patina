@@ -1,0 +1,6 @@
+# R-19: Playwright output (screenshots, traces, HTML report, leftover-row log) is scratch.
+# node_modules/ is already ignored by the root .gitignore.
+output/
+test-results/
+playwright-report/
+blob-report/

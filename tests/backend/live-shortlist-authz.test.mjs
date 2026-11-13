@@ -98,6 +98,8 @@ test('control: recruiter A shortlists own application (200, row shortlisted, 1 n
   const notes = await notificationsFor(shortlistId);
   assert.equal(notes.length, 1);
   assert.equal(notes[0].type, 'shortlisted');
+  // Names the job the same way the rejection does.
+  assert.equal(notes[0].message, 'You have been shortlisted for [T-0001 TEST] harness job.');
 
   const rejectId = await newApplication();
   const r2 = await api(cookieA, 'POST', SHORTLIST, { applicationId: rejectId, status: 'rejected' });

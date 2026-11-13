@@ -1,18 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { Link, Outlet, useNavigate } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Briefcase, LayoutDashboard, LogOut, User, Zap, Bell, ListChecks } from "lucide-react";
+import { Briefcase, LayoutDashboard, LogOut, User, Zap, Bell, ListChecks, Trophy } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+import { api } from "../../lib/api";
 
 function CandidateLayout() {
-  const navigate = useNavigate();
   const { logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const navItems = [
-    { to: "/candidate/dashboard", icon: LayoutDashboard, label: "About" },
+    { to: "/candidate/dashboard", icon: LayoutDashboard, label: "My applications" },
     { to: "/candidate/jobs", icon: Briefcase, label: "Jobs" },
+    { to: "/candidate/results", icon: Trophy, label: "Results" },
     { to: "/candidate/assessment", icon: ListChecks, label: "Assessment" },
     { to: "/candidate/profile", icon: User, label: "Profile" },
   ];
@@ -25,15 +24,10 @@ function CandidateLayout() {
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/notifications?unread=true`, {
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setUnreadCount(data.unreadCount || 0);
-        }
+        const data = await api.get('/api/notifications?unread=true');
+        setUnreadCount(data?.unreadCount || 0);
       } catch (err) {
-        console.error('Failed to fetch notifications:', err);
+        console.error('Failed to fetch notifications:', err.message);
       }
     };
 

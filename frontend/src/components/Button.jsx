@@ -35,8 +35,11 @@ function Button({
   const variants = {
     primary: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/95 shadow-xs hover:shadow-card',
     secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/70',
-    outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground active:bg-accent/80',
-    ghost: 'hover:bg-accent hover:text-accent-foreground active:bg-accent/80',
+    // The `accent` colour has sub-keys only in tailwind.config.js (no DEFAULT), so the
+    // bare accent hover classes generated no CSS; `muted` is the hover surface the
+    // other controls use.
+    outline: 'border border-input bg-background hover:bg-muted hover:text-foreground active:bg-muted/80',
+    ghost: 'hover:bg-muted hover:text-foreground active:bg-muted/80',
     destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/95',
   };
 

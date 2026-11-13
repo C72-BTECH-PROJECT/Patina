@@ -1,75 +1,478 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-// lucide-react carries no brand icons, so the LinkedIn link uses the generic
-// Link glyph and its own label.
-import { X, Mail, MapPin, Link as LinkIcon, FileText, Calendar } from 'lucide-react';
+import { AlertTriangle, Calendar, Mail, ShieldAlert, X } from 'lucide-react';
 import Badge from '../Badge';
-import ScoreBreakdown from './ScoreBreakdown';
+import Button from '../Button';
+import ScoreBadge from '../ScoreBadge';
+import Spinner from '../Spinner';
+import ScoreBreakdown, { EvidenceUnavailable, FlagsPanel } from './ScoreBreakdown';
+import { api, isAborted } from '../../lib/api';
+import {
+  SUBSCORES, assessmentStateText, attemptStateText, describeVoid, formatWhen, resettableAttempt,
+  scoringFailureText, statusText, subscoreLabel,
+} from './applicationsLogic';
 
 /**
- * CandidateModal — the "Audit Score Breakdown" view (CHECKLIST 5.7 / 5.8).
+ * The recruiter drill-down for ONE application (card R-18, DECISIONS.md §6.2, §7, §8.2):
+ * composite -> weights (provisional) -> sub-scores -> evidence, the assessment attempts
+ * with per-question outcomes and recruiter feedback, the GitHub-ownership and
+ * unproctored notes, the honest flags panel, and the reset action.
  *
- * Takes one analysis from `GET /api/candidates` (the
- * `analysis.controller.serializeCandidate` shape) and shows the composite next
- * to the stored explanation that produced it. It renders no metric the backend
- * did not persist: sources with no evidence show their reason, not a zero.
+ * Data: GET /api/recruiter/applications/:id (backend/Controllers/analysis.controller.js
+ * getRecruiterApplication). Every number shown is a value from that response.
+ * Reset: POST /api/assessment/:assessmentId/reset { reason } (assessment.controller.js
+ * resetAssessment); the reason is required. After a reset the detail is reloaded from
+ * the server so the void record shown is the stored one.
  */
 
-const GithubIcon = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-  </svg>
-);
-
-const scoreTone = (score) =>
-  score >= 80 ? 'success' : score >= 60 ? 'warning' : 'destructive';
-
-// Written out rather than interpolated: Tailwind only emits classes it can find
-// as literal strings in the source.
-const TONE_TEXT_CLASS = {
-  success: 'text-success',
-  warning: 'text-warning',
-  destructive: 'text-destructive',
+// The backend's unproctored note (explainability.js UNPROCTORED_NOTE) is the same words
+// as the heading; it is shown only if it ever says something more.
+const extraUnproctoredNote = (note) => {
+  if (typeof note !== 'string') return '';
+  const same = note.trim().replace(/\.$/, '').toLowerCase() === 'unproctored online assessment';
+  return same || !note.trim() ? '' : `${note.trim()} `;
 };
 
-function ScoreRing({ score }) {
-  const tone = scoreTone(score);
-  const circumference = 2 * Math.PI * 50;
-  const offset = circumference - (score / 100) * circumference;
-
+function Section({ title, children, testId, aside }) {
   return (
-    <div className="relative w-28 h-28 flex-shrink-0">
-      <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r="50" fill="none" stroke="hsl(var(--border))" strokeWidth="8" />
-        <motion.circle
-          cx="60"
-          cy="60"
-          r="50"
-          fill="none"
-          stroke={`hsl(var(--${tone}))`}
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 0.9, ease: 'easeOut' }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-h2 font-extrabold ${TONE_TEXT_CLASS[tone]} tabular-nums`}>
-          {score}
-        </span>
-        <span className="text-caption text-muted-foreground">/100</span>
+    <section className="space-y-3" data-testid={testId}>
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-body font-semibold text-foreground">{title}</h3>
+        {aside}
       </div>
+      {children}
+    </section>
+  );
+}
+
+function ResetRecord({ voided, currentUserId }) {
+  const d = describeVoid(voided, currentUserId);
+  if (!d) return null;
+  return (
+    <div className="p-3 rounded-lg border border-warning/30 bg-warning/10" data-testid="reset-record">
+      <div className="text-body-sm font-medium text-foreground">This attempt was reset</div>
+      <dl className="mt-1 grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-caption">
+        <dt className="text-muted-foreground">Who</dt>
+        <dd className="text-foreground" data-testid="reset-record-who">{d.who}</dd>
+        <dt className="text-muted-foreground">When</dt>
+        <dd className="text-foreground" data-testid="reset-record-when">{formatWhen(d.at) || 'not recorded'}</dd>
+        <dt className="text-muted-foreground">Why</dt>
+        <dd className="text-foreground" data-testid="reset-record-reason">{d.reason}</dd>
+        {d.prior && (
+          <>
+            <dt className="text-muted-foreground">State before</dt>
+            <dd className="text-foreground">{d.prior}</dd>
+          </>
+        )}
+      </dl>
+      <p className="mt-1 text-caption text-muted-foreground">
+        A reset attempt stays on record and no longer counts toward the attempt limit or the score.
+      </p>
     </div>
   );
 }
 
-function CandidateModal({ analysis, onClose }) {
-  if (!analysis) return null;
+function QuestionResults({ results }) {
+  if (!results.length) {
+    return <p className="text-caption text-muted-foreground">No per-question results are stored for this attempt.</p>;
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left border-collapse" data-testid="question-results">
+        <thead>
+          <tr className="border-b border-border">
+            <th className="py-1.5 pr-3 text-caption font-medium text-muted-foreground">#</th>
+            <th className="py-1.5 pr-3 text-caption font-medium text-muted-foreground">Question</th>
+            <th className="py-1.5 pr-3 text-caption font-medium text-muted-foreground">Outcome</th>
+            <th className="py-1.5 text-caption font-medium text-muted-foreground">Recruiter feedback</th>
+          </tr>
+        </thead>
+        <tbody>
+          {results.map((r, i) => (
+            <tr key={r.question_id || i} className="border-b border-border last:border-0 align-top">
+              <td className="py-2 pr-3 text-caption text-muted-foreground tabular-nums">{i + 1}</td>
+              <td className="py-2 pr-3 text-caption text-foreground min-w-[12rem]">
+                {r.question || <span className="italic text-muted-foreground">Question text not stored</span>}
+                <div className="text-muted-foreground">
+                  {r.skill || 'Unnamed skill'} ·{' '}
+                  {r.question_type === 'mcq' ? 'multiple choice' : r.question_type === 'short_answer' ? 'short answer' : 'type not recorded'}
+                </div>
+              </td>
+              <td className={`py-2 pr-3 text-caption tabular-nums whitespace-nowrap ${r.correct ? 'text-success' : 'text-destructive'}`}>
+                {r.correct ? 'Right' : 'Not right'} · {r.points} of {r.max_points}
+              </td>
+              <td className="py-2 text-caption text-foreground min-w-[12rem]">
+                {r.recruiter_feedback || (
+                  <span className="italic text-muted-foreground">No recruiter feedback stored for this question.</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
-  const person = analysis.candidate || {};
-  const appliedAt = analysis.appliedAt ? new Date(analysis.appliedAt) : null;
+function AttemptCard({ item, index, currentUserId }) {
+  const text = attemptStateText(item.state);
+  const results = Array.isArray(item.results) ? item.results : [];
+  return (
+    <div className="rounded-lg border border-border p-4 space-y-3" data-testid="assessment-attempt" data-state={item.state}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-body-sm font-medium text-foreground">Attempt {index + 1}</span>
+        <Badge variant={item.voided ? 'warning' : 'outline'}>{text.label}</Badge>
+        {item.score_of_record && <Badge variant="success">Score of record</Badge>}
+        {item.late_submission && <Badge variant="warning">Late submission</Badge>}
+        {item.auto_submitted && <Badge variant="outline">Submitted automatically ({String(item.auto_submitted)})</Badge>}
+      </div>
+      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-caption">
+        <div><dt className="text-muted-foreground">Started</dt><dd className="text-foreground">{formatWhen(item.started_at) || 'not started'}</dd></div>
+        <div><dt className="text-muted-foreground">Submitted</dt><dd className="text-foreground">{formatWhen(item.submitted_at) || '—'}</dd></div>
+        <div><dt className="text-muted-foreground">Completed</dt><dd className="text-foreground">{formatWhen(item.completed_at) || '—'}</dd></div>
+        <div>
+          <dt className="text-muted-foreground">Score</dt>
+          <dd className="text-foreground tabular-nums" data-testid="attempt-score">{item.score === null || item.score === undefined ? '—' : String(item.score)}</dd>
+        </div>
+      </dl>
+      {item.voided && <ResetRecord voided={item.voided} currentUserId={currentUserId} />}
+      {results.length > 0 || item.state === 'completed' || item.voided ? <QuestionResults results={results} /> : null}
+    </div>
+  );
+}
+
+function ResetForm({ attempt, onDone }) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const trimmed = reason.trim();
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await api.post(`/api/assessment/${attempt.assessmentId}/reset`, { reason: trimmed });
+      setReason('');
+      onDone(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="rounded-lg border border-border p-4 space-y-2">
+      <label htmlFor="reset-reason" className="block text-body-sm font-medium text-foreground">
+        Reset assessment attempt
+      </label>
+      <p className="text-caption text-muted-foreground">
+        For a genuine problem such as a lost connection. The attempt is kept on record with your
+        reason, stops counting toward the score, and the candidate is notified and can take a new
+        assessment. A reason is required.
+      </p>
+      <textarea
+        id="reset-reason"
+        data-testid="reset-reason-input"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        rows={2}
+        required
+        placeholder="Why is this attempt being reset?"
+        className="w-full bg-background border border-input rounded-md px-3 py-2 text-body-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+      {error && <p className="text-caption text-destructive" role="alert">Not reset: {error}</p>}
+      <Button
+        type="submit"
+        size="sm"
+        variant="destructive"
+        loading={busy}
+        disabled={!trimmed}
+        data-testid="reset-attempt-button"
+      >
+        Reset assessment attempt
+      </Button>
+    </form>
+  );
+}
+
+function SummarySubscores({ score }) {
+  // Used only when a score row has no stored explanation: the list summary's values.
+  return (
+    <div className="space-y-2">
+      {SUBSCORES.map(({ key, testId }) => {
+        const sub = score.subscores?.[key] || null;
+        return (
+          <div key={key} className="rounded-lg border border-border p-3" data-testid={testId} data-available={sub?.available ? 'true' : 'false'}>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-body-sm font-medium text-foreground">{subscoreLabel(key)}</span>
+              <span className="text-body-sm text-foreground tabular-nums" data-testid="subscore-value">
+                {sub?.available ? `${sub.value}/100 · weight ${sub.weight}` : '—'}
+              </span>
+            </div>
+            {!sub?.available && (
+              <p className="text-caption text-muted-foreground mt-1">
+                {sub?.reason || 'Not available for this score; no reason was stored.'}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Detail({ detail, currentUserId, onReset, resetResult }) {
+  const { candidate, job, score, explanation, weights, assessment, notes } = detail;
+  const status = statusText(detail.status);
+  const stateText = assessmentStateText(assessment);
+  const items = Array.isArray(assessment?.items) ? assessment.items : [];
+  const target = resettableAttempt(items);
+  const baseWeights = explanation?.weighting_scheme?.base_weights || null;
+  const history = Array.isArray(detail.score_history) ? detail.score_history : [];
+
+  return (
+    <div className="space-y-8">
+      {/* Who and what */}
+      <div className="pr-10">
+        <h2 className="text-h2 font-heading font-semibold text-foreground">
+          {candidate?.name || <span className="italic text-muted-foreground">No name on the candidate's profile</span>}
+        </h2>
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-body-sm text-muted-foreground">
+          {candidate?.email ? (
+            <a href={`mailto:${candidate.email}`} className="flex items-center gap-1.5 hover:text-foreground no-underline">
+              <Mail className="w-4 h-4" aria-hidden="true" />
+              {candidate.email}
+            </a>
+          ) : <span className="italic">No email on the account</span>}
+          {job?.title && <span>Applied for {job.title}</span>}
+          {detail.applied_at && (
+            <span className="flex items-center gap-1.5">
+              <Calendar className="w-4 h-4" aria-hidden="true" />
+              {formatWhen(detail.applied_at)}
+            </span>
+          )}
+          <Badge variant={status.variant} data-status={detail.status || ''}>{status.label}</Badge>
+        </div>
+      </div>
+
+      {/* Composite */}
+      <Section title="Credibility score" testId="drilldown-composite-section">
+        {score ? (
+          <div className="flex flex-wrap items-center gap-3" data-testid="drilldown-composite" data-state="scored" data-value={String(score.composite)}>
+            <span className="text-h1 font-extrabold text-foreground tabular-nums">{String(score.composite)}</span>
+            <span className="text-body-sm text-muted-foreground">/100</span>
+            <ScoreBadge band={score.band} />
+            {score.evidence_limited && (
+              <Badge variant="warning" data-testid="drilldown-evidence-limited">
+                <ShieldAlert className="w-3 h-3 mr-1" aria-hidden="true" />
+                Evidence-limited
+              </Badge>
+            )}
+            {score.created_at && <span className="text-caption text-muted-foreground">Computed {formatWhen(score.created_at)}</span>}
+          </div>
+        ) : (
+          <div data-testid="drilldown-composite" data-state="pending">
+            <p className="text-body-sm font-medium text-foreground">Not scored yet</p>
+            <p className="text-caption text-muted-foreground">
+              This application has no score row. Use "Score again" in the applications table to retry.
+            </p>
+          </div>
+        )}
+        {explanation?.band_thresholds?.note && (
+          <p className="text-caption text-muted-foreground">{explanation.band_thresholds.note}</p>
+        )}
+      </Section>
+
+      {/* Weights */}
+      {score && (
+        <Section
+          title="Weights used"
+          testId="drilldown-weights"
+          aside={<Badge variant="warning">Provisional</Badge>}
+        >
+          {weights ? (
+            <>
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="py-1.5 pr-3 text-caption font-medium text-muted-foreground">Evidence source</th>
+                    <th className="py-1.5 pr-3 text-caption font-medium text-muted-foreground">Weight used</th>
+                    {baseWeights && <th className="py-1.5 text-caption font-medium text-muted-foreground">Base weight</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {SUBSCORES.map(({ key }) => (
+                    <tr key={key} className="border-b border-border last:border-0" data-testid={`weight-${key}`}>
+                      <td className="py-1.5 pr-3 text-body-sm text-foreground">{subscoreLabel(key)}</td>
+                      <td className="py-1.5 pr-3 text-body-sm text-foreground tabular-nums">
+                        {weights[key] === undefined || weights[key] === null ? '—' : String(weights[key])}
+                      </td>
+                      {baseWeights && (
+                        <td className="py-1.5 text-body-sm text-muted-foreground tabular-nums">
+                          {baseWeights[key] === undefined ? '—' : String(baseWeights[key])}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-caption text-muted-foreground">
+                Provisional: these weights are a design choice with no calibration behind them.
+                {explanation?.weighting_scheme?.redistribution ? ` ${explanation.weighting_scheme.redistribution}` : ''}
+              </p>
+            </>
+          ) : (
+            <p className="text-body-sm text-muted-foreground">No weights were stored with this score.</p>
+          )}
+        </Section>
+      )}
+
+      {/* Sub-scores and evidence */}
+      {score && (
+        <Section title="Sub-scores and evidence" testId="drilldown-subscores">
+          {explanation?.factors?.length ? (
+            <ScoreBreakdown explanation={explanation} evidenceLimited={score.evidence_limited} showFlags={false} />
+          ) : (
+            <>
+              <EvidenceUnavailable
+                title="No explanation stored with this score"
+                reason="This score row has no stored factor breakdown, so only the sub-score values are shown."
+              />
+              <SummarySubscores score={score} />
+            </>
+          )}
+        </Section>
+      )}
+
+      {/* Notes the recruiter must see */}
+      <Section title="What these results do not prove" testId="drilldown-notes">
+        <div className="p-3 rounded-lg bg-muted border border-border" data-testid="note-github-ownership">
+          <div className="text-body-sm font-medium text-foreground">GitHub account taken from the resume; ownership not verified</div>
+          {notes?.github_ownership && <p className="text-caption text-muted-foreground mt-0.5">{notes.github_ownership}</p>}
+        </div>
+        <div className="p-3 rounded-lg bg-muted border border-border" data-testid="note-unproctored">
+          <div className="text-body-sm font-medium text-foreground">Unproctored online assessment</div>
+          <p className="text-caption text-muted-foreground mt-0.5">
+            {extraUnproctoredNote(notes?.unproctored_assessment)}
+            Identity, a second device, AI-written answers and tab switching are not controlled.
+          </p>
+        </div>
+      </Section>
+
+      {/* Assessment */}
+      <Section
+        title="Assessment"
+        testId="drilldown-assessment"
+        aside={(
+          <span className="text-caption text-muted-foreground tabular-nums">
+            {assessment?.attempts ? `Attempts used ${assessment.attempts.used} of ${assessment.attempts.max}` : null}
+          </span>
+        )}
+      >
+        <div data-testid="drilldown-assessment-state" data-state={assessment?.state || ''}>
+          <div className="text-body-sm font-medium text-foreground">{stateText.label}</div>
+          {stateText.hint && <p className="text-caption text-muted-foreground">{stateText.hint}</p>}
+        </div>
+        {items.length ? (
+          <div className="space-y-3">
+            {items.map((item, i) => (
+              <AttemptCard key={item.assessmentId || i} item={item} index={i} currentUserId={currentUserId} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-caption text-muted-foreground">No assessment attempt exists for this application yet.</p>
+        )}
+        {resetResult && (
+          <div
+            className={`p-3 rounded-lg border text-caption ${resetResult.scoring?.status === 'scored' ? 'border-success/30 bg-success/10 text-foreground' : 'border-warning/30 bg-warning/10 text-foreground'}`}
+            role="status"
+            data-testid="reset-result"
+          >
+            The attempt was reset.{' '}
+            {resetResult.notified ? 'The candidate was notified.' : 'The candidate notification could not be sent.'}{' '}
+            {resetResult.scoring?.status === 'scored'
+              ? 'A new score without that attempt was saved.'
+              : `${scoringFailureText(resetResult.scoring?.reason)} Use "Score again" in the table.`}
+          </div>
+        )}
+        {target ? (
+          <ResetForm attempt={target} onDone={onReset} />
+        ) : (
+          <p className="text-caption text-muted-foreground">
+            No attempt can be reset: the candidate has not started one, or every attempt is already reset.
+          </p>
+        )}
+      </Section>
+
+      {/* Flags */}
+      <FlagsPanel storedReason={explanation?.flags_unavailable_reason ?? null} />
+
+      {/* History */}
+      {history.length > 1 && (
+        <Section title="Score history" testId="drilldown-history">
+          <p className="text-caption text-muted-foreground">Every score row for this application, newest first. Rows are added, never changed.</p>
+          <ul className="space-y-1">
+            {history.map((h) => (
+              <li key={h.id} className="flex flex-wrap items-center gap-2 text-body-sm">
+                <span className="tabular-nums font-medium text-foreground">{String(h.composite)}</span>
+                <ScoreBadge band={h.band} />
+                {h.evidence_limited && <Badge variant="warning">Evidence-limited</Badge>}
+                <span className="text-caption text-muted-foreground">{formatWhen(h.created_at)}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </div>
+  );
+}
+
+function CandidateModal({ applicationId, onClose, onChanged, currentUserId = null }) {
+  const [state, setState] = useState({ status: 'loading', detail: null, error: null });
+  const [resetResult, setResetResult] = useState(null);
+  const controllerRef = useRef(null);
+
+  const load = useCallback(async () => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    setState((s) => ({ ...s, status: 'loading', error: null }));
+    try {
+      const detail = await api.get(`/api/recruiter/applications/${encodeURIComponent(applicationId)}`, {
+        signal: controller.signal, cache: 'no-store',
+      });
+      if (!detail || typeof detail !== 'object' || !detail.id) {
+        setState({ status: 'error', detail: null, error: { message: 'The server sent an application that could not be read.' } });
+        return;
+      }
+      setState({ status: 'ready', detail, error: null });
+    } catch (err) {
+      if (isAborted(err)) return;
+      setState({ status: 'error', detail: null, error: err });
+    }
+  }, [applicationId]);
+
+  useEffect(() => {
+    load();
+    return () => controllerRef.current?.abort();
+  }, [load]);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const onReset = (result) => {
+    setResetResult(result);
+    load();
+    onChanged?.();
+  };
+
+  const name = state.detail?.candidate?.name;
 
   return (
     <motion.div
@@ -80,112 +483,51 @@ function CandidateModal({ analysis, onClose }) {
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={`Score breakdown for ${person.name}`}
+      aria-label={name ? `Application details for ${name}` : 'Application details'}
     >
       <motion.div
-        className="bg-background rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden relative border border-border shadow-lg"
+        className="bg-background rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden relative border border-border shadow-lg"
         initial={{ opacity: 0, scale: 0.96, y: 24 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 24 }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
+        data-testid="drilldown"
+        data-state={state.status}
       >
         <button
           type="button"
           onClick={onClose}
           className="absolute top-5 right-5 w-9 h-9 rounded-lg bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors z-10"
           aria-label="Close"
+          data-testid="drilldown-close"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="overflow-y-auto max-h-[90vh]">
-          {/* Header */}
-          <div className="p-6 border-b border-border">
-            <div className="flex flex-col sm:flex-row items-start gap-6">
-              <div className="flex-1 min-w-0 pr-10">
-                <h2 className="text-h2 font-heading font-semibold text-foreground mb-1">
-                  {person.name}
-                </h2>
-                {analysis.jobTitle && (
-                  <p className="text-body-sm text-muted-foreground mb-3">
-                    Applied for {analysis.jobTitle}
-                  </p>
-                )}
-
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-body-sm text-muted-foreground">
-                  {person.location && person.location !== '—' && (
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4" aria-hidden="true" />
-                      {person.location}
-                    </span>
-                  )}
-                  {person.email && (
-                    <a
-                      href={`mailto:${person.email}`}
-                      className="flex items-center gap-1.5 hover:text-foreground transition-colors no-underline"
-                    >
-                      <Mail className="w-4 h-4" aria-hidden="true" />
-                      {person.email}
-                    </a>
-                  )}
-                  {person.github && (
-                    <a
-                      href={person.github}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1.5 hover:text-foreground transition-colors no-underline"
-                    >
-                      <GithubIcon className="w-4 h-4" />
-                      GitHub profile
-                    </a>
-                  )}
-                  {person.linkedin && (
-                    <a
-                      href={person.linkedin}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1.5 hover:text-foreground transition-colors no-underline"
-                    >
-                      <LinkIcon className="w-4 h-4" aria-hidden="true" />
-                      LinkedIn
-                    </a>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 mt-4">
-                  {analysis.matchLevel && (
-                    <Badge variant={scoreTone(analysis.credibilityScore)}>
-                      {analysis.matchLevel}
-                    </Badge>
-                  )}
-                  {analysis.evidenceLimited && <Badge variant="warning">Evidence-limited</Badge>}
-                  {analysis.resumeFileName && (
-                    <span className="flex items-center gap-1.5 text-caption text-muted-foreground">
-                      <FileText className="w-3.5 h-3.5" aria-hidden="true" />
-                      {analysis.resumeFileName}
-                    </span>
-                  )}
-                  {appliedAt && (
-                    <span className="flex items-center gap-1.5 text-caption text-muted-foreground">
-                      <Calendar className="w-3.5 h-3.5" aria-hidden="true" />
-                      {appliedAt.toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center">
-                <ScoreRing score={analysis.credibilityScore} />
-                <span className="text-caption text-muted-foreground mt-2">Credibility score</span>
-              </div>
+        <div className="overflow-y-auto max-h-[90vh] p-6">
+          {state.status === 'error' && (
+            <div className="py-10 text-center" role="alert" data-testid="drilldown-error">
+              <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-3" aria-hidden="true" />
+              <p className="text-body font-medium text-foreground">Could not load this application</p>
+              <p className="text-body-sm text-muted-foreground mt-1">{state.error?.message || 'The request failed.'}</p>
+              <Button variant="outline" className="mt-4" onClick={load}>Try again</Button>
             </div>
-          </div>
-
-          {/* Drill-down */}
-          <div className="p-6">
-            <ScoreBreakdown analysis={analysis} />
-          </div>
+          )}
+          {state.status === 'loading' && !state.detail && (
+            <div className="py-16 flex flex-col items-center gap-3" data-testid="drilldown-loading">
+              <Spinner />
+              <p className="text-body-sm text-muted-foreground">Loading application...</p>
+            </div>
+          )}
+          {state.detail && state.status !== 'error' && (
+            <Detail
+              detail={state.detail}
+              currentUserId={currentUserId}
+              onReset={onReset}
+              resetResult={resetResult}
+            />
+          )}
         </div>
       </motion.div>
     </motion.div>

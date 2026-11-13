@@ -1,27 +1,14 @@
-import React, { useEffect, useState} from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useScroll, useTransform} from 'framer-motion';
-import { Zap, TrendingUp, Users, Brain, Sparkles, ArrowRight, ChevronDown, Star } from 'lucide-react';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { Zap, Brain, Sparkles, ArrowRight, ChevronDown, FileText, GitBranch, ListChecks, Scale } from 'lucide-react';
 
-// Animated Counter Component
-const AnimatedCounter = ({ end, suffix = '', duration = 2 }) => {
-  const [count, setCount] = useState(0);
+// R-15 (D§8.2): this page describes what the system does and nothing else. The
+// demo score, the visitor statistics, the stock avatars, the rating and the
+// "Connect GitHub" claim were invented and are gone; nothing here is a number
+// the system did not produce.
 
-  useEffect(() => {
-    let startTime;
-    const animate = (timestamp) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / (duration * 1000), 1);
-      setCount(Math.floor(progress * end));
-      if (progress < 1) requestAnimationFrame(animate);
-    };
-    requestAnimationFrame(animate);
-  }, [end, duration]);
-
-  return <span>{count}{suffix}</span>;
-};
-
-// Glass Card Component
+// Card wrapper with a small hover lift.
 const GlassCard = ({ children, className = '', hover = true }) => (
   <motion.div
     className={`card ${hover ? 'card-lift' : ''} ${className}`}
@@ -32,181 +19,45 @@ const GlassCard = ({ children, className = '', hover = true }) => (
   </motion.div>
 );
 
-// Building Icon (simplified)
-const Building = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="4" y="2" width="16" height="20" rx="2" />
-    <path d="M9 22V18h6v4M8 6h.01M16 6h.01M12 6h.01M8 10h.01M16 10h.01M12 10h.01M8 14h.01M16 14h.01M12 14h.01" />
-  </svg>
-);
+// The inputs a credibility score is built from, in the order the pipeline uses them.
+const SCORE_INPUTS = [
+  { icon: FileText, title: 'Resume', text: 'Skills and contact details parsed from the PDF or DOCX you upload.' },
+  { icon: GitBranch, title: 'GitHub (optional)', text: 'If your resume links a public GitHub account, its public activity is checked against the skills you claim.' },
+  { icon: ListChecks, title: 'Assessment', text: 'A short timed assessment generated for the job you applied to.' },
+  { icon: Scale, title: 'Explained score', text: 'One score per application, with the evidence it used and anything that was unavailable.' },
+];
 
-// Floating Particle Component
-const FloatingParticle = ({ delay = 0, x = 0, y = 0 }) => (
+// Static explanation of how a score is put together (replaces the old animated demo score).
+const ScoreInputsPanel = () => (
   <motion.div
-    className="absolute w-1.5 h-1.5 bg-foreground rounded-full"
-    style={{ left: x, top: y }}
-    animate={{
-      y: [0, -14, 0],
-      opacity: [0.15, 0.6, 0.15],
-    }}
-    transition={{ duration: 3.5, repeat: Infinity, delay }}
-  />
+    className="card p-6"
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ duration: 0.5, delay: 0.3 }}
+  >
+    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
+      What a credibility score is built from
+    </p>
+    <ol className="space-y-4">
+      {SCORE_INPUTS.map(({ icon: Icon, title, text }, i) => (
+        <li key={title} className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-muted">
+            <Icon className="h-4 w-4 text-foreground" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-foreground">{i + 1}. {title}</p>
+            <p className="text-body-sm text-muted-foreground leading-relaxed">{text}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  </motion.div>
 );
-
-// Credential Score Demo Component
-const CredibilityDemo = () => {
-  const [score, setScore] = useState(0);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setScore(82), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const circumference = 2 * Math.PI * 120;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
-
-  return (
-    <motion.div
-      className="relative w-80 h-80 mx-auto"
-      initial={{ opacity: 0, scale: 0.85 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.8, delay: 0.5 }}
-    >
-      {/* Outer subtle ring */}
-      <motion.div
-        className="absolute inset-0 rounded-full border border-border"
-        animate={{ opacity: [0.4, 0.9, 0.4] }}
-        transition={{ duration: 3, repeat: Infinity }}
-      />
-
-      {/* Main Circle SVG */}
-      <svg className="w-full h-full -rotate-90" viewBox="0 0 260 260">
-        {/* Background Circle */}
-        <circle
-          cx="130"
-          cy="130"
-          r="120"
-          fill="none"
-          stroke="hsl(var(--border))"
-          strokeWidth="8"
-        />
-        {/* Progress Circle */}
-        <motion.circle
-          cx="130"
-          cy="130"
-          r="120"
-          fill="none"
-          stroke="hsl(var(--primary))"
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset }}
-          transition={{ duration: 2, delay: 0.5, ease: 'easeOut' }}
-        />
-      </svg>
-
-      {/* Center Content */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span
-          className="text-7xl font-extrabold text-foreground"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1 }}
-        >
-          {score === 0 ? <AnimatedCounter end={82} /> : score}
-        </motion.span>
-        <motion.span
-          className="text-xs text-muted-foreground mt-2 uppercase tracking-widest"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-        >
-          Credibility Score
-        </motion.span>
-        <motion.div
-          className="flex gap-2 mt-4"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.4 }}
-        >
-          {['Python', 'React', 'Node'].map((skill, i) => (
-            <span
-              key={skill}
-              className="px-3 py-1 text-xs rounded-full bg-muted text-muted-foreground"
-            >
-              {skill}
-            </span>
-          ))}
-        </motion.div>
-        <motion.div
-          className="mt-4 px-4 py-1.5 rounded-full bg-success/10 text-success text-xs font-medium border border-success/20"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 1.6 }}
-        >
-          ✓ Verified
-        </motion.div>
-      </div>
-
-      {/* Floating Elements */}
-      {[
-        { left: '12%', top: '18%', delay: 0 },
-        { left: '82%', top: '14%', delay: 0.6 },
-        { left: '8%', top: '68%', delay: 1.2 },
-        { left: '86%', top: '62%', delay: 1.8 },
-        { left: '48%', top: '6%', delay: 2.4 },
-        { left: '42%', top: '91%', delay: 3 },
-      ].map((pos, i) => (
-        <FloatingParticle key={i} delay={pos.delay} x={pos.left} y={pos.top} />
-      ))}
-    </motion.div>
-  );
-};
-
-// Stats Section Component
-const StatsSection = () => {
-  const stats = [
-    { value: 10000, suffix: '+', label: 'Candidates Verified', icon: Users },
-    { value: 500, suffix: '+', label: 'Companies Using', icon: Building },
-    { value: 95, suffix: '%', label: 'Accuracy Rate', icon: TrendingUp },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-      {stats.map((stat, index) => (
-        <motion.div
-          key={stat.label}
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: index * 0.1, duration: 0.4 }}
-        >
-          <GlassCard className="p-6 text-center">
-            <stat.icon className="w-6 h-6 mx-auto mb-3 text-foreground" />
-            <div className="text-4xl font-bold text-foreground mb-1">
-              <AnimatedCounter end={stat.value} suffix={stat.suffix} />
-            </div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</div>
-          </GlassCard>
-        </motion.div>
-      ))}
-    </div>
-  );
-};
 
 // Upload Icon
 const Upload = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-  </svg>
-);
-
-// Link Icon
-const LinkIcon = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
   </svg>
 );
 
@@ -261,7 +112,9 @@ const HeroSection = () => {
           </h1>
 
           <p className="text-lg text-muted-foreground leading-relaxed mb-8 max-w-xl mx-auto lg:mx-0">
-            The smartest way to validate candidate skills. Connect GitHub, upload your resume, and get instant credibility scores based on real-world activity.
+            Upload your resume and apply to a job. Your claimed skills are checked against your resume,
+            any public GitHub account it links to, and a short assessment, and the score you get comes
+            with an explanation of the evidence behind it.
           </p>
 
           <motion.div
@@ -279,37 +132,10 @@ const HeroSection = () => {
             </Link>
             <Link
               to="/login"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-md border border-input bg-background text-foreground font-medium text-body-sm hover:bg-accent transition-colors no-underline"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-md border border-input bg-background text-foreground font-medium text-body-sm hover:bg-muted transition-colors no-underline"
             >
               Log In
             </Link>
-          </motion.div>
-
-          <motion.div
-            className="mt-10 flex items-center gap-6 justify-center lg:justify-start"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-          >
-            <div className="flex -space-x-2">
-              {['https://i.pravatar.cc/40?img=1', 'https://i.pravatar.cc/40?img=2', 'https://i.pravatar.cc/40?img=3', 'https://i.pravatar.cc/40?img=4'].map((src, i) => (
-                <img
-                  key={i}
-                  src={src}
-                  alt=""
-                  className="w-8 h-8 rounded-full border-2 border-background"
-                />
-              ))}
-            </div>
-            <div className="text-left">
-              <div className="text-sm font-medium text-foreground">Trusted by 500+ companies</div>
-              <div className="flex items-center gap-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-3 h-3 fill-foreground text-foreground" />
-                ))}
-                <span className="text-xs text-muted-foreground ml-1">4.9/5</span>
-              </div>
-            </div>
           </motion.div>
         </motion.div>
 
@@ -319,7 +145,7 @@ const HeroSection = () => {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="relative"
         >
-          <CredibilityDemo />
+          <ScoreInputsPanel />
         </motion.div>
       </div>
 
@@ -341,17 +167,17 @@ const HowItWorksSection = () => {
     {
       icon: Upload,
       title: 'Upload Resume',
-      description: 'Submit your resume and let our AI extract your skills, experience, and project history with precision.',
+      description: 'Upload a PDF or DOCX resume. You see the skills that were extracted, or a clear message if the file could not be read.',
     },
     {
-      icon: LinkIcon,
-      title: 'Connect GitHub',
-      description: 'Link your GitHub profile to verify real-world coding activity, contributions, and repository quality.',
+      icon: ListChecks,
+      title: 'Apply and Take the Assessment',
+      description: 'Apply to a job and take its short timed assessment. GitHub evidence is used only if your resume links a public account; it is never required.',
     },
     {
       icon: Brain,
-      title: 'Get AI Insights',
-      description: 'Receive a comprehensive credibility score based on skills, activity, projects, and assessment results.',
+      title: 'Get an Explained Score',
+      description: 'Each application gets a credibility score that lists the evidence it used and marks anything that was unavailable.',
     },
   ];
 
@@ -365,13 +191,13 @@ const HowItWorksSection = () => {
           viewport={{ once: true }}
         >
           <span className="text-foreground text-xs font-semibold uppercase tracking-widest">How It Works</span>
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mt-3">Three Steps to Verification</h2>
-          <p className="text-muted-foreground mt-3 max-w-xl mx-auto">Our AI-powered platform analyzes multiple data points to generate accurate credibility scores.</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mt-3">Three Steps to a Score</h2>
+          <p className="text-muted-foreground mt-3 max-w-xl mx-auto">Every score shows the evidence behind it, so a recruiter can see why it is what it is.</p>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {features.map((feature, index) => (
-            <FeatureCard key={index} {...feature} index={index} />
+            <FeatureCard key={feature.title} {...feature} index={index} />
           ))}
         </div>
       </div>
@@ -432,11 +258,6 @@ function Landing() {
 
       {/* Hero Section */}
       <HeroSection />
-
-      {/* Stats Section */}
-      <section className="py-20">
-        <StatsSection />
-      </section>
 
       {/* How It Works */}
       <HowItWorksSection />

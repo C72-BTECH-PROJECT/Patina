@@ -26,7 +26,7 @@ function Badge({
     default: 'bg-secondary text-secondary-foreground',
     primary: 'bg-primary/10 text-primary',
     success: 'bg-success/10 text-success',
-    warning: 'bg-warning/10 text-warning',
+    warning: 'bg-warning/10 text-warning-text',
     destructive: 'bg-destructive/10 text-destructive',
     outline: 'border border-border text-foreground',
   };

@@ -1,14 +1,14 @@
 import React from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Zap, LayoutDashboard, Briefcase, Plus, Bell, Search, LogOut } from 'lucide-react';
+import { Zap, LayoutDashboard, Briefcase, Plus, LogOut, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 function RecruiterLayout() {
-  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const navItems = [
     { to: '/recruiter/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/recruiter/applications', icon: Users, label: 'Applications' },
     { to: '/recruiter/jobs', icon: Briefcase, label: 'Jobs' },
   ];
 
@@ -49,21 +49,9 @@ function RecruiterLayout() {
             ))}
           </div>
 
+          {/* R-15: the search box (no state, no handler) and the bell (no handler,
+              permanent unread dot; recruiters receive no notifications) are removed. */}
           <div className="flex items-center gap-3">
-            <div className="relative hidden lg:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search candidates..."
-                className="w-56 pl-9 pr-3 py-1.5 rounded-md bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-
-            <button className="relative w-8 h-8 rounded-md bg-muted border border-border flex items-center justify-center hover:bg-muted/80 transition-all">
-              <Bell className="w-4 h-4 text-muted-foreground" />
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-destructive" />
-            </button>
-
             <Link
               to="/recruiter/create-job"
               className="hidden md:inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors no-underline"
@@ -74,6 +62,7 @@ function RecruiterLayout() {
 
             <Link
               to="/recruiter/profile"
+              aria-label="Your profile"
               className="w-8 h-8 rounded-md bg-muted flex items-center justify-center font-semibold text-xs text-foreground border border-border hover:bg-muted/80 transition-all"
             >
               {(() => {

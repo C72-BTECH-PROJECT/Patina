@@ -1,495 +1,639 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  ChevronLeft, ChevronRight, AlertCircle,
-  Sparkles, FileText, ListChecks, Send,
-  CheckCircle2, XCircle,
-} from 'lucide-react';
+import { AlertCircle, Clock, Send } from 'lucide-react';
 import Button from '../../components/Button';
-import Spinner from '../../components/Spinner';
-import EmptyState from '../../components/EmptyState';
-import { useAuth } from '../../context/AuthContext';
+import AppliedJobPicker from '../../components/assessment/AppliedJobPicker';
+import QuestionCard from '../../components/assessment/QuestionCard';
+import ResultView from '../../components/assessment/ResultView';
+import {
+  answersFromSaved, answersPayload, candidateResultView, clockAnchor, formatClock, isKnownState,
+  limitMinutes, pollDelayFor, questionView, remainingMs, saveErrorAction, saveRetryDelay, screenFor,
+  shouldAutoSubmit, timeLimitOf,
+} from '../../components/assessment/assessmentLogic';
+import { api, isAborted } from '../../lib/api';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+// R-17 (D§6.2, D§0 A1): the candidate's assessment for one job, at
+// /candidate/assessment?jobId=<job id>. Without a jobId the applied jobs are listed.
+//
+// The page is driven by GET /api/assessment/status?jobId= and never waits on
+// question generation:
+//   not_applied      explain, link to the job
+//   preparing        poll status every few seconds
+//   unavailable      "not ready yet", Check again, and status is re-read after the server's retry gate
+//   ready            the rules and the Start button (POST /api/assessment/start; 202 = still preparing)
+//   in_progress      the questions (POST /api/assessment/start returns the same attempt, its clock and
+//                    saved_answers on every call, so a reload restores both); every change is saved with
+//                    PUT /api/assessment/:id/answers; the timer counts expires_at - server_time
+//   grading_pending  submitted, grading pending; Retry calls POST /api/assessment/evaluate without answers
+//   completed        the result: the evaluate answer, or on a later visit status's `result` (same shape)
+//   attempts_used    no attempt left
+// Logic lives in components/assessment/assessmentLogic.js (unit-tested).
 
-// T-0025: candidates answer a generated assessment and submit it for
-// server-side scoring. MCQs are graded against the answer key, short
-// answers by rubric; the result folds into their credibility score.
+const TEXT_SAVE_DEBOUNCE_MS = 700;
+const TICK_MS = 250;
+const mono = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+
+const clearTimers = (...refs) => {
+  for (const r of refs) {
+    clearTimeout(r.current);
+    r.current = null;
+  }
+};
+
 function Assessment() {
-  const { authFetch } = useAuth();
   const [searchParams] = useSearchParams();
-  const [jobs, setJobs] = useState([]);
-  const [jobId, setJobId] = useState(searchParams.get('jobId') || '');
-  const [meta, setMeta] = useState(null);
-  const [questions, setQuestions] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [picked, setPicked] = useState({});
-  const [drafts, setDrafts] = useState({});
-  const [submitted, setSubmitted] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const jobId = searchParams.get('jobId');
+  if (!jobId) return <AppliedJobPicker />;
+  return <AssessmentForJob key={jobId} jobId={jobId} />;
+}
+
+function AssessmentForJob({ jobId }) {
+  // Page-level: 'loading' (first status read), 'error' (it failed), 'state' (a status is shown).
+  const [phase, setPhase] = useState('loading');
+  const [pageError, setPageError] = useState('');
+  const [status, setStatus] = useState(null);
+  const [statusVersion, setStatusVersion] = useState(0);
+  const [notice, setNotice] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [jobTitle, setJobTitle] = useState(null);
+  const [jobTitleError, setJobTitleError] = useState('');
+
+  // The started attempt.
+  const [attempt, setAttempt] = useState(null); // { assessmentId, startedAt, expiresAt, questions }
+  const [questionsError, setQuestionsError] = useState('');
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [answers, setAnswers] = useState({});
+  const [anchor, setAnchor] = useState(null);
+  const [now, setNow] = useState(mono());
+  const [save, setSave] = useState({ state: 'idle', message: '' });
+  const [submit, setSubmit] = useState({ running: false, startedAt: null, error: '' });
+  const [retry, setRetry] = useState({ running: false, startedAt: null });
   const [result, setResult] = useState(null);
-  const [phase, setPhase] = useState('pick-job'); // pick-job | loading | error | ready
-  const [error, setError] = useState('');
+
+  const ctrlRef = useRef(null);
+  const aliveRef = useRef(true);
+  const seqRef = useRef(0);
+  const attemptRef = useRef(null);
+  const answersRef = useRef({});
+  const anchorRef = useRef(null);
+  const pendingRef = useRef(new Map());
+  const inFlightRef = useRef(false);
+  const flushTimerRef = useRef(null);
+  const retryTimerRef = useRef(null);
+  const failuresRef = useRef(0);
+  const closedRef = useRef(false);
+  const submitStartedRef = useRef(false);
+  const autoSubmittedRef = useRef(false);
+  const loadingQuestionsRef = useRef(false);
+
+  const phaseRef = useRef('loading');
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
 
   useEffect(() => {
-    const loadJobs = async () => {
-      try {
-        const resp = await authFetch(`${API_BASE_URL}/api/jobs`);
-        if (resp.ok) setJobs(await resp.json());
-      } catch {
-        // job picker stays empty; user can still generate via ?jobId=
-      }
+    aliveRef.current = true;
+    ctrlRef.current = new AbortController();
+    return () => {
+      aliveRef.current = false;
+      ctrlRef.current?.abort();
+      clearTimers(flushTimerRef, retryTimerRef);
     };
-    loadJobs();
-  }, [authFetch]);
-
-  const generate = async (id) => {
-    const target = id || jobId;
-    if (!target) return;
-    setPhase('loading');
-    setError('');
-    setCurrentIndex(0);
-    setPicked({});
-    setDrafts({});
-    setSubmitted(false);
-    setResult(null);
-    try {
-      const resp = await authFetch(`${API_BASE_URL}/api/assessment/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: target }),
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (resp.status === 409 && typeof data.score === 'number') {
-        const max = data.max_attempts || 5;
-        setError(`You have used all ${max} attempts for this assessment. Your latest score: ${data.score}%.`);
-        setPhase('error');
-        return;
-      }
-      if (!resp.ok) {
-        setError(data.message || `Generation failed (HTTP ${resp.status}).`);
-        setPhase('error');
-        return;
-      }
-      const bundle = data?.questions ?? data;
-      const list = Array.isArray(bundle?.questions)
-        ? bundle.questions
-        : Array.isArray(bundle)
-          ? bundle
-          : [];
-      if (list.length === 0) {
-        setError('The service returned no questions. Try again.');
-        setPhase('error');
-        return;
-      }
-      setMeta({
-        assessmentId: data.assessmentId || bundle?.assessment_id || null,
-        model: bundle?.model_used || data.model_used || null,
-        count: list.length,
-      });
-      setQuestions(list);
-      setPhase('ready');
-    } catch {
-      setError('Could not reach the server. Check your connection and try again.');
-      setPhase('error');
-    }
-  };
-
-  useEffect(() => {
-    const preset = searchParams.get('jobId');
-    if (preset) generate(preset);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const current = questions[currentIndex];
-  const isLast = currentIndex === questions.length - 1;
-  const isAnswered = (q) =>
-    Boolean(picked[q.question_id] || (drafts[q.question_id] || '').trim());
-  const answeredCount = questions.filter(isAnswered).length;
+  const reanchor = useCallback((body) => {
+    const a = clockAnchor(body?.expires_at, body?.server_time, mono());
+    if (!a) return;
+    anchorRef.current = a;
+    setAnchor(a);
+    setNow(mono());
+  }, []);
 
-  const submit = async () => {
-    if (!meta?.assessmentId || submitting) return;
-    const answers = questions
-      .filter(isAnswered)
-      .map((q) => ({
-        question_id: q.question_id,
-        response: q.question_type === 'mcq'
-          ? picked[q.question_id]
-          : (drafts[q.question_id] || '').trim(),
-      }));
-    if (answers.length === 0) return;
+  /** Show a state the server reported (status body, or an error body that carries `state`). */
+  const showState = useCallback((body) => {
+    setStatus(body);
+    setPhase('state');
+    setStatusVersion((v) => v + 1);
+  }, []);
 
-    setSubmitting(true);
-    setError('');
+  const readStatus = useCallback(async () => {
+    const seq = ++seqRef.current;
     try {
-      const resp = await authFetch(`${API_BASE_URL}/api/assessment/evaluate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assessmentId: meta.assessmentId, answers }),
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) {
-        setError(data.message || `Submission failed (HTTP ${resp.status}). Your answers are still on this page — try again.`);
-        return;
+      const body = await api.get(`/api/assessment/status?jobId=${encodeURIComponent(jobId)}`, { signal: ctrlRef.current?.signal, cache: 'no-store' });
+      if (!aliveRef.current || seq !== seqRef.current) return;
+      setNotice('');
+      showState(body || {});
+    } catch (err) {
+      if (isAborted(err) || !aliveRef.current || seq !== seqRef.current) return;
+      if (phaseRef.current === 'loading' || phaseRef.current === 'error') {
+        setPageError(err.message);
+        setPhase('error');
+      } else {
+        setNotice(`Could not check the assessment status: ${err.message}`);
       }
-      setResult(data);
-      setSubmitted(true);
-    } catch {
-      setError('Could not reach the server. Your answers are still on this page — try again.');
+      setStatusVersion((v) => v + 1); // keeps any polling going
+    }
+  }, [jobId, showState]);
+
+  // First read, and the job title for the header.
+  useEffect(() => {
+    readStatus();
+    api.get(`/api/jobs/${encodeURIComponent(jobId)}`, { signal: ctrlRef.current?.signal })
+      .then((job) => { if (aliveRef.current) setJobTitle(job?.title || null); })
+      .catch((err) => { if (!isAborted(err) && aliveRef.current) setJobTitleError(err.message); });
+  }, [jobId, readStatus]);
+
+  const state = phase === 'state' ? status?.state : null;
+  const screen = phase === 'state' ? screenFor(state) : null;
+
+  // Polling: preparing, unavailable (after the server's retry gate) and grading_pending.
+  useEffect(() => {
+    if (phase !== 'state' || retry.running) return undefined;
+    const delay = pollDelayFor(state, status);
+    if (!delay) return undefined;
+    const t = setTimeout(() => { readStatus(); }, delay);
+    return () => clearTimeout(t);
+  }, [phase, state, status, statusVersion, retry.running, readStatus]);
+
+  // ---- the attempt -------------------------------------------------------
+
+  const beginAttempt = useCallback((data) => {
+    const questions = (Array.isArray(data.questions) ? data.questions : []).map(questionView);
+    const a = {
+      assessmentId: data.assessmentId,
+      startedAt: data.started_at || null,
+      expiresAt: data.expires_at || null,
+      questions,
+    };
+    attemptRef.current = a;
+    setAttempt(a);
+    const restored = answersFromSaved(data.saved_answers);
+    answersRef.current = restored;
+    setAnswers(restored);
+    pendingRef.current = new Map();
+    closedRef.current = false;
+    submitStartedRef.current = false;
+    autoSubmittedRef.current = false;
+    failuresRef.current = 0;
+    reanchor(data);
+    setSave(Object.keys(restored).length
+      ? { state: 'saved', message: 'Your saved answers were restored.' }
+      : { state: 'idle', message: '' });
+    setQuestionsError('');
+    showState({ ...data, state: 'in_progress' });
+  }, [reanchor, showState]);
+
+  /** An ApiError whose body names a candidate state moves the page there, with the server's message. */
+  const followErrorState = useCallback((err, extra = {}) => {
+    const s = err?.body?.state;
+    if (isKnownState(s)) {
+      showState({ ...err.body, ...extra, state: s });
+      setNotice(err.message);
+      return true;
+    }
+    return false;
+  }, [showState]);
+
+  /** POST /api/assessment/start: begins the attempt, or returns the one already running. */
+  const callStart = useCallback(async ({ fromStatus }) => {
+    const { status: http, data } = await api.request('POST', '/api/assessment/start', { jobId }, { signal: ctrlRef.current?.signal });
+    if (!aliveRef.current) return;
+    if (http === 202 || data?.state === 'preparing') {
+      setNotice('');
+      showState({ ...(data || {}), state: 'preparing' });
+      return;
+    }
+    if (data?.state === 'in_progress' && data.assessmentId && Array.isArray(data.questions) && data.questions.length) {
+      setNotice('');
+      beginAttempt(data);
+      return;
+    }
+    const msg = 'The server answered without any questions for this attempt.';
+    if (fromStatus) setQuestionsError(msg); else setNotice(msg);
+  }, [jobId, beginAttempt, showState]);
+
+  const start = async () => {
+    setStarting(true);
+    setNotice('');
+    try {
+      await callStart({ fromStatus: false });
+    } catch (err) {
+      if (isAborted(err) || !aliveRef.current) return;
+      if (!followErrorState(err)) setNotice(err.message);
     } finally {
-      setSubmitting(false);
+      if (aliveRef.current) setStarting(false);
     }
   };
 
+  // Status says in_progress but the page holds no questions (a reload, or another tab):
+  // start returns the same attempt with its clock and saved answers.
+  const loadQuestions = useCallback(async () => {
+    if (loadingQuestionsRef.current) return;
+    loadingQuestionsRef.current = true;
+    setLoadingQuestions(true);
+    setQuestionsError('');
+    try {
+      await callStart({ fromStatus: true });
+    } catch (err) {
+      if (isAborted(err) || !aliveRef.current) return;
+      if (!followErrorState(err)) setQuestionsError(err.message);
+    } finally {
+      loadingQuestionsRef.current = false;
+      if (aliveRef.current) setLoadingQuestions(false);
+    }
+  }, [callStart, followErrorState]);
+
+  useEffect(() => {
+    if (state === 'in_progress' && !attemptRef.current && !questionsError) loadQuestions();
+  }, [state, questionsError, loadQuestions]);
+
+  // ---- submit (and the automatic submit at zero) ---------------------------
+
+  const doSubmit = useCallback(async ({ auto }) => {
+    const a = attemptRef.current;
+    if (!a || submitStartedRef.current) return;
+    submitStartedRef.current = true;
+    if (auto) autoSubmittedRef.current = true;
+    closedRef.current = true;
+    clearTimers(flushTimerRef, retryTimerRef);
+    setSubmit({ running: true, startedAt: mono(), error: '' });
+    setNotice(auto ? 'Time is up: your answers were submitted automatically.' : '');
+    try {
+      const data = await api.post('/api/assessment/evaluate', {
+        assessmentId: a.assessmentId,
+        answers: answersPayload(answersRef.current, a.questions),
+      }, { signal: ctrlRef.current?.signal });
+      if (!aliveRef.current) return;
+      setResult(candidateResultView(data));
+      showState({ ...(data || {}), state: 'completed' });
+      setSubmit({ running: false, startedAt: null, error: '' });
+    } catch (err) {
+      if (isAborted(err) || !aliveRef.current) return;
+      setSubmit({ running: false, startedAt: null, error: '' });
+      if (followErrorState(err, { assessmentId: a.assessmentId })) return;
+      if (err?.body?.state === 'voided') {
+        setNotice(err.message);
+        readStatus();
+        return;
+      }
+      // Unknown outcome (network, gateway timeout, server error): the submission may or
+      // may not be stored. Submitting again is safe (the server grades the stored
+      // submission once); Check status re-reads.
+      submitStartedRef.current = false;
+      closedRef.current = false; // saving resumes; a closed attempt then reports itself
+      setSubmit({ running: false, startedAt: null, error: err.message });
+    }
+  }, [followErrorState, readStatus, showState]);
+
+  // Clock tick (also drives the elapsed-time text while grading); auto-submit at zero.
+  const ticking = (screen === 'questions' && anchor) || submit.running || retry.running;
+  useEffect(() => {
+    if (!ticking) return undefined;
+    const id = setInterval(() => {
+      const t = mono();
+      setNow(t);
+      if (!autoSubmittedRef.current && shouldAutoSubmit({ anchor: anchorRef.current, monoNow: t, submitStarted: submitStartedRef.current })) {
+        doSubmit({ auto: true });
+      }
+    }, TICK_MS);
+    return () => clearInterval(id);
+  }, [ticking, doSubmit]);
+
+  // ---- saving --------------------------------------------------------------
+
+  const flush = useCallback(async () => {
+    const a = attemptRef.current;
+    if (!a || closedRef.current || inFlightRef.current || pendingRef.current.size === 0) return;
+    clearTimeout(retryTimerRef.current);
+    retryTimerRef.current = null;
+    const batch = [...pendingRef.current].map(([question_id, response]) => ({ question_id, response }));
+    pendingRef.current.clear();
+    inFlightRef.current = true;
+    setSave({ state: 'saving', message: '' });
+    let again = false;
+    try {
+      const data = await api.put(`/api/assessment/${encodeURIComponent(a.assessmentId)}/answers`, { answers: batch }, { signal: ctrlRef.current?.signal });
+      if (!aliveRef.current) return;
+      failuresRef.current = 0;
+      reanchor(data);
+      if (pendingRef.current.size) again = true;
+      else setSave({ state: 'saved', message: '' });
+    } catch (err) {
+      if (isAborted(err) || !aliveRef.current || closedRef.current) return;
+      const action = saveErrorAction(err);
+      if (action === 'submit') {
+        setSave({ state: 'failed', message: 'Time is up; the last change was not saved.' });
+        doSubmit({ auto: true });
+      } else if (action === 'closed') {
+        closedRef.current = true;
+        setSave({ state: 'failed', message: err.message });
+        readStatus();
+      } else if (action === 'retry') {
+        for (const b of batch) if (!pendingRef.current.has(b.question_id)) pendingRef.current.set(b.question_id, b.response);
+        failuresRef.current += 1;
+        setSave({ state: 'retrying', message: err.message });
+        retryTimerRef.current = setTimeout(() => { flushRef.current(); }, saveRetryDelay(failuresRef.current));
+      } else {
+        setSave({ state: 'failed', message: err.message });
+      }
+    } finally {
+      inFlightRef.current = false;
+    }
+    if (again) flushRef.current();
+  }, [doSubmit, readStatus, reanchor]);
+
+  const flushRef = useRef(flush);
+  useEffect(() => { flushRef.current = flush; }, [flush]);
+
+  const setAnswer = (questionId, value, { debounce }) => {
+    if (closedRef.current) return;
+    answersRef.current = { ...answersRef.current, [questionId]: value };
+    setAnswers(answersRef.current);
+    pendingRef.current.set(questionId, value);
+    clearTimeout(flushTimerRef.current);
+    if (debounce) {
+      if (!inFlightRef.current && !retryTimerRef.current) setSave({ state: 'pending', message: '' });
+      flushTimerRef.current = setTimeout(() => { flushRef.current(); }, TEXT_SAVE_DEBOUNCE_MS);
+    } else {
+      flushTimerRef.current = null;
+      flushRef.current();
+    }
+  };
+
+  // ---- grading retry -------------------------------------------------------
+
+  const retryGrading = async () => {
+    const assessmentId = status?.assessmentId || attemptRef.current?.assessmentId;
+    if (!assessmentId) {
+      setNotice('The server did not say which attempt is pending, so grading cannot be retried from here. Check again.');
+      return;
+    }
+    setRetry({ running: true, startedAt: mono() });
+    setNotice('');
+    try {
+      const data = await api.post('/api/assessment/evaluate', { assessmentId }, { signal: ctrlRef.current?.signal });
+      if (!aliveRef.current) return;
+      setResult(candidateResultView(data));
+      showState({ ...(data || {}), state: 'completed' });
+    } catch (err) {
+      if (isAborted(err) || !aliveRef.current) return;
+      if (err?.body?.state === 'completed') {
+        setNotice('');
+        readStatus();
+      } else if (!followErrorState(err, { assessmentId })) {
+        setNotice(err.message);
+      }
+    } finally {
+      if (aliveRef.current) setRetry({ running: false, startedAt: null });
+    }
+  };
+
+  const checkAgain = async () => {
+    setChecking(true);
+    await readStatus();
+    if (aliveRef.current) setChecking(false);
+  };
+
+  // ---- render --------------------------------------------------------------
+
+  const header = (
+    <div className="mb-6">
+      <h1 className="text-h2 text-foreground">Skill assessment</h1>
+      <p className="text-body-sm text-muted-foreground mt-1">
+        {jobTitle ? `For: ${jobTitle}` : jobTitleError ? `The job title could not be loaded: ${jobTitleError}` : 'For the job you applied to'}
+      </p>
+    </div>
+  );
+
+  const noticeBox = notice && (
+    <div role="alert" className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/20 text-body-sm text-destructive">
+      {notice}
+    </div>
+  );
+
+  const frame = (stateName, body) => (
+    <div className="max-w-3xl mx-auto" data-testid="assessment-state" data-state={stateName}>
+      {header}
+      {noticeBox}
+      {body}
+    </div>
+  );
+
+  const checkAgainButton = (
+    <Button variant="outline" onClick={checkAgain} loading={checking} data-testid="assessment-check-again">
+      {checking ? 'Checking...' : 'Check again'}
+    </Button>
+  );
+
   if (phase === 'loading') {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Spinner />
-        <p className="text-body-sm text-muted-foreground">
-          Generating your assessment — this can take up to a minute...
-        </p>
-      </div>
-    );
+    return frame('loading', <p className="text-body-sm text-muted-foreground">Checking your assessment for this job...</p>);
   }
 
   if (phase === 'error') {
-    return (
-      <div className="max-w-lg mx-auto">
-        <EmptyState
-          icon={AlertCircle}
-          title="Could not generate the assessment"
-          description={error}
-          action={
-            <Button onClick={() => setPhase('pick-job')}>
-              Try again
-            </Button>
-          }
-        />
+    return frame('error', (
+      <div className="card p-6">
+        <div className="flex items-start gap-2 mb-4">
+          <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" aria-hidden="true" />
+          <p className="text-body-sm text-foreground">Could not load the assessment status: {pageError}</p>
+        </div>
+        <Button variant="outline" onClick={() => { setPhase('loading'); readStatus(); }}>Try again</Button>
       </div>
-    );
+    ));
   }
 
-  if (phase === 'pick-job') {
-    return (
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-h2 text-foreground">Skill Assessment</h1>
-        <p className="text-body-sm text-muted-foreground mt-1 mb-6">
-          Pick a job — questions are generated live from its requirements and your resume.
-        </p>
-        {jobs.length === 0 ? (
-          <EmptyState
-            icon={ListChecks}
-            title="No jobs available"
-            description="There are no jobs to assess against yet."
-            action={
-              <Link to="/candidate/jobs" className="btn btn-primary no-underline">
-                Browse jobs
-              </Link>
-            }
-          />
+  const startLimit = timeLimitOf(status);
+  const attempts = status?.attempts && Number.isFinite(Number(status.attempts.max))
+    ? { used: Number(status.attempts.used) || 0, max: Number(status.attempts.max) }
+    : null;
+
+  switch (screen) {
+    case 'not_applied':
+      return frame(state, (
+        <div className="card p-6">
+          <p className="text-body-sm text-foreground mb-4">
+            The assessment is offered only for jobs you have applied to, and you have not applied to this one.
+          </p>
+          <Link to={`/candidate/jobs/${encodeURIComponent(jobId)}`} className="btn btn-primary no-underline">View the job</Link>
+        </div>
+      ));
+
+    case 'preparing':
+      return frame(state, (
+        <div className="card p-6">
+          <p className="text-body font-medium text-foreground">Your assessment is being prepared.</p>
+          <p className="text-body-sm text-muted-foreground mt-1">
+            This page checks again every few seconds and shows the Start screen when it is ready. You can leave and come back.
+          </p>
+        </div>
+      ));
+
+    case 'unavailable':
+      return frame(state, (
+        <div className="card p-6">
+          <p className="text-body font-medium text-foreground">Not ready yet, we will keep trying.</p>
+          <p className="text-body-sm text-muted-foreground mt-1 mb-4">
+            While this page is open it asks the server again
+            {status?.retry_after_seconds ? ` in about ${Math.ceil(Number(status.retry_after_seconds))} seconds` : ' shortly'}.
+          </p>
+          {checkAgainButton}
+        </div>
+      ));
+
+    case 'start':
+      return frame(state, (
+        <div className="card p-6">
+          <h2 className="text-h3 text-foreground mb-3">Before you start</h2>
+          <ul className="list-disc pl-5 space-y-2 text-body-sm text-foreground mb-6">
+            <li>
+              {attempts
+                ? `You have ${Math.max(0, attempts.max - attempts.used)} of ${attempts.max} attempt${attempts.max === 1 ? '' : 's'} left for this job. `
+                : 'The server did not report how many attempts you have. '}
+              Your first completed attempt is the one that counts.
+            </li>
+            <li>
+              {startLimit !== null
+                ? `You have ${startLimit} minute${startLimit === 1 ? '' : 's'}. `
+                : 'The server did not report the time limit. '}
+              The clock starts when you press Start, not before, and keeps running if you leave or reload the page.
+            </li>
+            <li>Your answers are saved as you go. When the time runs out, what you have answered is submitted automatically.</li>
+            <li>This is an unproctored online assessment.</li>
+            <li>After you submit you see your score, a summary per skill and whether each answer was right; the correct answers are not shown.</li>
+          </ul>
+          <Button onClick={start} loading={starting} data-testid="assessment-start">
+            {starting ? 'Starting...' : 'Start'}
+          </Button>
+        </div>
+      ));
+
+    case 'questions': {
+      if (!attempt) {
+        return frame(state, questionsError ? (
+          <div className="card p-6">
+            <p className="text-body-sm text-foreground mb-4">Your assessment is in progress, but its questions could not be loaded: {questionsError}</p>
+            <Button variant="outline" onClick={() => { setQuestionsError(''); }} loading={loadingQuestions}>Try again</Button>
+          </div>
         ) : (
-          <div className="space-y-3">
-            {jobs.map((job) => (
-              <button
-                key={job.id}
-                type="button"
-                onClick={() => { setJobId(job.id); generate(job.id); }}
-                className="card p-4 w-full text-left hover:border-primary transition-colors"
-              >
-                <div className="font-medium text-foreground">{job.title}</div>
-                <div className="text-caption text-muted-foreground truncate">
-                  {(job.requiredSkills || job.required_skills || []).join(' • ')}
-                </div>
-              </button>
+          <p className="text-body-sm text-muted-foreground">Your assessment is in progress. Loading your questions and saved answers...</p>
+        ));
+      }
+      const left = remainingMs(anchor, now);
+      const limit = limitMinutes(attempt.startedAt, attempt.expiresAt);
+      const answered = attempt.questions.filter((q) => (answers[q.question_id] || '').trim()).length;
+      const SAVE_TEXT = {
+        idle: 'No answers yet',
+        pending: 'Not saved yet',
+        saving: 'Saving...',
+        saved: save.message || 'All answers saved',
+        retrying: `Not saved, retrying: ${save.message}`,
+        failed: `Not saved: ${save.message}`,
+      };
+      const saveCls = save.state === 'retrying' || save.state === 'failed' ? 'text-destructive' : 'text-muted-foreground';
+      const elapsed = submit.running && submit.startedAt !== null ? Math.max(0, Math.floor((now - submit.startedAt) / 1000)) : 0;
+      return frame(state, (
+        <>
+          <div className="sticky top-0 z-10 card p-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2" data-testid="assessment-timer" data-remaining-ms={left === null ? '' : String(Math.round(left))}>
+              <Clock className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+              <span className={`font-semibold tabular-nums ${left !== null && left < 60000 ? 'text-destructive' : 'text-foreground'}`}>
+                {left === null ? 'Time remaining not known' : formatClock(left)}
+              </span>
+              {limit !== null && <span className="text-caption text-muted-foreground">of {limit} min</span>}
+            </div>
+            <span className="text-caption text-muted-foreground">{answered} of {attempt.questions.length} answered</span>
+            <span className={`text-caption ${saveCls}`} data-testid="assessment-save-indicator" data-save-state={save.state} aria-live="polite">
+              {SAVE_TEXT[save.state] || save.state}
+            </span>
+          </div>
+
+          <div className="space-y-4 mb-6">
+            {attempt.questions.map((q, i) => (
+              <QuestionCard
+                key={q.question_id || i}
+                index={i}
+                question={q}
+                value={answers[q.question_id] || ''}
+                disabled={submit.running || submitStartedRef.current}
+                onChoose={(id, label) => setAnswer(id, label, { debounce: false })}
+                onType={(id, text) => setAnswer(id, text, { debounce: true })}
+              />
             ))}
           </div>
-        )}
-      </div>
-    );
-  }
 
-  if (submitted) {
-    const resultById = Object.fromEntries(
-      (result?.results || []).map((r) => [r.question_id, r])
-    );
-    const score = result?.score;
-    return (
-      <div className="max-w-3xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="card p-8 text-center mb-6"
-        >
-          <div className="text-h1 text-foreground font-semibold">{score}%</div>
-          <p className="text-body-sm text-muted-foreground mt-1">
-            {result?.points_earned} of {result?.points_possible} points across {questions.length} questions.
-          </p>
-          {result?.short_answer_graded === false && (
-            <p className="text-caption text-warning mt-2">
-              Short-answer grading was unavailable for this attempt, so the score
-              reflects the questions that could be graded.
-            </p>
+          {submit.error && (
+            <div role="alert" className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/20 text-body-sm text-destructive">
+              Submitting failed: {submit.error} Your answers stay on this page. Submitting again is safe.
+              <div className="mt-2">{checkAgainButton}</div>
+            </div>
           )}
-          <p className="text-caption text-muted-foreground mt-2">
-            Your latest attempt counts toward your credibility score for this job.
-          </p>
-          <div className="mt-4 flex justify-center">
-            <Button onClick={() => generate()}>
-              <Sparkles className="w-4 h-4" />
-              Retake assessment
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button onClick={() => doSubmit({ auto: false })} loading={submit.running} disabled={submit.running} data-testid="assessment-submit">
+              {!submit.running && <Send className="w-4 h-4" aria-hidden="true" />}
+              {submit.running ? 'Submitting...' : `Submit (${answered}/${attempt.questions.length})`}
             </Button>
+            {submit.running && (
+              <span className="text-body-sm text-muted-foreground">
+                Submitted; grading your answers ({elapsed} s). Please keep this page open.
+              </span>
+            )}
           </div>
-        </motion.div>
+        </>
+      ));
+    }
 
-        <div className="space-y-3 mb-6">
-          {questions.map((q, i) => {
-            const r = resultById[q.question_id];
-            const mine = q.question_type === 'mcq'
-              ? picked[q.question_id]
-              : (drafts[q.question_id] || '').trim();
-            return (
-              <div key={q.question_id || i} className="card p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="text-caption text-muted-foreground mb-1">
-                    Q{i + 1} • {q.skill}
-                  </div>
-                  {r && (
-                    <span className={`inline-flex items-center gap-1 text-caption font-medium ${
-                      r.points >= (r.max_points || 1) - 0.001 ? 'text-success' : 'text-destructive'
-                    }`}>
-                      {r.points >= (r.max_points || 1) - 0.001
-                        ? <CheckCircle2 className="w-3.5 h-3.5" />
-                        : <XCircle className="w-3.5 h-3.5" />}
-                      {r.points}/{r.max_points}
-                    </span>
-                  )}
-                </div>
-                <div className="text-body-sm text-foreground mb-2">{q.question}</div>
-                <div className="text-body-sm mb-2">
-                  <span className="text-muted-foreground">Your answer: </span>
-                  {mine ? <span className="text-foreground">{mine}</span> : <span className="text-muted-foreground">Not answered</span>}
-                </div>
-                {r?.feedback && (
-                  <div className="text-caption text-muted-foreground rounded-md bg-muted p-2">
-                    {r.feedback}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+    case 'grading_pending': {
+      const elapsed = retry.running && retry.startedAt !== null ? Math.max(0, Math.floor((now - retry.startedAt) / 1000)) : 0;
+      return frame(state, (
+        <div className="card p-6">
+          <p className="text-body font-medium text-foreground">Submitted, grading pending.</p>
+          <p className="text-body-sm text-muted-foreground mt-1 mb-4">
+            Your answers are saved and will be graded. This page checks again every few seconds; you can also retry now.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button onClick={retryGrading} loading={retry.running} data-testid="assessment-retry-grading">
+              {retry.running ? 'Grading...' : 'Retry grading'}
+            </Button>
+            {retry.running && <span className="text-body-sm text-muted-foreground">Grading your answers ({elapsed} s).</span>}
+          </div>
         </div>
+      ));
+    }
 
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => { setPhase('pick-job'); setQuestions([]); setSubmitted(false); setResult(null); }}>
-            Pick another job
-          </Button>
+    case 'result':
+      // Right after submit: the evaluate answer. On a later visit: the same result as
+      // status rebuilds it from the stored evaluation (R-17 backend addition).
+      if (result) return frame(state, <ResultView view={result} questions={attempt?.questions} />);
+      if (status?.result && typeof status.result === 'object') {
+        return frame(state, <ResultView view={candidateResultView(status.result)} questions={attempt?.questions} />);
+      }
+      return frame(state, (
+        <div className="card p-6" data-testid="assessment-result">
+          <p className="text-body font-medium text-foreground mb-1">You have completed this assessment.</p>
+          <p className="text-body-sm text-muted-foreground mb-4">The server returned no stored result for this attempt.</p>
+          <Link to="/candidate/results" className="btn no-underline">See my results</Link>
         </div>
-      </div>
-    );
+      ));
+
+    case 'attempts_used':
+      return frame(state, (
+        <div className="card p-6">
+          <p className="text-body font-medium text-foreground">You have no attempts left for this job.</p>
+          {attempts && (
+            <p className="text-body-sm text-muted-foreground mt-1">Attempts used: {attempts.used} of {attempts.max}.</p>
+          )}
+        </div>
+      ));
+
+    default:
+      return frame('unknown', (
+        <div className="card p-6">
+          <p className="text-body-sm text-foreground mb-4">
+            The server reported an assessment state this page does not recognise: {String(state ?? 'none')}.
+          </p>
+          {checkAgainButton}
+        </div>
+      ));
   }
-
-  return (
-    <div className="max-w-3xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-h2 text-foreground">Skill Assessment</h1>
-            <p className="text-body-sm text-muted-foreground mt-1">
-              AI-generated questions based on your resume and the job
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => { setPhase('pick-job'); setQuestions([]); }}
-            className="text-caption text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Pick another job
-          </button>
-        </div>
-      </motion.div>
-
-      {error && (
-        <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/20 text-body-sm text-destructive">
-          {error}
-        </div>
-      )}
-
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-caption text-muted-foreground">
-            Question {currentIndex + 1} of {questions.length}
-          </span>
-          <span className="text-caption text-muted-foreground">
-            {answeredCount} answered
-          </span>
-        </div>
-        <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-primary rounded-full"
-            animate={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
-            transition={{ duration: 0.3 }}
-          />
-        </div>
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={current.question_id || currentIndex}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.25 }}
-          className="card p-6 mb-6"
-        >
-          <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <span className="badge badge-primary text-[10px]">
-              <Sparkles className="w-3 h-3 mr-1" />
-              {current.skill}
-            </span>
-            <span className="badge text-[10px]">{current.question_type === 'mcq' ? 'Multiple choice' : 'Short answer'}</span>
-            {current.source && (
-              <span className="badge text-[10px]">from {current.source === 'jd' ? 'job description' : current.source}</span>
-            )}
-          </div>
-
-          <h2 className="text-body font-medium text-foreground leading-relaxed mb-4">
-            {current.question}
-          </h2>
-
-          {current.question_type === 'mcq' && Array.isArray(current.options) && (
-            <div className="space-y-2">
-              {current.options.map((opt) => {
-                const selected = picked[current.question_id] === opt.label;
-                return (
-                  <button
-                    key={opt.label}
-                    type="button"
-                    onClick={() => setPicked((prev) => ({ ...prev, [current.question_id]: opt.label }))}
-                    className={`flex items-start gap-3 p-3 rounded-md border w-full text-left transition-colors ${
-                      selected
-                        ? 'bg-primary/10 border-primary'
-                        : 'bg-muted border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <span className={`w-6 h-6 rounded-md border flex items-center justify-center text-caption font-semibold flex-shrink-0 ${
-                      selected
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background border-border'
-                    }`}>
-                      {opt.label}
-                    </span>
-                    <span className="text-body-sm text-foreground">{opt.text}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {current.question_type === 'short_answer' && (
-            <div>
-              <textarea
-                value={drafts[current.question_id] || ''}
-                onChange={(e) => setDrafts((prev) => ({ ...prev, [current.question_id]: e.target.value }))}
-                placeholder="Type your answer here..."
-                rows={5}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-body-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
-              />
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-caption text-muted-foreground">
-                  {(drafts[current.question_id] || '').split(/\s+/).filter(Boolean).length} words
-                </span>
-                {drafts[current.question_id] && (
-                  <button
-                    onClick={() => setDrafts((prev) => ({ ...prev, [current.question_id]: '' }))}
-                    className="text-caption text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    Clear answer
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
-
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
-          disabled={currentIndex === 0}
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Previous
-        </Button>
-
-        <div className="flex items-center gap-1.5 flex-wrap justify-center">
-          {questions.map((q, i) => {
-            const answered = picked[q.question_id] || (drafts[q.question_id] || '').trim();
-            return (
-              <button
-                key={q.question_id || i}
-                onClick={() => setCurrentIndex(i)}
-                className={`w-8 h-8 rounded-md text-caption font-medium transition-colors ${
-                  i === currentIndex
-                    ? 'bg-primary text-primary-foreground'
-                    : answered
-                    ? 'bg-success/10 text-success'
-                    : 'bg-secondary text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {i + 1}
-              </button>
-            );
-          })}
-        </div>
-
-        {isLast ? (
-          <Button
-            onClick={submit}
-            disabled={answeredCount === 0 || submitting || !meta?.assessmentId}
-          >
-            {submitting ? (
-              <>
-                <Spinner />
-                Grading...
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                Submit ({answeredCount}/{questions.length})
-              </>
-            )}
-          </Button>
-        ) : (
-          <Button
-            onClick={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))}
-          >
-            Next
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        )}
-      </div>
-
-      <div className="mt-6 p-3 rounded-md bg-primary/5 border border-primary/10">
-        <div className="flex items-start gap-2">
-          <FileText className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-body-sm text-foreground font-medium">Up to 5 attempts per job</p>
-            <p className="text-caption text-muted-foreground mt-0.5">
-              Your answers are graded against the answer key when you submit, and your
-              latest attempt counts toward your credibility score. You can leave and come
-              back before submitting — the same attempt is resumed.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default Assessment;

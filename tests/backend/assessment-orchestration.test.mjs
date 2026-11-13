@@ -582,7 +582,9 @@ test('evaluate with a prior score row: the old row is unchanged, a new row exist
   assert.equal(r.body.state, 'completed');
   assert.equal(r.body.results.length, 10);
   for (const res of r.body.results) {
-    assert.deepEqual(Object.keys(res).sort(), ['candidate_feedback', 'correct', 'max_points', 'points', 'question_id', 'question_type', 'skill']);
+    assert.deepEqual(Object.keys(res).sort(), ['candidate_feedback', 'correct', 'max_points', 'points', 'question', 'question_id', 'question_type', 'skill']);
+    const served = s.body.questions.find((q) => q.question_id === res.question_id);
+    assert.equal(res.question, served.question, 'the question text the candidate was served');
   }
   assert.ok(r.body.skills.length >= 1, 'per-skill summary');
   assert.equal(r.body.skills.reduce((n, k) => n + k.questions, 0), 10);
@@ -619,6 +621,101 @@ test('evaluate with a prior score row: the old row is unchanged, a new row exist
   // A second submit is refused; status reads completed.
   assert.equal((await evaluate(c, row.id, answers)).res.status, 409);
   assert.equal((await status(c, job.id)).body.state, 'completed');
+});
+
+// ---- R-17: what the candidate page reads from status ----
+test('R-17: status carries time_limit_minutes from ASSESSMENT_TIME_LIMIT_MINUTES (ready, preparing, not_applied)', async () => {
+  const { c, job } = readyCandidate();
+  seedPool(c, job.id);
+  try {
+    process.env.ASSESSMENT_TIME_LIMIT_MINUTES = '25';
+    const s = await status(c, job.id);
+    assert.equal(s.body.state, 'ready');
+    assert.equal(s.body.time_limit_minutes, 25);
+    assert.equal(s.body.time_limit_minutes, svc.timeLimitMinutes(), 'the same helper the deadline uses');
+
+    const other = readyCandidate();
+    genMode = 'hold';
+    const p = await status(other.c, other.job.id);
+    assert.equal(p.body.state, 'preparing');
+    assert.equal(p.body.time_limit_minutes, 25);
+    await waitFor(() => held.length === 1, 'the background generate call');
+    release();
+    await settled(other.c, other.job.id);
+
+    const stranger = newCandidate();
+    const n = await status(stranger, job.id);
+    assert.equal(n.body.state, 'not_applied');
+    assert.equal(n.body.time_limit_minutes, 25);
+
+    delete process.env.ASSESSMENT_TIME_LIMIT_MINUTES;
+    assert.equal((await status(c, job.id)).body.time_limit_minutes, 15, 'the default when unset');
+  } finally {
+    delete process.env.ASSESSMENT_TIME_LIMIT_MINUTES;
+  }
+});
+
+test('R-17: completed status carries the same candidate result evaluate gave, from the stored evaluation, with no key material', async () => {
+  const { c, job } = readyCandidate();
+  seedPool(c, job.id);
+  const s = await start(c, job.id);
+  assert.equal(s.res.status, 200, s.text);
+  const r = await evaluate(c, s.body.assessmentId, answerAll(s.body.questions));
+  assert.equal(r.res.status, 200, r.text);
+
+  const st = await status(c, job.id);
+  assert.equal(st.res.status, 200, st.text);
+  assert.equal(st.body.state, 'completed');
+  assert.ok(st.body.result, 'completed status carries the result');
+  // Same function over the same stored fields: only `scoring` (not stored; it belongs to
+  // the grading run) and `server_time` (the read's clock) differ.
+  const { scoring: _scoring, server_time: _t1, ...fromEvaluate } = r.body;
+  const { server_time: _t2, ...fromStatus } = st.body.result;
+  assert.deepEqual(fromStatus, fromEvaluate);
+  assert.equal(st.body.result.results.length, 10);
+  assert.ok(st.body.result.results.some((x) => x.points === 0.5), 'partly right is kept as points');
+
+  // No reveal, asserted against the stored key (which now also holds recruiter_results).
+  const keyRow = db.tables.assessment_keys.find((k) => k.assessment_id === s.body.assessmentId);
+  assert.equal(keyRow.answer_key.recruiter_results.length, 10);
+  assertNoKey(st.text, st.body, s.body.assessmentId);
+  assert.ok(!allKeys(st.body).has('recruiter_results'));
+  for (const rr of keyRow.answer_key.recruiter_results) assert.ok(!st.text.includes(rr.recruiter_feedback));
+
+  // The question text survives a reload (status carries it), and only the text: no
+  // options, so no option list can hint at which one was right.
+  for (const res of st.body.result.results) {
+    const served = s.body.questions.find((q) => q.question_id === res.question_id);
+    assert.equal(res.question, served.question, 'status carries the served question text');
+  }
+  assert.ok(!allKeys(st.body.result).has('options'), 'no options in the result');
+  for (const q of s.body.questions.filter((x) => x.options)) {
+    for (const o of q.options) assert.ok(!st.text.includes(o.text), `option text reached the result: ${o.text}`);
+  }
+});
+
+test('R-17: a voided attempt shows no result; the result is the first non-voided completed attempt; an older evaluation without per-question results sends what exists', async () => {
+  const { c, job } = readyCandidate();
+  seedCompleted(c, job.id, { score: 20, completedAt: '2026-11-14T09:00:00Z', voided: { by: RECRUITER, at: '2026-11-14T10:00:00Z', reason: 'lost connection' } });
+  const v = await status(c, job.id);
+  assert.notEqual(v.body.state, 'completed');
+  assert.equal('result' in v.body, false, 'no result outside completed');
+  await settled(c, job.id);
+
+  const kept = seedCompleted(c, job.id, { score: 60, completedAt: '2026-11-14T11:00:00Z' });
+  const s = await status(c, job.id);
+  assert.equal(s.body.state, 'completed');
+  assert.equal(s.body.result.assessmentId, kept.id);
+  assert.equal(s.body.result.score, 60);
+  assert.equal(s.body.result.results.length, 1);
+  assert.equal(s.body.result.results[0].candidate_feedback, null, 'nothing invented for a missing field');
+  assert.ok(!s.text.includes('lost connection'));
+
+  delete kept.evaluation.results; // an older stored evaluation without per-question results
+  const o = await status(c, job.id);
+  assert.equal(o.body.result.score, 60);
+  assert.deepEqual(o.body.result.results, []);
+  assert.deepEqual(o.body.result.skills, []);
 });
 
 test('evaluate with no prior score row and the parser down creates one, marked evidence-limited (assessment-only fallback)', async () => {

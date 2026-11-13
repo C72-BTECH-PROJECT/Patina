@@ -1,0 +1,12 @@
+{
+  "name": "patina-e2e",
+  "private": true,
+  "description": "R-19: scripted browser checks (Playwright) against the stack started by scripts/start-all.ps1, plus shot.mjs for verifier screenshots.",
+  "scripts": {
+    "test": "playwright test",
+    "shot": "node shot.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0"
+  }
+}

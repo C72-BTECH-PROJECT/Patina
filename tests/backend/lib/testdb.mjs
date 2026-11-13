@@ -16,6 +16,7 @@ const requireFromBackend = createRequire(join(REPO_DIR, 'backend', 'package.json
 const { createClient } = requireFromBackend('@supabase/supabase-js');
 
 export const JOB_TAG = '[T-0001 TEST]';
+export const EXTRA_JOB_TAGS = ['[E2E ', '[VERIFY '];
 const USERNAME_PREFIX = 't0001_';
 const MAX_ROWS = 50;
 const BUCKET = 'resumes';
@@ -117,6 +118,14 @@ const TABLE_FILTERS = (ids) => [
   { table: 'resumes', apply: (q) => q.in('candidate_id', candidateIds(ids)) },
   { table: 'applications', apply: (q) => q.in('candidate_id', candidateIds(ids)) },
   { table: 'jobs', apply: (q) => q.in('recruiter_id', recruiterIds(ids)).like('title', `${JOB_TAG}%`) },
+  // Batch 4: jobs created through the UI by the e2e suite ("[E2E <timestamp>]") and by
+  // verifier browser passes ("[VERIFY ...]"). Same guard as above: owned by a test
+  // recruiter AND carrying a test title tag.
+  ...EXTRA_JOB_TAGS.map((tag) => ({
+    table: 'jobs',
+    label: `jobs:${tag}`,
+    apply: (q) => q.in('recruiter_id', recruiterIds(ids)).like('title', `${tag}%`),
+  })),
 ];
 
 // Baseline stores `${C}/<uuid><ext>`, HEAD stores `candidates/${C}/resume<ext>`.
@@ -139,10 +148,10 @@ async function listObjects(sb, prefix) {
 // configured t0001_ profile still exists (1 = missing, so isZero() fails).
 export async function counts(sb, ids) {
   const out = {};
-  for (const { table, apply } of TABLE_FILTERS(ids)) {
+  for (const { table, label, apply } of TABLE_FILTERS(ids)) {
     const { count, error } = await apply(sb.from(table).select('*', { count: 'exact', head: true }));
     // A missing table (I-0007 / I-0013 in a fresh project) is reported, not fatal.
-    out[table] = error ? `error: ${error.message}` : count;
+    out[label ?? table] = error ? `error: ${error.message}` : count;
   }
   for (const { prefix, label } of STORAGE_PREFIXES(ids)) {
     out[label] = (await listObjects(sb, prefix)).length;
@@ -157,19 +166,19 @@ export async function counts(sb, ids) {
 // Delete everything owned by the test accounts.
 export async function sweep(sb, ids) {
   const removed = {};
-  for (const { table, apply } of TABLE_FILTERS(ids)) {
+  for (const { table, label: rowLabel, apply } of TABLE_FILTERS(ids)) {
     const { count, error: countErr } = await apply(sb.from(table).select('*', { count: 'exact', head: true }));
     if (countErr) {
       // Table absent in this project: nothing to delete.
-      removed[table] = `skipped (${countErr.message})`;
+      removed[rowLabel ?? table] = `skipped (${countErr.message})`;
       continue;
     }
-    if (count > MAX_ROWS) throw new Error(`guard: ${table} delete would remove ${count} rows (> ${MAX_ROWS}); aborting`);
+    if (count > MAX_ROWS) throw new Error(`guard: ${rowLabel ?? table} delete would remove ${count} rows (> ${MAX_ROWS}); aborting`);
     if (count > 0) {
       const { error } = await apply(sb.from(table).delete());
       if (error) throw new Error(`${table} delete failed: ${error.message}`);
     }
-    removed[table] = count;
+    removed[rowLabel ?? table] = count;
   }
   for (const { prefix, label } of STORAGE_PREFIXES(ids)) {
     const paths = await listObjects(sb, prefix);

@@ -451,6 +451,11 @@ test('status actions: shortlist and reject notify the candidate once; ownership 
   const rj2 = await call('POST', '/api/jobs/applications/shortlist', { user: REC_A, body: { applicationId: app.id, status: 'rejected' } });
   assert.equal(rj2.body.notified, true);
   assert.deepEqual(notes().map((n) => n.type), ['shortlisted', 'rejected']);
+  // Both name the job, the same way.
+  assert.deepEqual(notes().map((n) => n.message), [
+    'You have been shortlisted for [R-13 TEST] status job.',
+    'The recruiter has decided not to move forward with your application for [R-13 TEST] status job.',
+  ]);
 });
 
 test('recruiter reads only observe: list, detail and /attempts start no preparation (zero generate, zero parse calls) and report not_prepared; the candidate status read still prepares', async () => {

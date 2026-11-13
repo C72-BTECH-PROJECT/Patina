@@ -4,7 +4,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens (R-14). One definition of each colour, as an HSL triplet so it
+ * works both in Tailwind (tailwind.config.js reads these as
+ * `hsl(var(--x) / <alpha-value>)`, so `bg-success/10` keeps working) and in SVG
+ * and chart attributes (`stroke="hsl(var(--border))"`), which Tailwind classes
+ * cannot reach. Values are the palette the app already used in hex.
+ */
 :root {
+  --background: 0 0% 100%;            /* #ffffff */
+  --foreground: 0 0% 3.9%;            /* #0a0a0a */
+  --border: 0 0% 89.8%;               /* #e5e5e5 */
+  --input: 0 0% 89.8%;                /* #e5e5e5 */
+  --ring: 0 0% 3.9%;                  /* #0a0a0a */
+  --primary: 0 0% 3.9%;               /* #0a0a0a */
+  --primary-foreground: 0 0% 100%;    /* #ffffff */
+  --secondary: 0 0% 96.1%;            /* #f5f5f5 */
+  --secondary-foreground: 0 0% 3.9%;  /* #0a0a0a */
+  --muted: 0 0% 96.1%;                /* #f5f5f5 */
+  --muted-foreground: 0 0% 45.1%;     /* #737373 */
+  --success: 142.1 70.6% 45.3%;       /* #22c55e */
+  --success-foreground: 0 0% 100%;
+  --warning: 37.7 92.1% 50.2%;        /* #f59e0b */
+  --warning-foreground: 0 0% 100%;
+  /* Amber TEXT on a light surface (`text-warning-text`): #f59e0b is 2.15:1 on white,
+     this is 7.1:1 on white and above 6:1 on the bg-warning/10 tint. Fills, rings,
+     borders and icons keep --warning. */
+  --warning-text: 22.7 82.5% 31.4%;   /* #92400e */
+  --destructive: 0 84.2% 60.2%;       /* #ef4444 */
+  --destructive-foreground: 0 0% 100%;
+
   --accent-purple: #0a0a0a;
   --accent-cyan: #0a0a0a;
   --accent-pink: #0a0a0a;
@@ -33,6 +62,70 @@ html, body {
   border: 1px solid #e5e5e5;
   border-radius: 0.75rem;
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+/*
+ * Buttons and badges as plain classes (`btn btn-primary`, `badge badge-primary`).
+ * In the components layer so a Tailwind utility on the same element (for
+ * example `text-[10px]`) still wins.
+ */
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+  }
+
+  .btn:hover {
+    background: hsl(var(--muted));
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    border-color: hsl(var(--primary));
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+
+  .btn-primary:hover {
+    background: hsl(var(--primary) / 0.9);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 9999px;
+    background: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1rem;
+    white-space: nowrap;
+  }
+
+  .badge-primary {
+    border-color: hsl(var(--primary));
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
 }
 
 /* Typography */
@@ -139,37 +232,6 @@ html, body {
 }
 
 .glow-border:hover::before {
-  opacity: 1;
-}
-
-.btn-primary {
-  position: relative;
-  background: #0a0a0a;
-  padding: 1rem 2rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  color: #ffffff;
-  overflow: hidden;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-}
-
-.btn-primary::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%, rgba(255,255,255,0.05) 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-  background: #0a0a0a;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-}
-
-.btn-primary:hover::before {
   opacity: 1;
 }
 

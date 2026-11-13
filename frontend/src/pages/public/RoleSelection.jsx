@@ -68,7 +68,7 @@ function RoleSelection() {
               How would you like to use <span className="text-foreground">PATINA</span>?
             </h1>
             <p className="text-muted-foreground text-lg max-w-lg mx-auto">
-              Choose your role to get started with the most advanced AI-powered skill verification platform.
+              Choose your role to get started.
             </p>
           </motion.div>
 
@@ -77,7 +77,7 @@ function RoleSelection() {
               to="/signup"
               icon={User}
               title="I'm a Candidate"
-              description="Connect your GitHub, upload your resume, and verify your skills to stand out to top employers with AI-powered credibility scores."
+              description="Upload your resume, apply to jobs, and take a short technical assessment. Each application gets a credibility score that shows how it was worked out."
               delay={0.1}
               color="#0a0a0a"
             />
@@ -86,7 +86,7 @@ function RoleSelection() {
               to="/signup"
               icon={Building2}
               title="I'm a Recruiter"
-              description="Review verified candidate profiles, credibility scores, and make data-driven hiring decisions with real-time analytics."
+              description="Post jobs, review the applications to them ranked by credibility score, see the evidence behind each score, and shortlist or reject."
               delay={0.2}
               color="#0a0a0a"
             />

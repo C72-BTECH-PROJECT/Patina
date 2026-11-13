@@ -25,8 +25,8 @@ Status values: `todo`, `doing`, `done` (verifier passed), `failed` (two failed v
 | 1 | R-01; R-02 → R-03 → R-04 | Nov 13 | R-01 beside the chain; all of batch 2 beside batch 1 |
 | 2 | R-05; R-06; R-07 → R-08; R-20 | Nov 13 | All four lanes |
 | 3 | R-09 → R-10 → R-11 → R-12 → R-13 | Nov 14 | Serial (same controllers) |
-| 4 | R-14, then R-15, R-16, R-17 together, then R-18 | Nov 15 | As stated |
-| 5 | R-19, R-21 | Nov 15–16 | Both |
+| 4 | R-14, then R-15, R-16, R-17 together, then R-18, then R-19 (moved in from batch 5 by Anthony, 2026-11-13: batch 4 is not done until the scripted browser check of the full spine passes). R-19's Playwright scaffolding (`tests/e2e/` only) may be built beside R-14 so the batch-4 verifiers can use it for their browser passes. | Nov 15 | As stated |
+| 5 | R-21 | Nov 15–16 | — |
 | 6 | R-22 → R-23, R-24, R-25, R-26 | Nov 16 | After R-22 |
 | Stretch | S-3, S-1, S-2, S-4, S-5, in that order | Only after R-19 passes | — |
 | Phase 4 | H-1 to H-4 | Starts Nov 16 whatever else is open | — |
@@ -171,35 +171,35 @@ Suggested commit points for Anthony: one after each batch passes its verifier ru
 ## Batch 4: frontend
 
 ### R-14 · Frontend foundation: one API client, green CI build, tokens, routes
-- **Status:** todo · **Agent:** patina-implementer · **Depends:** R-13 (final API shapes) · **Risk:** medium (touches every page)
+- **Status:** DONE 2026-11-13 (verified: PASS WITH NOTES, see LOG.md; ring arc checked with intercepted data only, real-data check moved to R-16's browser pass) · **Agent:** patina-implementer · **Depends:** R-13 (final API shapes) · **Risk:** medium (touches every page)
 - **Goal:** D§8.1.
 - **Files:** `frontend/src/lib/api.js` (new), every file that defines an API base URL or calls `fetch` (list in `inventory/services.frontend.md` §3), `frontend/src/index.css`, `tailwind.config.js`, `App.jsx`, `frontend/package.json`.
 - **Do:** one client (base URL from `REACT_APP_API_BASE_URL`, credentials included, errors normalised to `{ status, error, message }`); remove the global `fetch` patch, the two hardcoded URLs and the `import.meta.env` read; fix the 9 lint warnings; define the missing CSS variables and the `btn` and `badge` classes; add index routes for `/candidate` and `/recruiter` and a 404 route; one `ScoreBadge` that renders the backend `band`; delete the dead components and the `@tailwindcss/vite` dependency (Y6).
 - **Check:** `CI=true npm run build` exits 0; `git grep -nE "localhost:5000|import\.meta|window\.fetch\s*=" frontend/src` finds only `lib/api.js`'s default; in a browser the score ring on a scored result draws its arc (screenshot in the verifier report).
 
 ### R-15 · Honesty sweep and broken controls
-- **Status:** todo · **Agent:** patina-implementer · **Depends:** R-14 · **Risk:** low
+- **Status:** DONE 2026-11-13 (verified in a browser on the real stack: PASS WITH NOTES, see LOG.md; admin page and server side of sign-up/resend NOT checked) · **Agent:** patina-implementer · **Depends:** R-14 · **Risk:** low
 - **Goal:** D§8.2. Removes F1 to F12, F23, F24 and the broken items.
 - **Files:** `pages/public/Landing.jsx`, `Login.jsx`, `pages/recruiter/CreateJob.jsx`, `Jobs.jsx`, `Profile.jsx`, `components/layouts/RecruiterLayout.jsx`, `pages/candidate/CandidateProfile.jsx`, `Notifications.jsx`, admin page, `backend/Controllers/auth.controller.js` only if the resend bug is server-side.
 - **Do:** remove the invented statistics, demo score, avatars, "Connect GitHub" copy, random "AI Suggestion", "3x" claim, profile statistics and badge, the unread dot and the dead search box; job cards show the real application count; fix contrast on CreateJob, Jobs and Profile; Recruiter Profile role check; notifications error state and "Mark read"; resend-confirmation sends the typed email; "Skip verification" skips; admin suspension state persists across tabs.
 - **Check:** `git grep -nE "10000|500\+|4\.9|pravatar|Math\.random|3x more" frontend/src` is empty; a verifier browser pass confirms each listed control is readable and each listed flow works, with a screenshot per page.
 
 ### R-16 · Candidate flow: upload result, apply state, my applications, results
-- **Status:** todo · **Agent:** patina-implementer · **Depends:** R-14 · **Risk:** low
+- **Status:** DONE 2026-11-13 (verified in a browser on the real stack: PASS WITH NOTES, see LOG.md) · **Agent:** patina-implementer · **Depends:** R-14 · **Risk:** low
 - **Goal:** spine steps 2 to 4.
 - **Files:** `pages/candidate/Upload.jsx`, jobs and job-detail pages, `Dashboard.jsx`, `Results.jsx`, `Processing.jsx` (delete, Y1), `components/layouts/CandidateLayout.jsx`, `App.jsx` routes.
 - **Do:** Upload shows what was parsed, or the unreadable message, or a real error (F20, F21); Apply shows "scored" or "not scored: reason" with a score-again action; the dashboard lists the candidate's applications with status, score state and assessment state; Results is per application, linked from the list and the nav, shows "not scored yet" for no score and never a default 0 or a canned sentence (F13, F14).
 - **Check:** verifier browser pass with the test candidate: upload f1 → parsed skills shown; upload f6 → unreadable message; apply → scored state; the dashboard row links to a result whose composite equals the API value.
 
 ### R-17 · Assessment page: timer, saved answers, honest states
-- **Status:** todo · **Agent:** patina-implementer · **Depends:** R-12, R-14 · **Risk:** medium
+- **Status:** DONE 2026-11-13 (verified in a browser on the real stack: PASS WITH NOTES, see LOG.md) · **Agent:** patina-implementer · **Depends:** R-12, R-14 · **Risk:** medium
 - **Goal:** spine step 6 in the browser; fixes F22.
 - **Files:** `pages/candidate/Assessment.jsx`, its components.
 - **Do:** only offered for applied jobs; a start screen stating the rules (one attempt, 15 minutes, unproctored); countdown from the server's `expires_at`; answers saved to the server on change; reload restores answers and remaining time; automatic submit at zero; the page reads R-11's status endpoint and never waits on generation: `preparing` shows "Your assessment is being prepared" and polls every few seconds, `unavailable` shows "Not ready yet, we will keep trying" with a "Check again" action and no invented cause, and the Start button is enabled only on `ready`; the clock starts at Start, not when the pool was prepared; "grading pending" state with retry; the result shows what R-11 returns and nothing else.
 - **Check:** verifier browser pass: with assessment-service stopped the page shows the preparing or not-ready state within 2 s and never a spinner longer than that; with it running, start, answer two questions, reload → both answers and the running clock are restored; submit → result with no correct answers visible in the page or the network response.
 
 ### R-18 · Recruiter: one applications view with actions and drill-down
-- **Status:** todo · **Agent:** patina-implementer · **Depends:** R-13, R-15 · **Risk:** medium
+- **Status:** DONE 2026-11-13 (verified in a browser on the real stack: PASS WITH NOTES, see LOG.md) · **Agent:** patina-implementer · **Depends:** R-13, R-15 · **Risk:** medium
 - **Goal:** spine step 5 in the browser; fixes F15 to F19.
 - **Files:** `pages/recruiter/Dashboard.jsx`, `JobDetails.jsx`, `AllCandidates.jsx` (replaced, Y6), `components/recruiter/CandidateModal.jsx`, `ScoreBreakdown.jsx`, a new `ApplicationsTable` component, nav in `RecruiterLayout.jsx`.
 - **Do:** one table used for all applications and for one job, ranked by composite, unscored rows labelled "Not scored yet" with a retry action (Y1 condition); status filter on the real status values; shortlist and reject buttons; a "Reset assessment attempt" action with a required reason in the drill-down, and a visible record when an attempt was reset (Y5 addition); drill-down showing composite, weights (labelled provisional), each sub-score with its evidence, assessment per-question outcomes, the evidence-limited marker, the "GitHub ownership not verified" and "unproctored assessment" notes, and the honest flags panel; dashboard counts computed from the same data with true labels; loading, empty and error states distinct.
@@ -210,7 +210,8 @@ Suggested commit points for Anthony: one after each batch passes its verifier ru
 ## Batch 5: end-to-end check and vocabulary
 
 ### R-19 · Scripted end-to-end check (the definition of done for list A)
-- **Status:** todo · **Agent:** patina-implementer writes; patina-verifier runs · **Depends:** R-16, R-17, R-18, O-1, O-5 · **Risk:** medium (live LLM and live GitHub)
+- **Batch:** 4 (moved from batch 5 by Anthony, 2026-11-13). It closes batch 4.
+- **Status:** DONE 2026-11-13 (verified: PASS WITH NOTES, two consecutive runs exit 0 on a fresh start, see LOG.md; GitHub-available branch and sign-up spec NOT exercised) · **Agent:** patina-implementer writes; patina-verifier runs · **Depends:** R-16, R-17, R-18, O-1, O-5 · **Risk:** medium (live LLM and live GitHub)
 - **Goal:** the six spine steps, through the browser only, re-runnable.
 - **Files:** `tests/e2e/` (new: Playwright config, `spine.spec.mjs`, `signup.spec.mjs`, fixtures), `tests/run-suite.ps1` (an `e2e` suite), `tests/README.md`, `data-testid` attributes in frontend pages where needed.
 - **Do:** against the stack started by `scripts/start-all.ps1`: recruiter logs in and creates a job titled `[E2E <timestamp>]`; candidate logs in, uploads the demo resume, sees parsed skills, applies, sees a scored result; recruiter sees the application with score and drill-down and shortlists it; candidate opens the assessment, the script waits on the `preparing` state until `ready` (bounded wait; a pool that never becomes ready is reported as a provider failure, separately from a product failure), takes it (answers chosen by the script) and sees a result with no correct answers; recruiter sees the assessment sub-score in a new composite. Assertions are on states and invariants (score present, weights sum to 1, three sub-scores available when GitHub answered, statuses), never on specific LLM text or score values. A second spec uploads the image-only fixture and expects the unreadable message. `signup.spec.mjs` covers sign-up as far as O-5(a) allows. The run ends by printing the rows it left in Supabase.
