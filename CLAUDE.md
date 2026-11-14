@@ -17,11 +17,15 @@ about the project — not feature status.
   (root). Its as-is claims cite `file:line` at its verified-at commit, and the
   `docs` suite checks that the cites resolve. Its §4–§5 (to-be, migration) are
   proposals, not status; status stays in AUDIT.md.
-- **What gets built next, and in what order:** `ROADMAP.md` (root). A plan,
-  never status; the `docs` suite checks its dependency order and ids.
+- **What gets built next, and in what order:** `REBUILD/ROADMAP.md`. A plan,
+  never status. The root `ROADMAP.md` is the pre-rebuild plan (T-0010); the
+  `docs` suite still checks it until card R-22 archives it.
 - `Docs/archive/project_checklist.md` and `Docs/archive/IMPLEMENTATION-TRACKER.md`
   are archived team self-reports (T-0008). Do NOT treat them as accurate:
   checked boxes there are not evidence. They are history, not a pointer.
+- `Docs/archive/tasks/` and `Docs/archive/WORKLOG.md` are the task specs and
+  work log used before the rebuild (archived 2026-11-14). History only: new
+  work is written as cards and log rows under `REBUILD/` (Session protocol).
 
 ## What this project is
 Replaces keyword-based ATS with a multi-layer pipeline: resume parsing (NLP)
@@ -76,16 +80,19 @@ Guide-review items, owner-reported (no written source in the repo):
   boundary makes sense, say so in your summary and stop.
 
 ## Session protocol
-- **Start:** read CLAUDE.md, the last 5 entries in WORKLOG.md, and the
-  ISSUES.md entries for the module being touched. Never read the whole log.
-- **Before code:** write a task spec in `tasks/T-NNNN-<slug>.md` (see
-  `tasks/TEMPLATE.md`). Wait for the user's approval of the acceptance
-  criteria before implementing anything.
-- **During:** if you find a problem outside the current task's scope, add a
+The `REBUILD/` files are the session protocol (Anthony, 2026-11-14;
+`REBUILD/DECISIONS.md` §0 A9). The full version is `REBUILD/HANDOFF.md`.
+- **Start:** read CLAUDE.md, `REBUILD/HANDOFF.md`, the top two blocks of
+  `REBUILD/PROGRESS.md`, and the ISSUES.md entries for the module being
+  touched. Never read a whole log.
+- **Before code:** write a card in `REBUILD/TASKS.md` (goal, files, what to
+  do, acceptance check). Wait for the user's approval of the acceptance
+  check before implementing anything.
+- **During:** if you find a problem outside the current card's scope, add a
   new ISSUES.md entry — do not fix it silently out of scope.
-- **End:** run the task's verification steps, fill in the task's "Result"
-  section with PASS/FAIL + evidence per criterion, then append one entry to
-  WORKLOG.md (format and length limit defined there).
+- **End:** run the card's check, write PASS/FAIL + evidence on the card, add
+  a new top block to `REBUILD/PROGRESS.md`, and append one row to
+  `REBUILD/LOG.md`.
 - Never commit, push, or open PRs (existing rule above — kept here as a
   reminder since this section is read every session).
 
@@ -116,7 +123,7 @@ at once and give it a card.
 
 ## Rebuild mode (Nov 12–18, 2026): append this section to the end of CLAUDE.md
 
-A ground-up correctness rebuild is in progress on branch `rebuild/fable`. The session brief is `REBUILD/KICKOFF.md`; current state is `REBUILD/PROGRESS.md`. Every agent, the lead and all subagents, follows these rules:
+A ground-up correctness rebuild is in progress on branch `rebuild/fable`. The session brief was `REBUILD/KICKOFF.md`; from 2026-11-15 a session starts from `REBUILD/HANDOFF.md`. Current state is `REBUILD/PROGRESS.md`. Every agent, the lead and all subagents, follows these rules:
 
 - `main` must stay demo-able for the Nov 18 evaluation. All rebuild work happens on `rebuild/fable`.
 - Git is read-only for Claude. Anthony commits, pushes and merges.
