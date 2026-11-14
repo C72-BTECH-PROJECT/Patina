@@ -33,7 +33,11 @@ Microsoft/
 tests/private/
 tests/.out/
 eval/resumes/
-eval/labels/
+# eval/labels: only the final label set and its rulings are committed (labels of
+# public Kaggle resumes; the PDFs, drafts and review sheets stay local).
+eval/labels/*
+!eval/labels/gold.csv
+!eval/labels/RULINGS.md
 !tests/fixtures/*.pdf
 !tests/fixtures/*.docx
 !tests/fixtures/demo/*.pdf

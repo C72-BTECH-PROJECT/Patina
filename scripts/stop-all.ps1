@@ -8,6 +8,12 @@
   start time recorded by start-all, so a reused PID is never touched. Anything
   else listening on the Patina ports is reported, never stopped.
 
+  One exception, for the frontend only: when start-all recorded the frontend's
+  launcher but never recorded its listener PID (start-all was interrupted or
+  timed out before the dev server answered, and the npm launcher has since
+  exited, so the tree cannot be reached from it), the node.exe process that is
+  listening on the frontend's port (3000) is stopped by port.
+
   Exit 0 when every recorded process is gone; 1 otherwise.
 #>
 [CmdletBinding()]
@@ -49,13 +55,33 @@ foreach ($r in $records) {
   }
 }
 
-# Wait up to 15 s for every recorded process to be gone.
+# Frontend fallback: no listener PID was recorded, so stop the dev server by its port.
+# Only node.exe listeners are stopped; anything else on the port is left and reported.
+$stoppedByPort = @()
+foreach ($r in @($records | Where-Object { $_.service -eq 'frontend' -and -not $_.listenPid })) {
+  $holders = @(Get-NetTCPConnection -LocalPort ([int]$r.port) -State Listen -ErrorAction SilentlyContinue |
+      ForEach-Object { [int]$_.OwningProcess } | Select-Object -Unique)
+  foreach ($h in $holders) {
+    $name = try { (Get-Process -Id $h -ErrorAction Stop).ProcessName } catch { '' }
+    if ($name -ne 'node') { continue }
+    $ErrorActionPreference = 'Continue'
+    & taskkill.exe /PID $h /T /F 2>&1 | Out-Null
+    $ErrorActionPreference = 'Stop'
+    $stoppedByPort += $h
+  }
+}
+if ($stoppedByPort.Count -gt 0) {
+  Write-Host "stop-all: frontend listener PID was not recorded; stopped node.exe PID $($stoppedByPort -join ',') listening on port 3000."
+}
+
+# Wait up to 15 s for every recorded process to be gone (and the by-port stop to free the port).
 $deadline = (Get-Date).AddSeconds(15)
 do {
   $remaining = @($records | Where-Object {
       (Test-Ours $_.launcherPid $_.launcherStart) -or (Test-Ours $_.listenPid $_.listenStart)
     })
-  if ($remaining.Count -eq 0) { break }
+  $portHeld = @($stoppedByPort | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
+  if ($remaining.Count -eq 0 -and $portHeld.Count -eq 0) { break }
   Start-Sleep -Milliseconds 500
 } while ((Get-Date) -lt $deadline)
 

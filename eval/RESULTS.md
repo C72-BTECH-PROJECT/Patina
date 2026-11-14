@@ -236,10 +236,25 @@ Written by hand by the R-21 implementer to pair the two harness sections above. 
 - n = 20 résumés, all from the public Kaggle Resume Dataset named in the SRS. The labelling guide planned 30; this is 20.
 - How they were chosen: by file name, not by content or layout. The first 12 files by name in the INFORMATION-TECHNOLOGY folder, plus the first 2 by name in each of ENGINEERING, FINANCE, HR and DESIGNER. None was skipped.
 - Labels: AI-drafted from the résumé text only (the parser's output was never consulted) and checked against each PDF by one human labeller (Anthony). One labeller, so no inter-labeller agreement figure exists and none is reported.
-- Labelling rulings R1–R7 and the per-row decisions are in `eval/labels/RULINGS.md`, kept with the label set (git-ignored, like `gold.csv`). They were made before this run.
+- Labelling rulings R1–R7 and the per-row decisions are in `eval/labels/RULINGS.md`, committed beside the label set `eval/labels/gold.csv` (both committed on 2026-11-14; the résumé PDFs, the label draft and the review sheet are not). They were made before this run.
 - Role mix: 11 of 20 are not IT roles (role type `other`), 9 are support/operations, and none is a development role. The numbers say little about development résumés.
 - Frozen before the run: the alias table and the out-of-scope list (same SHA-256 as the 2026-11-12 smoke run, so unchanged since before labelling) and the parser vocabulary, taken after the owner-approved sas/statistics change (nlp-engine@2.3.0). Nothing was changed after seeing this run's misses.
 - Two résumés have no gold skills; they count only through false finds.
+
+### Reproducing this run
+
+- Dataset: the public Kaggle "Resume Dataset" (`snehaanbhawal/resume-dataset`: PDF résumés in one folder per job category, `data/data/<CATEGORY>/<id>.pdf`). The PDFs are not in this repository; download the dataset and copy the 20 files below into `eval/resumes/`.
+- The 20 file ids (12 from INFORMATION-TECHNOLOGY, 2 each from ENGINEERING, FINANCE, HR and DESIGNER, chosen by the rule in the limits above): `10030015`, `10089434`, `10219099`, `10247517`, `10265057`, `10399912`, `10466583`, `10549585`, `10553553`, `10641230`, `10694288`, `10748989`, `10839851`, `10840430`, `11441764`, `11580408`, `11584809`, `11957080`, `12045067`, `12334140` (each `<id>.pdf`).
+- Labels and rulings: `eval/labels/gold.csv`, `eval/labels/RULINGS.md` (committed). Frozen inputs: `eval/aliases.json`, `eval/out_of_scope_terms.json`, `eval/vocabulary_frozen.json` (hashes below).
+- Command, with nlp-engine@2.3.0 running on port 8000: `nlp-engine\venv\Scripts\python eval\run_parsing_eval.py --nlp-url http://127.0.0.1:8000 --vocabulary eval\vocabulary_frozen.json --sensitivity 10089434.pdf` (add `--no-write` to print without appending).
+
+### Interpretation (written 2026-11-14 after the run; no number below was changed)
+
+- **Extraction is accurate on the skills the parser knows.** Precision is 0.795: about four in five skills it reports are right. Recall on the gold skills that are in its vocabulary is 0.866 (58 of 67). 7 of the 15 false finds are the two naming mismatches listed under "Same skill, different name", not wrong extractions.
+- **Vocabulary coverage is the limit.** 212 of the 279 gold skills (76 %) are outside the 180-skill vocabulary, so overall recall is 0.208 and F1 is 0.330. A fixed list cannot name the office, vendor-hardware, ERP, payroll and in-house products these résumés list. The SRS targets (accuracy ≥ 85 %, F1 ≥ 0.80) are **not met** on this sample.
+- **This is the case for the trained NER model the SRS specifies** (CHECKLIST 1.5, list C in `REBUILD/CUT.md`): a model that learns what a skill looks like is not bound to a list. It is on the roadmap (Track A); adding words to the list after seeing these misses would only fit the list to this sample.
+- **The sample has no development roles** (11 other, 9 support/operations, 0 development). These numbers say nothing measured about developer résumés, which are the product's main case. **The next evaluation is a developer-role sample.**
+- **Roadmap for that next run:** join the two alias gaps (`exchange server` = `microsoft exchange`; `sccm` = `system center configuration manager`) in the alias table and in the parser's canonical names. The next run **must use a fresh sample**: these 20 résumés have now been seen, so any change made because of their misses cannot be measured on them. (Recorded on card H-1 in `REBUILD/TASKS.md` until `REBUILD/ROADMAP.md` is written.)
 
 - Label set: `eval/labels/gold.csv`, 20 resumes
 - Sources: kaggle 20, consented 0, smoke 0

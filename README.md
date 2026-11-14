@@ -1,198 +1,207 @@
 # Patina
 
-Patina is an evidence-based hiring platform for technical roles. It helps candidates present credible evidence of their skills and gives recruiters a clearer view of fit than keyword-only resume review.
+Final-year project C72: an AI-automated skill validation and credibility framework. Patina replaces keyword
+screening with evidence. A candidate's résumé says what they claim; public GitHub activity and a generated
+technical assessment say how much of it holds; the recruiter sees one credibility score with the reasons for it.
 
-> **Status:** active development. The interface, API foundation, local NLP parsing flow, and Supabase connectivity are in place. Persistent database tables and their application integration are the next milestone.
+This file is the one run guide. It does not carry project status.
 
-## Business overview
+| Question | Where to look |
+|---|---|
+| What is verified to work | `AUDIT.md` |
+| What the spec asks for | `CHECKLIST.md`, `PROJECT_SOURCE_DOCS.md` |
+| How it is built, and the honest microservices verdict | `ARCHITECTURE.md` |
+| Why each design decision was made (weights, caps, anti-cheating, Supabase) | `REBUILD/DECISIONS.md` |
+| What is in and out for the Nov 18 evaluation | `REBUILD/CUT.md` |
+| Where a given piece of code is | `CODE_MAP.md` |
+| Demo script and prepared answers | `REVIEW_BRIEF.md` |
+| Parsing evaluation numbers | `eval/RESULTS.md` |
+| Known defects | `ISSUES.md` |
 
-### The problem
+## What runs
 
-Keyword-based hiring workflows can make it hard to distinguish verified technical capability from resume inflation. Candidates also need a better way to show the work behind their claims.
+Six local processes. The browser talks only to the gateway.
 
-### The product
+| Process | Port | Folder | Runtime |
+|---|---|---|---|
+| frontend (React dev server) | 3000 | `frontend/` | Node |
+| gateway (the only entry point) | 5000 | `gateway/` | Node |
+| core (auth, data, orchestration, scoring) | 5001, loopback | `backend/` | Node |
+| nlp-engine (résumé parsing) | 8000, loopback | `nlp-engine/` | Python |
+| github-evidence | 8001, loopback | `github-evidence/` | Python |
+| assessment-service (LLM questions and grading) | 8002, loopback | `assessment-service/` | Python |
 
-Patina brings resume analysis, job-fit signals, and technical evidence into a candidate profile that recruiters can review. The intended flow is:
+Plus a hosted Supabase project (Postgres, Auth, Storage), reached only by core.
 
-1. A candidate signs up, uploads a resume, and explores suitable roles.
-2. Patina extracts structured resume information and compares it with a selected job description.
-3. GitHub signals, when available, support skill verification.
-4. Recruiters review candidates, skills, match signals, and evidence in one dashboard.
+## Prerequisites
 
-### Product scope
+- Windows with PowerShell 5.1 or newer (the start and stop scripts are PowerShell).
+- Node.js 18 or newer (developed on 24) with npm.
+- Python 3.11 or newer (developed on 3.14).
+- A Supabase project with every migration in `supabase/migrations/` applied
+  (see `Docs/SUPABASE_MIGRATIONS_RUNBOOK.md`).
+- A Gemini API key for the assessment. Without it everything else runs and the assessment reports itself
+  unavailable.
+- Optional: a GitHub token for github-evidence. Without it the GitHub API's unauthenticated rate limit applies.
 
-Patina currently focuses on technical and coding roles. The product direction includes evidence-based skill validation, GitHub-backed verification, and structured technical assessments. Degree verification and broad soft-skill validation are outside the current scope.
+## One-time setup
 
-## Current implementation
+From the repository root, in PowerShell.
 
-This section is the source of truth for the current repository. Update it whenever a commit changes runtime behavior, architecture, dependencies, routes, or delivery status.
+**1. Node dependencies**
 
-| Area | Status | Notes |
-| --- | --- | --- |
-| Candidate and recruiter UI | Implemented | React routes and role-specific screens are available. |
-| Resume upload and analysis | Implemented locally | Express forwards a resume and job description to the FastAPI NLP service. |
-| Resume parsing and job matching | Implemented locally | The NLP service extracts text/entities and produces semantic matching signals. |
-| GitHub language lookup | Implemented | Used as an additional skill-verification signal when a GitHub account is available. |
-| Authentication | Implemented | Supabase Auth stores email/password credentials; an Auth-linked profile stores the role and username. The backend accepts username/password login and maintains an HTTP-only app session. |
-| Admin console | Implemented | An existing, promoted administrator can review candidate/recruiter accounts, dashboard metrics, and suspend or reactivate portal access. |
-| Job creation | Prototype | Jobs are held in application memory; they do not persist across server restarts. |
-| Supabase connectivity | Verified | The backend has an authenticated Supabase client, but no tables or controller reads/writes are wired yet. |
-| Persistent data model | Implemented for profiles | The Auth-linked profiles migration and RLS policy are applied in Supabase. Jobs and resume analyses still need persistent tables. |
-| LLM technical assessments | Planned | Not implemented in the current runtime. |
-
-## Architecture
-
-```text
-React frontend (port 3000)
-        |
-        v
-Express API (port 5000)
-        |---------------------> Supabase (connection configured; tables pending)
-        |
-        +---------------------> FastAPI NLP service (port 8000)
-                                      |
-                                      v
-                         Resume extraction, entities, semantic matching
+```powershell
+cd backend;  npm install; cd ..
+cd gateway;  npm install; cd ..
+cd frontend; npm install; cd ..
 ```
 
-| Layer | Technology |
-| --- | --- |
-| Frontend | React, React Router, Tailwind CSS, Framer Motion, Recharts |
-| Backend | Node.js, Express, Passport, Express Session |
-| Database platform | Supabase (PostgreSQL) via `@supabase/supabase-js` |
-| NLP service | Python, FastAPI, spaCy, Sentence Transformers, pdfplumber, python-docx |
-| External data | GitHub API integration |
+**2. Python environments.** The folder names matter: the start script looks for exactly these.
 
-## Repository structure
+```powershell
+python -m venv nlp-engine\venv
+nlp-engine\venv\Scripts\python -m pip install -r nlp-engine\requirements.txt
+nlp-engine\venv\Scripts\python -m spacy download en_core_web_sm
 
-```text
-Patina/
-??? frontend/                 # React application
-?   ??? src/
-?       ??? components/       # Reusable UI and layouts
-?       ??? context/          # Shared React state
-?       ??? data/             # Temporary/mock UI data
-?       ??? pages/            # Public, candidate, and recruiter screens
-??? backend/                  # Express API
-??? nlp-engine/               # FastAPI resume parsing service
-??? Docs/                     # Supporting architecture/research documentation
-??? README.md                 # Product and technical project documentation
+python -m venv github-evidence\venv
+github-evidence\venv\Scripts\python -m pip install -r github-evidence\requirements.txt
+
+python -m venv assessment-service\.venv
+assessment-service\.venv\Scripts\python -m pip install -r assessment-service\requirements.txt
 ```
 
-## Local setup
+**3. Download the sentence model once.** `start-all.ps1` starts nlp-engine offline, so the MiniLM model must
+already be in the local cache:
 
-### Prerequisites
-
-- Node.js 18 or newer
-- Python 3.11 or compatible
-- A Supabase project for the backend environment variables
-
-### Backend
-
-```bash
-cd backend
-npm install
+```powershell
+nlp-engine\venv\Scripts\python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 ```
 
-Create `backend/.env` from `backend/.env.example` and provide real values:
+**4. Environment files.** Copy each `.env.example` to `.env` in the same folder and fill it in. Never commit
+a `.env` file. Variable names only:
 
-```env
-SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-# Optional unless a backend feature specifically requires it
-SUPABASE_ANON_KEY=your-anon-key
+| File | Required | Optional |
+|---|---|---|
+| `backend/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SESSION_SECRET` (at least 32 characters, or core refuses to start) | `PORT` (5001), `FRONTEND_URL`, `NLP_PARSE_URL`, `ASSESSMENT_MAX_ATTEMPTS` (1), `ASSESSMENT_TIME_LIMIT_MINUTES` (15), `ASSESSMENT_PREPARE_RETRIES` (2). Leave `ASSESSMENT_PREPARE_ON_APPLY` unset. |
+| `assessment-service/.env` | `GEMINI_API_KEY` | `GEMINI_MODELS`, `GEMINI_BASE_URL`, and the `ASSESSMENT_*` settings listed in its `.env.example` |
+| `github-evidence/.env` | — | `GITHUB_TOKEN`, and the `GITHUB_*` settings listed in its `.env.example` |
+| `frontend/.env` | — | `REACT_APP_API_BASE_URL` (default `http://localhost:5000`, the gateway) |
+| `gateway/.env` | — | none needed; defaults are in `gateway/index.js`. Names are listed in `gateway/.env.example`. |
+| `tests/.env` | only for the test suites: `TEST_CANDIDATE_USERNAME`, `TEST_CANDIDATE_PASSWORD`, `TEST_RECRUITER_USERNAME`, `TEST_RECRUITER_PASSWORD` | |
 
-PORT=5000
-FRONTEND_URL=http://localhost:3000
-SESSION_SECRET=replace-with-a-long-random-value
+## Start and stop
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start-all.ps1
 ```
 
-Start the API:
+`start-all.ps1` starts the six processes, waits until each answers its health check, runs one warm-up parse
+through nlp-engine, and prints a status table. Expect about a minute; the frontend dev server is the slowest.
+When it prints `all services up`, open **http://localhost:3000**.
 
-```bash
-npm run dev
+- It exits 1 and names the service if anything did not come up, and stops what it started.
+- It refuses to start if a Patina port is already in use or a previous run is still up.
+- `-NoFrontend` skips the React dev server. `-KeepOnFailure` leaves processes running after a failed start.
+- Logs: `tests\.out\start-all\<service>.out.log` and `.err.log`.
+- **Do not pipe this command** into `Select-Object`, `Out-String`, `tail` or similar: the pipe waits for the
+  servers to exit, and they never do.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\stop-all.ps1
 ```
 
-### NLP service
+`stop-all.ps1` stops exactly the processes `start-all.ps1` recorded in `tests\.out\start-all\pids.json`, and
+prints one row per service with the state of its port. If the frontend's listener was never recorded (for
+example `start-all` was interrupted before the dev server answered), it stops the `node.exe` process listening
+on port 3000. Anything else on a Patina port is reported, not stopped.
 
-```bash
-cd nlp-engine
-venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m spacy download en_core_web_sm
-uvicorn app.main:app --reload --port 8000
+Health checks, if you want to look yourself:
+
+| URL | Answers |
+|---|---|
+| `http://127.0.0.1:5000/health` | the gateway's aggregate: `ok` or `degraded`, one boolean per service |
+| `http://127.0.0.1:5001/api/health` | core, including a database check |
+| `http://127.0.0.1:8000/` | nlp-engine and its parser version |
+| `http://127.0.0.1:8001/health` | github-evidence, and whether a token is configured |
+| `http://127.0.0.1:8002/` | assessment-service, and whether an LLM key is configured |
+
+## First use
+
+1. Open `http://localhost:3000`, choose a role and sign up. Email confirmation is on in the project's
+   Supabase settings, so confirm the address from the email before logging in.
+2. As a recruiter: create a job with required skills.
+3. As a candidate: upload a résumé (PDF or DOCX with a text layer), open the job, apply. The score appears
+   with the application. Then take the assessment from the same job; pool preparation runs in the background
+   after apply and usually takes under a minute.
+4. As the recruiter: open **Applications**, then a row, for the drill-down.
+
+Synthetic demo résumés with invented people are in `tests/fixtures/demo/` (see its `README.md`).
+
+## Tests
+
+All commands run from the repository root. The suites start and stop their own services, so **run
+`stop-all.ps1` first**; the ports must be free. The one exception is `e2e`, which needs the stack running.
+
+```powershell
+# The default suites (nlp, backend, gateway, frontend, docs, github, assessment). They write nothing to Supabase;
+# core still needs backend\.env and a reachable Supabase project to start.
+powershell -File tests\run-suite.ps1 -Target current
+
+# One suite
+powershell -File tests\run-suite.ps1 -Target current -Suites backend
+
+# Adds the tests that write to Supabase as the test accounts in tests\.env
+powershell -File tests\run-suite.ps1 -Target current -Suites backend -Live
+
+# End-to-end through the browser (Playwright). Start the stack first.
+cd tests\e2e; npm ci; npx playwright install chromium; cd ..\..      # one time
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start-all.ps1
+powershell -File tests\run-suite.ps1 -Suites e2e
+
+# Docs consistency check alone
+node tests\docs\check-trackers.mjs
 ```
 
-On macOS/Linux, activate with `source venv/bin/activate`. The NLP environment belongs in `nlp-engine/venv`; do not create another virtual environment at the repository root.
+The end-to-end run drives the whole spine as a recruiter and a candidate (create job, upload, apply, score,
+drill-down, shortlist, assessment with a mid-way reload, answer-key leak scan, re-score). It writes real rows
+through the app as the test accounts and prints what it created; `node tests\backend\sweep.mjs --check` lists
+leftovers. Details: `tests/README.md`. The parsing evaluation is separate: `eval/README.md`.
 
-### Frontend
+## Troubleshooting
 
-```bash
-cd frontend
-npm install
-npm start
+| Symptom | Cause and fix |
+|---|---|
+| `start-all: FAILED before starting anything: … port … is already in use` | A previous stack or another program holds the port. Run `scripts\stop-all.ps1`; if the port is still held, the message names the PID. |
+| `core did not come up` and `core.err.log` says `SESSION_SECRET is not set` or `too short` | Set a random `SESSION_SECRET` of at least 32 characters in `backend/.env`. |
+| `nlp-engine did not come up` | First run without the cached model (setup step 3), or the spaCy model is missing (step 2). See `tests\.out\start-all\nlp-engine.err.log`. |
+| Status table shows core `degraded` | Core is up but its database check failed: check `SUPABASE_URL`, the keys, and the network. |
+| Everyone is logged out | Core was restarted. Sessions are kept in core's memory. Log in again. |
+| Assessment stays "unavailable" | No `GEMINI_API_KEY`, or the provider refused the call. `http://127.0.0.1:8002/` reports whether a key is configured; the reason is in `assessment-service.err.log`. |
+| GitHub evidence "unavailable" | No link on the résumé, the account has no public commits in the last year, or the GitHub API rate limit was hit (set `GITHUB_TOKEN`). The score is still computed without it. |
+| Upload says the file cannot be read | The PDF has no text layer (a scan). OCR is not built. Use a text PDF or DOCX. |
+| A request returns 504 with `may_still_complete` | The gateway stopped waiting; core may still finish. Reload the page to read the real state before retrying. |
+| The terminal hangs after `start-all.ps1` | The command was piped. Run it unpiped. |
+
+## Repository layout
+
+```
+frontend/            React app (Create React App)
+gateway/             API gateway
+backend/             core service
+nlp-engine/          résumé parser
+github-evidence/     GitHub metrics service
+assessment-service/  LLM assessment service
+supabase/migrations/ database schema, 17 versioned SQL files
+scripts/             start-all.ps1, stop-all.ps1
+tests/               all test suites and fixtures; run-suite.ps1
+eval/                parsing evaluation: harness, labels, results
+REBUILD/             the Nov 2026 rebuild: decisions, cut, task cards, log
+Docs/                scope documents, runbooks, archive of superseded docs
 ```
 
-The frontend runs at `http://localhost:3000`, the API at `http://localhost:5000`, and the NLP service at `http://localhost:8000`.
+## Rules for contributors
 
-## API surface
-
-| Method | Endpoint | Current behavior |
-| --- | --- | --- |
-| `POST` | `/api/auth/signup` | Creates an email/password Supabase Auth account and linked candidate or recruiter profile. |
-| `POST` | `/api/auth/login` | Resolves a username and verifies its password through Supabase Auth before starting an app session. |
-| `GET` | `/api/auth/me` | Returns the authenticated session user. |
-| `POST` | `/api/auth/logout` | Ends the current session. |
-| `GET` | `/api/admin/overview` | Returns administrator-only user, job, and suspension counts. |
-| `GET` | `/api/admin/users?role=candidate|recruiter` | Returns administrator-only account lists. |
-| `PATCH` | `/api/admin/users/:userId/suspension` | Suspends or reactivates a candidate/recruiter without deleting their data. |
-| `GET` | `/api/jobs` | Returns jobs from the in-memory job store. |
-| `POST` | `/api/jobs` | Creates a job in the in-memory job store. |
-| `POST` | `/api/analyze` | Sends an uploaded resume to the NLP service for the selected job. |
-| `GET` | `/api/candidate-analysis` | Returns the signed-in candidate's most recent persisted analysis. |
-| `GET` | `/api/candidates` | Returns the recruiter's candidates, ranked by composite credibility score. |
-| `GET` | `/api/health` | Returns API health information. |
-
-## Supabase and security
-
-The backend connector is `backend/Config/supabase.js`. It reads `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from `backend/.env`.
-
-The service-role key must never be exposed to the frontend or committed to Git. `backend/.env` is ignored; `backend/.env.example` is the safe, tracked template. Connectivity and the Auth-linked `profiles` table have been verified. The profile table has an own-profile RLS read policy; future job and analysis tables still need their schema and RLS policies.
-
-Before running the admin console, apply every SQL file in `supabase/migrations` through the Supabase SQL Editor, in filename order. To provision the one administrator, create a normal account, then promote it after applying `20260831000000_add_single_admin_role.sql`:
-
-```sql
-update public.profiles set role = 'admin' where username = 'your_admin_username';
-```
-
-Use that account at `/login/admin`. The `20260901000000_add_profile_suspension.sql` migration is required for login suspension checks and the access controls.
-
-## Development notes
-
-- `node_modules`, virtual environments, generated frontend builds, uploads, and local `.env` files are intentionally ignored by Git.
-- Some mock and in-memory data remains while the persistent Supabase schema is introduced. It is prototype data, not production storage.
-- The frontend production build succeeds. Existing lint warnings for unused variables do not prevent the build.
-
-## Documentation maintenance policy
-
-Keep the **Business overview** stable unless the product decision itself changes. In the same commit, update the relevant items below whenever implementation changes:
-
-1. **Current implementation** for capability status and scope.
-2. **Architecture** for a changed service, data flow, or system boundary.
-3. **Repository structure** for important ownership or folder changes.
-4. **Local setup / environment variables** for changed setup or configuration.
-5. **API surface** for added, removed, or changed endpoints.
-
-For a feature-sized commit, add a concise dated entry below.
-
-### Change log
-
-- **2026-08-23** ? Added the versioned Supabase Auth profile migration with username uniqueness, an automatic profile trigger, and an own-profile RLS policy; awaiting execution in Supabase.
-- **2026-08-23** ? Added the Supabase backend client and environment template; verified server-side connectivity. Persistent tables and application queries are pending.
-- **2026-08-23** ? Reorganized frontend route screens into `pages/public`, `pages/candidate`, and `pages/recruiter`; moved reusable UI into `components`.
-- **2026-08-23** ? Removed the unused local PostgreSQL connector and `pg` dependency.
-- **2026-09-01** — Added the administrator dashboard, account suspension/reactivation APIs, and persistent suspension state. Suspended users are denied at login and on authenticated requests.
-
-## Next milestone
-
-Create persistent Supabase tables and Row Level Security policies for jobs, applications, and resume analyses, then replace the remaining in-memory job and analysis stores with Supabase-backed queries.
+- A feature is "done" only with `file:line` evidence and a test or harness result in `AUDIT.md`.
+- Database changes are migration files in `supabase/migrations/`; nothing is changed by hand in the dashboard.
+- Secrets live only in `.env` files, which are git-ignored.
+- Out-of-scope problems go to `ISSUES.md` with a triage tag (rule in `CLAUDE.md`).
