@@ -188,7 +188,7 @@ else {
   const roadmap = read('ROADMAP.md');
   const plain = (s) => (s ?? '').replace(/[*`]/g, '').trim();
   const issueIds = new Set([...read('ISSUES.md').matchAll(/^###\s+(I-\d{4})\b/gm)].map((m) => m[1]));
-  const taskIds = new Set(readdirSync(resolve(root, 'tasks')).map((f) => (f.match(/^(T-\d{4})-/) || [])[1]).filter(Boolean));
+  const taskIds = new Set(readdirSync(resolve(root, 'Docs/archive/tasks')).map((f) => (f.match(/^(T-\d{4})-/) || [])[1]).filter(Boolean));
   const defined = new Set();
   const mapped = { issues: new Set(), moves: new Set() };
   for (const t of tables(roadmap)) {
@@ -211,7 +211,7 @@ else {
         mapped.moves.add(mv);
       }
       for (const [tk] of plain(r[idx.task]).matchAll(/\bT-\d{4}\b/g)) {
-        if (!taskIds.has(tk)) fail(`ROADMAP.md: ${id} names task ${tk}, which has no tasks/${tk}-*.md`);
+        if (!taskIds.has(tk)) fail(`ROADMAP.md: ${id} names task ${tk}, which has no Docs/archive/tasks/${tk}-*.md`);
       }
       for (const cell of r) for (const [is] of cell.matchAll(/\bI-\d{4}\b/g)) mapped.issues.add(is);
       defined.add(id);

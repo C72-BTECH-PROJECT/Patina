@@ -2,7 +2,21 @@
 
 Resume a fresh session with: "Read REBUILD/KICKOFF.md, REBUILD/CHECKPOINT1_ANSWERS.md and REBUILD/PROGRESS.md and continue."
 
-## Steps 4 and 5 done, uncommitted (2026-11-14 night; this block is the newest and wins)
+## Rebuild handed over: decisions A9 to A12 recorded, uncommitted (2026-11-15; this block is the newest and wins)
+- **The next session runs on Opus.** This was the Fable session's last task. Start from `REBUILD/HANDOFF.md`.
+- **Anthony's decisions of 2026-11-14 are recorded** as `DECISIONS.md` §0 A9 to A12: `AUDIT.md` re-verified by a full rewrite as the first card of roadmap A1 (not done yet); the `REBUILD/` files are the session protocol; the six security items accepted; parsing chosen by measurement between runtime LLM extraction and an LLM-taught spaCy NER model; O*NET Technology Skills by default and ESCO for broader skills, licences to confirm; proctoring is tab-switch and focus-loss only; design refresh in Track B unless the design branch merges before Nov 18; the demo runs from `main` after his merge and he stages the verified candidate.
+- **Changed:** `tasks/` and `WORKLOG.md` moved to `Docs/archive/` (moved, not deleted); `CLAUDE.md` (source of truth, session protocol, rebuild-mode intro); `tests/docs/check-trackers.mjs` (reads task specs from `Docs/archive/tasks`; the only non-doc file touched); `REBUILD/ROADMAP.md` (A1 first card, A2 rewritten as the comparison, A4 proctoring, decisions section); `REBUILD/HANDOFF.md`; NER wording in `eval/RESULTS.md` and `REVIEW_BRIEF.md` (no number changed).
+- **Verification:** `node tests/docs/check-trackers.mjs`: 6 problems, the same six stale `AUDIT.md` cites as before the move. No application code changed; no suite run.
+- **Open:** the Kaggle dataset name (Anthony's message left it as a placeholder; `eval/RESULTS.md` is unchanged); O-9; the rest is in `HANDOFF.md` §7 and §8.
+- **Next:** Anthony commits, merges to `main`, stages the verified candidate, runs the Nov 17 rehearsal; then R-36. After Nov 18: roadmap A1, starting with the `AUDIT.md` rewrite (R-25).
+
+## Step 6 done: roadmap and handoff written, uncommitted (2026-11-14 late)
+- Steps 4 and 5 are committed (`07c5137`). **Written, docs only, no code changed:** `REBUILD/ROADMAP.md` (H-1: Track A milestones A1 to A6, Track B B1 to B7, exit criteria, no time estimates) and `REBUILD/HANDOFF.md` (H-2: read-first list, rules, triage, model routing, verification policy, open work, questions for Anthony).
+- **Waiting on Anthony, nothing acted on:** the `AUDIT.md` decision (re-verify, recommended, or archive and change `CLAUDE.md`); which session protocol is the rule; whether the roadmap's reading of "the six security items" is right; trained NER after the hybrid parser; the open skills list. All listed in `HANDOFF.md` §8.
+- **Verification:** `node tests/docs/check-trackers.mjs`: 6 problems, unchanged, all stale `AUDIT.md` cites. No suite run; no code touched.
+- **Next:** Anthony stages the verified candidate and runs the Nov 17 rehearsal (`REVIEW_BRIEF.md` §1 and §2); then R-36. After Nov 18: roadmap A1.
+
+## Steps 4 and 5 done, uncommitted (2026-11-14 night)
 - **Anthony (2026-11-14):** cap checked in the UI; everything up to `bd5aa4b` committed and pushed. `DECISIONS.md` §0 A8 records the evaluation follow-ups.
 - **Evaluation follow-ups:** `.gitignore` un-ignores only `eval/labels/gold.csv` and `eval/labels/RULINGS.md` (PDFs and drafts stay ignored). `eval/RESULTS.md` has a reproduction block (dataset name, the 20 file ids, command) and an interpretation block. The next evaluation (developer-role, fresh sample, alias gaps `exchange server` and `sccm` joined first, trained NER as the roadmap case) is on card H-1 in `TASKS.md`.
 - **`scripts/stop-all.ps1`:** stops the frontend by port 3000 when its listener PID was not recorded. Checked once with a doctored `pids.json`: exit 0, all six ports free.

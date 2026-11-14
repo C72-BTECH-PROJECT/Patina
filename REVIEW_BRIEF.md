@@ -64,7 +64,7 @@ Each step: what to do, what to say, what it proves. A 5-minute version is steps 
 | **5:30–6:45** | Open the **support** candidate's drill-down. Point at Partly verified, 79, the cap sentence, GitHub "unavailable", assessment weight 0.80. | "No GitHub, and he is not penalised for that: the assessment takes the whole independent share, 0.80. He did very well, and he is capped at 79, one point under the high band, because the high band needs two independent sources and he has one. The uncapped number and the reason are stored and shown." | GitHub optional (GF-4); the 79 cap; support vocabulary (GF-3) |
 | **6:45–8:00** | Back as **Casey**: Assessment for the job. It should be ready by now. **Start**. Answer one question. Reload the page. | "Ten questions drawn from twenty generated for her résumé and this job. The pool was prepared in the background after she applied, so nothing waits on the LLM here. Fifteen minutes on the server's clock. I reload: the answer and the remaining time come back, so a reload neither loses work nor restarts the clock. One attempt. I will leave it running." | Anti-cheating controls (GR-1) |
 | **8:00–9:00** | `ARCHITECTURE.md` §1 diagram, or the slide. | "Six processes. The browser reaches only the gateway. Core owns the data and orchestrates three stateless services. That is a gateway and three real services around a monolithic core, which partly meets the microservices claim in the SRS, and I will say exactly which parts in questions." | GR-2 |
-| **9:00–10:00** | `eval/RESULTS.md`, interpretation block. | "One real measurement. On 20 public résumés, when the parser names a skill it is right 80 % of the time, and it finds 87 % of the skills it knows. But 76 % of the skills in those résumés are outside its fixed vocabulary, so overall recall is 21 %. That is the measured case for the trained NER model in the SRS, which is not built. What is not built is listed, and none of it is faked on screen." | Honest status |
+| **9:00–10:00** | `eval/RESULTS.md`, interpretation block. | "One real measurement. On 20 public résumés, when the parser names a skill it is right 80 % of the time, and it finds 87 % of the skills it knows. But 76 % of the skills in those résumés are outside its fixed vocabulary, so overall recall is 21 %. That is the limit of a fixed list. The trained NER model in the SRS is not built; the roadmap picks its replacement by measurement. What is not built is listed, and none of it is faked on screen." | Honest status |
 
 If the assessment is still "preparing" at 6:45 (preparation took between 6.5 s and 88 s across runs), say so,
 show the preparing state, and come back to it after the architecture step.
@@ -89,7 +89,7 @@ the rebuild (§5, item 7), so do not point the evaluators at it for current stat
 | Promise | What exists | What is missing |
 |---|---|---|
 | Microservices | Gateway, orchestrating core, three stateless services | Per-service data, scaling of core, containers |
-| Custom NER, hybrid layers | Fixed vocabulary with aliases, spaCy, MiniLM similarity; measured | A trained NER model |
+| Custom NER, hybrid layers | Fixed vocabulary with aliases, spaCy, MiniLM similarity; measured | A trained NER model (roadmap A2 compares it with runtime LLM extraction, by measurement) |
 | GitHub validation | Repositories, languages, authored-commit activity, claimed language present in owned repos | Ownership proof; code-quality analysis; authorship-level checks |
 | LLM assessment | Generated per candidate, validated, MCQ graded deterministically, short answers graded by the LLM under a schema | PFQS two-step generation, calibrated rubrics, proctoring |
 | Scoring | Weighted composite, verification state, bands, stored explanation, one flag ("sources disagree") | Any calibration; the other inconsistency flags |
@@ -230,7 +230,8 @@ unit-tested and has **not** been seen raised live (§5, item 1).
 > not in its 180-skill list at all. So F1 is 0.33, and the SRS target of 0.80 is not met. Parse time was under
 > two seconds, against a target of ten. The limits: 20 résumés, not the 30 we planned; one human labeller
 > checking AI-drafted labels, so no agreement figure; and none of the 20 is a developer résumé, so this says
-> nothing measured about our main case. A developer-role sample on fresh files is the next evaluation.
+> nothing measured about our main case. Next is a comparison on fresh developer résumés: LLM extraction at
+> runtime, against an NER model trained on LLM-labelled public CVs, which keeps parsing local.
 
 Evidence: `eval/RESULTS.md`, section "2026-11-14 11:28 UTC" with its interpretation block: micro P 0.795,
 R 0.208 (58 of 279), F1 0.330; in-vocabulary recall 0.866 (58 of 67); 212 of 279 outside the vocabulary; 11 of
@@ -297,5 +298,5 @@ Say these before they are found. In order of how much they matter on Nov 18.
    preparation took between 6.5 s and 88 s across runs. The end-to-end run failed once on Nov 14 on a
    test-capture error and passed on re-run.
 10. **OCR is not built**, and the guide said it must be. A scanned résumé is rejected with a clear message.
-11. **`rebuild/fable` is not merged into `main`.** Which branch is demonstrated must be settled, and that
-    branch rehearsed, before Nov 18.
+11. **`rebuild/fable` is not merged into `main` yet.** The demo runs from `main` after Anthony's merge
+    (decision A12), so `main` after the merge is what must be rehearsed on Nov 17, not this branch.
