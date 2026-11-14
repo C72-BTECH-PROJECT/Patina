@@ -229,7 +229,8 @@ test('list item shape: profile name (null when none, never "Candidate"), account
   assert.deepEqual(r.body.map((i) => i.id), [appA2.id, appA1.id, appA3.id]);
 
   const a1 = r.body.find((i) => i.id === appA1.id);
-  assert.deepEqual(Object.keys(a1).sort(), ['applied_at', 'assessment', 'candidate', 'id', 'job', 'score', 'scoring', 'status'].sort());
+  // R-27 (D§7.1 W4) adds `score_state`.
+  assert.deepEqual(Object.keys(a1).sort(), ['applied_at', 'assessment', 'candidate', 'id', 'job', 'score', 'score_state', 'scoring', 'status'].sort());
   assert.deepEqual(a1.candidate, { id: cA1, name: 'Asha Rao', email: 'asha@example.test' });
   assert.deepEqual(a1.job, { id: jobA.id, title: jobA.title });
   assert.equal(a1.status, 'submitted');
@@ -239,6 +240,8 @@ test('list item shape: profile name (null when none, never "Candidate"), account
   assert.equal(a1.score.composite, 62.25);
   assert.equal(a1.score.band, 'medium');
   assert.equal(a1.score.evidence_limited, true);
+  assert.equal(a1.score.verification, 'unverified', 'R-27: résumé only, from the stored sub-scores');
+  assert.equal(a1.score_state, 'awaiting_assessment', 'R-27: not assessed yet');
   assert.deepEqual(a1.score.skills, ['python', 'docker'], 'skills of the resume that score was computed from');
   assert.equal(a1.score.created_at, newA1.created_at);
   assert.deepEqual(a1.score.subscores.parsing_semantic_alignment, { available: true, value: 62.25, weight: 1 });
@@ -520,4 +523,54 @@ test('recruiter reads only observe: list, detail and /attempts start no preparat
   // The batched pool check's lookup error is an error too.
   db.fail.add('assessment_keys:GET');
   assertContract500(await list(REC_A, job.id), 'list with assessment_keys:GET failing');
+});
+
+// R-27 (D§7.1 W4): awaiting the assessment is the primary state, and awaiting
+// applicants are ranked in their own group below scored ones.
+test('R-27 W4: a ready pool reads awaiting_assessment; scored-and-assessed rank above awaiting, unscored last', async () => {
+  const job = seedJob(REC_A, '[R-27 TEST] awaiting job');
+  // Assessed: completed attempt, low composite.
+  const cDone = seedCandidate({ first: 'Done', last: 'Assessed' });
+  const appDone = apply(cDone, job);
+  seedScore(cDone, job, 40);
+  db.tables.assessments.push({
+    id: randomUUID(), candidate_id: cDone, job_id: job.id, status: 'completed', score: 50, questions: { questions: [] },
+    answers: { started_at: '2026-11-14T10:00:00.000Z', submitted_at: '2026-11-14T10:10:00.000Z', responses: [] },
+    evaluation: { score: 50, results: [] }, created_at: '2026-11-14T09:59:00.000Z', completed_at: '2026-11-14T10:11:00.000Z',
+  });
+  // Awaiting: a ready pool, high partial composite.
+  const cReady = seedCandidate({ first: 'Ready', last: 'Waiting' });
+  const appReady = apply(cReady, job);
+  seedScore(cReady, job, 19);
+  const pool = { id: randomUUID(), candidate_id: cReady, job_id: job.id, status: 'generated', questions: [], answers: null, score: null, evaluation: null, created_at: db.stamp() };
+  db.tables.assessments.push(pool);
+  db.tables.assessment_keys.push({ assessment_id: pool.id, answer_key: { answers: [], pool_questions: { questions: [{ question_id: 'q1', question: 'R27-POOL-Q' }] } } });
+  // Awaiting with a higher partial than the assessed one: still ranked below it.
+  const cHigh = seedCandidate({ first: 'High', last: 'Partial' });
+  const appHigh = apply(cHigh, job);
+  seedScore(cHigh, job, 55);
+  // Unscored.
+  const cNone = seedCandidate({ first: 'No', last: 'Score' });
+  const appNone = apply(cNone, job);
+
+  const l = await list(REC_A, job.id);
+  assert.equal(l.res.status, 200, l.text);
+  assert.deepEqual(l.body.map((i) => i.id), [appDone.id, appHigh.id, appReady.id, appNone.id]);
+  const by = Object.fromEntries(l.body.map((i) => [i.id, i]));
+  assert.equal(by[appReady.id].assessment.state, 'ready');
+  assert.equal(by[appReady.id].score_state, 'awaiting_assessment');
+  assert.equal(by[appHigh.id].assessment.state, 'not_prepared');
+  assert.equal(by[appHigh.id].score_state, 'awaiting_assessment');
+  assert.equal(by[appDone.id].assessment.state, 'completed');
+  assert.equal(by[appDone.id].score_state, 'final');
+  assert.equal(by[appNone.id].score_state, 'awaiting_assessment');
+  assert.equal(by[appNone.id].score, null);
+  assert.ok(!l.text.includes('R27-POOL-Q'));
+
+  const d = await detail(REC_A, appReady.id);
+  assert.equal(d.res.status, 200, d.text);
+  assert.equal(d.body.score_state, 'awaiting_assessment');
+  assert.equal(d.body.score.verification, 'unverified');
+  // A row scored before R-27 has no weights_version; it is returned as stored, never rewritten.
+  assert.equal(d.body.explanation.weights_version, undefined);
 });

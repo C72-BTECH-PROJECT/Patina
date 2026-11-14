@@ -15,17 +15,36 @@ from app.extractor import (
     REASON_NO_TEXT_LAYER,
     SUPPORTED_EXTENSIONS,
     UnreadableDocument,
-    extract_text,
+    extract_document,
     file_extension,
 )
+from pydantic import BaseModel
+
 from app.preprocessor import preprocess
-from app.ner import extract_entities
+from app.ner import (
+    GENERIC_SKILL_PATTERNS,
+    SKILL_ALIASES,
+    SKILL_KEYWORDS,
+    _ALIAS_TO_CANONICAL,
+    _EXTRA_NORMALISATION,
+    extract_entities,
+    extract_skills,
+    normalize_skill,
+    normalize_skills,
+)
 from app.embedder import analyse
 
 # The one version string for this parser. Reported in every /parse response
 # and on GET /, so core stores what actually produced a parse instead of a
 # hardcoded copy. Bump it whenever the response contract or extraction changes.
-PARSER_VERSION = "nlp-engine@2.0.0"
+# 2.1.0 (R-30): `entities.links`; `entities.education` is one object per
+# qualification; link targets behind words feed github/linkedin; DOCX tables,
+# headers, footers and text boxes are read; the name never carries contact tokens.
+# 2.2.0 (R-21): skill vocabulary: "github" removed, English words and bare
+# "API" need technical context, Node.js is not JavaScript, C / Go / R detected
+# (Go's canonical name is now "go", was "golang"), IT support tools added;
+# links and email addresses are not read for skills.
+PARSER_VERSION = "nlp-engine@2.2.0"
 SERVICE_VERSION = PARSER_VERSION.split("@", 1)[1]
 
 # `raw_text` carries the full extracted text up to this many characters.
@@ -85,6 +104,56 @@ def health_check():
         "service": "NLP Parser Microservice",
         "version": SERVICE_VERSION,
         "parser_version": PARSER_VERSION,
+    }
+
+
+# --- Skill vocabulary and skills-from-text (R-32) ------------------------------
+# The job form's skill input searches this vocabulary and suggests the skills
+# found in a job description. Both read app/ner.py, the one skill vocabulary, and
+# never change what /parse returns.
+#
+# A vocabulary name is the canonical spelling the parser itself produces for a
+# job description (normalize_skills(extract_skills(text)), as in
+# app/embedder.py), so a skill picked from the list and a skill read from the
+# description are the same string. Each name carries the spellings that
+# normalize_skill maps onto it ("js" -> "javascript", "postgres" -> "postgresql").
+
+SKILLS_TEXT_LIMIT = 50_000
+
+
+def skill_vocabulary() -> list:
+    """[{"name": canonical, "aliases": [...]}] sorted by name."""
+    names = normalize_skills(
+        list(SKILL_KEYWORDS) + list(GENERIC_SKILL_PATTERNS) + list(SKILL_ALIASES)
+    )
+    aliases = {name: set() for name in names}
+    for alias in list(_ALIAS_TO_CANONICAL) + list(_EXTRA_NORMALISATION):
+        canonical = normalize_skill(alias)
+        if canonical in aliases and alias != canonical:
+            aliases[canonical].add(alias)
+    return [{"name": name, "aliases": sorted(aliases[name])} for name in sorted(names)]
+
+
+class SkillsFromText(BaseModel):
+    text: str
+
+
+@app.get("/skills/vocabulary")
+def get_skill_vocabulary():
+    return {"parser_version": PARSER_VERSION, "skills": skill_vocabulary()}
+
+
+@app.post("/skills/extract")
+def extract_skills_from_text(body: SkillsFromText):
+    if len(body.text) > SKILLS_TEXT_LIMIT:
+        return _error(400, {
+            "error": "text_too_long",
+            "limit": SKILLS_TEXT_LIMIT,
+            "message": f"The text is longer than {SKILLS_TEXT_LIMIT} characters.",
+        })
+    return {
+        "parser_version": PARSER_VERSION,
+        "skills": normalize_skills(extract_skills(body.text)),
     }
 
 
@@ -159,7 +228,7 @@ async def parse_resume(
 
     try:
         try:
-            raw_text = extract_text(file_path)
+            document = extract_document(file_path)
         except UnreadableDocument as exc:
             logger.warning(
                 "unreadable_document reason=%s detail=%s request_id=%s",
@@ -171,8 +240,11 @@ async def parse_resume(
                 "message": _UNREADABLE_MESSAGES[exc.reason],
             })
 
+        raw_text = document.text
         preprocessed = preprocess(raw_text)
-        entities = extract_entities(raw_text)
+        # Link targets attached to words go to the contact parser only; they are
+        # never added to raw_text, so skills and similarity do not change (R-30).
+        entities = extract_entities(raw_text, links=document.links)
 
         has_jd = jd is not None and bool(jd.strip())
         embedding_result = None
@@ -205,6 +277,7 @@ async def parse_resume(
                 "phone": entities.get("phone"),
                 "github": entities.get("github"),
                 "linkedin": entities.get("linkedin"),
+                "links": entities.get("links", []),
                 "skills": entities["skills"],
                 "skill_count": entities["skill_count"],
                 "experience": entities["experience"],

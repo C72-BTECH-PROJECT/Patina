@@ -71,7 +71,7 @@ Entry point: `app/main.py` → `generate_assessment()` in `app/generator.py`.
    no GitHub evidence is supplied the prompt forbids the source `"github"`.
 3. **Time budget** — one deadline covers the whole request:
    `ASSESSMENT_GENERATION_BUDGET_SECONDS` (default 210, refused above 230).
-4. **Generation rounds** — up to `ASSESSMENT_MAX_VALIDATION_ROUNDS` (default 2).
+4. **Generation rounds** — up to `ASSESSMENT_MAX_VALIDATION_ROUNDS` (default 3).
    If a round's output fails validation, the errors are appended to the prompt
    for the next round. If every model fails in a round, the request fails at once.
 5. **LLM call** (`llm_client.py`) — one call per model in `GEMINI_MODELS`, in
@@ -81,6 +81,17 @@ Entry point: `app/main.py` → `generate_assessment()` in `app/generator.py`.
 6. **Validation** (`validators.py`) — exactly 20 questions, 10 MCQ / 10
    short-answer, IDs `q1..q20`, matching answer entries, correct field types, and
    no `source: "github"` question unless GitHub evidence was supplied.
+   **Option rule (R-29):** an MCQ is dropped from the pool when its correct
+   option is BOTH longer than `ASSESSMENT_MCQ_MAX_LENGTH_RATIO` (1.25) × the
+   mean length of its three distractors AND at least
+   `ASSESSMENT_MCQ_MIN_LENGTH_GAP` (10) characters longer than that mean
+   (lengths after collapsing whitespace). The gap keeps short options from
+   being rejected for a few characters ("PATCH" against POST/PUT/GET, `ls -la`
+   against cd/pwd/rm). Only length is checked; the prompt also asks for options
+   of the same grammatical form, but form is not validated. If fewer than
+   `ASSESSMENT_SERVED_MCQ` valid MCQs remain, the round fails and the pool is
+   regenerated with the reasons; if no round inside the budget passes, the
+   request fails `502 llm_invalid_output`. A short set is never served.
 7. **Served draw** (`generator.py`) — a random `ASSESSMENT_SERVED_MCQ` (6) MCQs
    and `ASSESSMENT_SERVED_SHORT` (4) short answers are drawn from the 20, put in
    random order and renumbered `q1..q10`. The answer key is reduced to exactly
@@ -113,7 +124,7 @@ default):
 {
   "questions": {
     "assessment_id": "...", "candidate_id": "...", "job_id": "...",
-    "model_used": "gemini-...", "prompt_version": "assessment-v2",
+    "model_used": "gemini-...", "prompt_version": "assessment-v3",
     "questions": [ ... 10 items, ids q1..q10 ... ]
   },
   "answer_key": { "assessment_id": "...", "answers": [ ... 10 items, same ids ... ] }
@@ -269,7 +280,9 @@ stop the service at start-up with a message.
 | `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai/` | OpenAI-compatible endpoint |
 | `ASSESSMENT_GENERATION_BUDGET_SECONDS` | `210` | Whole-request budget; must be ≤ 230 |
 | `ASSESSMENT_REQUEST_TIMEOUT_SECONDS` | `120` | Cap on one LLM call (also cut to the time left) |
-| `ASSESSMENT_MAX_VALIDATION_ROUNDS` | `2` | Rounds when output fails validation |
+| `ASSESSMENT_MAX_VALIDATION_ROUNDS` | `3` | Rounds when output fails validation |
+| `ASSESSMENT_MCQ_MAX_LENGTH_RATIO` | `1.25` | MCQ rejected when its correct option is longer than this × the distractors' mean length (≥ 1.0) and also exceeds the gap below |
+| `ASSESSMENT_MCQ_MIN_LENGTH_GAP` | `10` | …and is at least this many characters longer than that mean (whole number ≥ 0) |
 | `ASSESSMENT_SERVED_MCQ` | `6` | MCQs served (0–10) |
 | `ASSESSMENT_SERVED_SHORT` | `4` | Short answers served (0–10) |
 
@@ -278,7 +291,7 @@ can use and making one JSON-mode chat call to each. Some listed ids (for example
 `gemini-2.5-flash`) answered 404 on chat, so a listed id is not proof of access.
 
 Other constants: `PROMPT_VERSION` (`prompts.py`, the only definition) =
-`assessment-v2`; `GRADING_PROMPT_VERSION` (`prompts.py`, the only definition) =
+`assessment-v3`; `GRADING_PROMPT_VERSION` (`prompts.py`, the only definition) =
 `grading-v2`; `GRADING_BUDGET_SECONDS` (`evaluator.py`) = 100;
 `SERVICE_NAME` = `Patina AI Assessment Service`.
 

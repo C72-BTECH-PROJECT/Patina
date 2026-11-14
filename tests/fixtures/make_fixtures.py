@@ -4,6 +4,12 @@ Every person, employer, school, email, phone number and link below is
 fictional (example.com / example-* handles). Do not put real resumes here;
 those go in tests/private/ (git-ignored).
 
+f7-f10 (R-30) have the structure of a real-world resume that parsed badly
+(phone beside the name, a full LinkedIn URL, links behind words, an education
+block over several lines) and of DOCX layouts whose text is not in plain body
+paragraphs (a table with header and footer, text boxes). demo/ holds the two
+synthetic resumes of the TM-4 demo set (see demo/README.md).
+
 Run with the NLP venv (needs python-docx, fpdf2, Pillow):
     nlp-engine/venv/Scripts/python tests/fixtures/make_fixtures.py
 
@@ -17,6 +23,9 @@ import zipfile
 from pathlib import Path
 
 from docx import Document
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
+from docx.oxml import OxmlElement, parse_xml
+from docx.oxml.ns import qn
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont
 
@@ -209,6 +218,144 @@ F6 = {
     ],
 }
 
+# R-30: the structure of a real-world resume that parsed badly, with invented
+# content. The phone number sits beside the name (with a country code; no
+# Indian mobile number starts with 5, so it is plainly fake), the LinkedIn URL
+# is written out in full, GitHub and the portfolio are links behind words, and
+# the education block runs over several lines with a CGPA and honours.
+F7 = {
+    "name": "PRIYA LINKWELL",
+    "phone": "+91 55555 01234",
+    "email": "priya.linkwell@example.com",
+    "linkedin_text": "https://www.linkedin.com/in/example-priya-linkwell/",
+    "github_target": "https://github.com/example-plinkwell",
+    "portfolio_target": "https://plinkwell.example.com/portfolio",
+    "sections": [
+        ("Summary", [
+            "Computer engineering graduate building data tools in Python, SQL and PostgreSQL.",
+        ]),
+        ("Skills", [
+            "Python, SQL, PostgreSQL, Pandas, Docker, Git",
+        ]),
+        ("Experience", [
+            "Data Engineering Intern - Example Analytics Pvt Ltd (Jan 2025 - Jun 2025)",
+            "- Built Python and SQL jobs that load sensor data into PostgreSQL.",
+        ]),
+        ("Education", [
+            "Example Institute of Technology, Pune",
+            "Bachelor of Technology in Computer Engineering",
+            "2021 - 2025 | CGPA: 8.72/10",
+            "Honours in Artificial Intelligence",
+            "Higher Secondary Certificate (HSC)",
+            "Example Junior College, Mumbai",
+            "2021 | Percentage: 88.5%",
+        ]),
+    ],
+}
+
+# R-30 / R-05: everything is in a two-column table, a header and a footer;
+# there is no plain body paragraph at all.
+F9 = {
+    "name": "TOBIAS WREN",
+    "contact": "tobias.wren@example.com | +1 (202) 555-0123",
+    "footer": "linkedin.com/in/example-tobias-wren",
+    "left": [
+        ("Skills", ["Linux, Bash, SQL, Python, Docker, Jenkins, Git, AWS"]),
+        ("Education", [
+            "B.Sc. in Computer Science",
+            "Example University of Leeds",
+            "2016 - 2019",
+        ]),
+    ],
+    "right": [
+        ("Experience", [
+            "Site Reliability Engineer - Proseware Cloud (Mar 2020 - Present)",
+            "- Ran Jenkins pipelines that build Docker images and deploy them to AWS.",
+            "- Wrote Bash and Python tooling for Linux fleet patching.",
+        ]),
+    ],
+}
+
+# R-30 / R-05: the whole resume is inside one text box (Word writes it twice:
+# the modern shape and a legacy VML copy as fallback).
+F10 = {
+    "lines": [
+        "INES CALLOWAY",
+        "ines.calloway@example.com | +1 (202) 555-0145",
+        "SKILLS",
+        "Python, Django, PostgreSQL, Redis, Docker",
+        "EXPERIENCE",
+        "Backend Developer - Lucerne Media (Jun 2021 - Present)",
+        "- Built Django services over PostgreSQL with Redis caching.",
+    ],
+}
+
+# TM-4 demo set (R-30). Both people are invented. Contact details use
+# example.com and the 555-01xx range reserved for fiction; employers are
+# Microsoft's fictional sample companies; there is no link to any account.
+# Demo job: tests/fixtures/jds/dev.txt with the "dev" skills in manifest.json.
+DEMO_KEYWORD_STUFFED = {
+    "name": "Casey Brightwater",
+    "contact": [
+        "casey.brightwater@example.com | +1 (202) 555-0187",
+    ],
+    "sections": [
+        ("Summary", [
+            "Results-driven professional skilled in Python, SQL, PostgreSQL, Docker, Git,",
+            "REST API, React, Redis, AWS and Kubernetes.",
+        ]),
+        ("Skills", [
+            "Python, SQL, PostgreSQL, Docker, Git, REST API, React, Redis, AWS, Kubernetes",
+            "Python | SQL | PostgreSQL | Docker | Git | REST API | React | Redis | AWS | Kubernetes",
+            "Keywords: Python developer, SQL expert, PostgreSQL expert, Docker expert,",
+            "Git expert, REST API expert, React expert, Redis expert, AWS expert, Kubernetes expert",
+        ]),
+        ("Experience", [
+            "Software Professional - Tailspin Toys (2023 - Present)",
+            "- Worked with Python, SQL, PostgreSQL, Docker, Git, REST API, React, Redis, AWS, Kubernetes.",
+        ]),
+        ("Education", [
+            "B.Sc. - Example College (2019 - 2022)",
+        ]),
+    ],
+}
+
+DEMO_SUPPORT_OPS = {
+    "name": "Teodor Halloway",
+    "contact": [
+        "teodor.halloway@example.com | +1 (202) 555-0164 | Springfield",
+    ],
+    "sections": [
+        ("Summary", [
+            "IT operations engineer with seven years of service desk and L2 support.",
+            "I keep Windows and Linux estates patched, monitored and documented, and I",
+            "run incidents to closure. Most of my work is internal, so there is no public code.",
+        ]),
+        ("Skills", [
+            "ServiceNow, Jira Service Management, ITIL 4, Nagios, Active Directory,",
+            "Windows Server, Group Policy, PowerShell, Linux, SQL, PostgreSQL, Python scripting",
+        ]),
+        ("Experience", [
+            "IT Operations Engineer - Wide World Importers (Apr 2021 - Present)",
+            "- Own the L2 incident queue in ServiceNow for 1,400 staff on six sites; 95% of P2 tickets closed inside SLA.",
+            "- Run ITIL change and problem management for monthly Windows Server patching of 210 servers.",
+            "- Added Nagios checks for disk space, services and certificate expiry; disk-full incidents fell by 90%.",
+            "- Wrote PowerShell and Python scripts that automate Active Directory joiner and leaver tasks.",
+            "- Investigate data problems in the warehouse application's PostgreSQL database with read-only SQL.",
+            "Service Desk Analyst - Alpine Ski House (Jul 2018 - Mar 2021)",
+            "- First-line support for 300 staff; tracked requests and problems in Jira Service Management.",
+            "- Managed Active Directory accounts, Group Policy and Windows Server file shares.",
+            "- Kept the team's runbooks in Git alongside the infrastructure scripts.",
+        ]),
+        ("Certifications", [
+            "ITIL 4 Foundation (2020)",
+        ]),
+        ("Education", [
+            "B.Sc. in Information Technology - Example University (2014 - 2017)",
+        ]),
+    ],
+}
+
 
 # --------------------------------------------------------------------------
 # Writers
@@ -304,7 +451,7 @@ def write_image_only_pdf(data, path):
     pdf.output(str(path))
 
 
-def write_docx(data, path):
+def _new_docx():
     doc = Document()
     props = doc.core_properties
     props.author = "T-0001 fixture generator"
@@ -312,16 +459,29 @@ def write_docx(data, path):
     props.modified = FIXED_TS.replace(tzinfo=None)
     props.last_modified_by = "T-0001 fixture generator"
     props.revision = 1
+    return doc
+
+
+def _add_section_lines(doc_or_cell, lines):
+    for line in lines:
+        if line.startswith("- "):
+            doc_or_cell.add_paragraph(line[2:], style="List Bullet")
+        else:
+            doc_or_cell.add_paragraph(line)
+
+
+def write_docx(data, path):
+    doc = _new_docx()
     doc.add_heading(data["name"], level=0)
     for line in data["contact"]:
         doc.add_paragraph(line)
     for heading, lines in data["sections"]:
         doc.add_heading(heading, level=1)
-        for line in lines:
-            if line.startswith("- "):
-                doc.add_paragraph(line[2:], style="List Bullet")
-            else:
-                doc.add_paragraph(line)
+        _add_section_lines(doc, lines)
+    _save_docx(doc, path)
+
+
+def _save_docx(doc, path):
     buf = io.BytesIO()
     doc.save(buf)
     # python-docx stamps each zip entry with the current time; rewrite the
@@ -334,6 +494,136 @@ def write_docx(data, path):
             dst.writestr(info, src.read(item.filename))
 
 
+# --------------------------------------------------------------------------
+# R-30 writers
+# --------------------------------------------------------------------------
+
+def write_realworld_pdf(data, path):
+    """Name and phone on one line; a contact line whose GitHub and Portfolio
+    labels are link annotations with no URL text, beside a written-out LinkedIn
+    URL and a mailto: link on the email."""
+    pdf = _new_pdf()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(pdf.get_string_width(data["name"]) + 4, 9, data["name"])
+    pdf.set_font("Helvetica", "", 16)
+    pdf.cell(0, 9, data["phone"], new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 10)
+    for text, link in (
+        (data["email"], "mailto:" + data["email"]),
+        (" | ", ""),
+        (data["linkedin_text"], data["linkedin_text"]),
+        (" | ", ""),
+        ("GitHub", data["github_target"]),
+        (" | ", ""),
+        ("Portfolio", data["portfolio_target"]),
+    ):
+        pdf.cell(pdf.get_string_width(text) + 1, 5, text, link=link)
+    pdf.ln(5)
+    for heading, lines in data["sections"]:
+        pdf.ln(3)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 7, heading.upper(), new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 10)
+        for line in lines:
+            pdf.multi_cell(0, 5, line, new_x="LMARGIN", new_y="NEXT")
+    pdf.output(str(path))
+
+
+def _add_hyperlink(paragraph, url, text):
+    """A w:hyperlink whose target is an external relationship (what Word writes
+    for a link inserted on a word)."""
+    r_id = paragraph.part.relate_to(url, RT.HYPERLINK, is_external=True)
+    link = OxmlElement("w:hyperlink")
+    link.set(qn("r:id"), r_id)
+    run = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = text
+    run.append(t)
+    link.append(run)
+    paragraph._p.append(link)
+
+
+def _add_field_hyperlink(paragraph, url, text):
+    """A simple HYPERLINK field: its shown text is not part of python-docx's
+    Paragraph.text, which is one way a written-out URL goes missing."""
+    field = OxmlElement("w:fldSimple")
+    field.set(qn("w:instr"), f'HYPERLINK "{url}"')
+    run = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = text
+    run.append(t)
+    field.append(run)
+    paragraph._p.append(field)
+
+
+def write_realworld_docx(data, path):
+    doc = _new_docx()
+    doc.add_heading(f"{data['name']}\t{data['phone']}", level=0)
+    p = doc.add_paragraph(data["email"] + " | ")
+    _add_field_hyperlink(p, data["linkedin_text"], data["linkedin_text"])
+    p.add_run(" | ")
+    _add_hyperlink(p, data["github_target"], "GitHub")
+    p.add_run(" | ")
+    _add_hyperlink(p, data["portfolio_target"], "Portfolio")
+    for heading, lines in data["sections"]:
+        doc.add_heading(heading, level=1)
+        _add_section_lines(doc, lines)
+    _save_docx(doc, path)
+
+
+def write_table_layout_docx(data, path):
+    """Name and contact in the page header, the LinkedIn URL in the footer,
+    and every section inside one two-column table: no body paragraph."""
+    doc = _new_docx()
+    section = doc.sections[0]
+    section.header.paragraphs[0].text = data["name"]
+    section.header.add_paragraph(data["contact"])
+    section.footer.paragraphs[0].text = data["footer"]
+    table = doc.add_table(rows=1, cols=2)
+    for cell, sections in zip(table.rows[0].cells, (data["left"], data["right"])):
+        for i, (heading, lines) in enumerate(sections):
+            if i == 0:
+                cell.paragraphs[0].text = heading.upper()
+            else:
+                cell.add_paragraph(heading.upper())
+            _add_section_lines(cell, lines)
+    _save_docx(doc, path)
+
+
+_TEXTBOX_RUN = """<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+ xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+ xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+ xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+ xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+ xmlns:v="urn:schemas-microsoft-com:vml"><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing>
+<wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="251659264"
+ behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/>
+<wp:positionH relativeFrom="column"><wp:posOffset>0</wp:posOffset></wp:positionH>
+<wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>
+<wp:extent cx="5486400" cy="3200400"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/>
+<wp:docPr id="1" name="Text Box 1"/><wp:cNvGraphicFramePr/>
+<a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+<wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="3200400"/></a:xfrm>
+<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr>
+<wps:txbx><w:txbxContent>{paragraphs}</w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp>
+</a:graphicData></a:graphic></wp:anchor></w:drawing></mc:Choice>
+<mc:Fallback><w:pict><v:shape id="Text Box 1" type="#_x0000_t202" style="position:absolute;width:432pt;height:252pt">
+<v:textbox><w:txbxContent>{paragraphs}</w:txbxContent></v:textbox></v:shape></w:pict></mc:Fallback>
+</mc:AlternateContent></w:r>"""
+
+
+def write_textbox_only_docx(data, path):
+    from xml.sax.saxutils import escape
+
+    paragraphs = "".join(
+        f'<w:p><w:r><w:t xml:space="preserve">{escape(line)}</w:t></w:r></w:p>'
+        for line in data["lines"]
+    )
+    doc = _new_docx()
+    doc.add_paragraph()._p.append(parse_xml(_TEXTBOX_RUN.format(paragraphs=paragraphs)))
+    _save_docx(doc, path)
+
+
 def main():
     write_single_column_pdf(F1, HERE / "f1_dev_github.pdf")
     write_docx(F2, HERE / "f2_dev_github.docx")
@@ -341,7 +631,15 @@ def main():
     write_docx(F4, HERE / "f4_support_nogithub.docx")
     write_two_column_pdf(F5, HERE / "f5_multicolumn.pdf")
     write_image_only_pdf(F6, HERE / "f6_image_only.pdf")
-    print("wrote 6 fixtures to", HERE)
+    write_realworld_pdf(F7, HERE / "f7_realworld_links.pdf")
+    write_realworld_docx(F7, HERE / "f8_realworld_links.docx")
+    write_table_layout_docx(F9, HERE / "f9_table_layout.docx")
+    write_textbox_only_docx(F10, HERE / "f10_textbox_only.docx")
+    demo = HERE / "demo"
+    demo.mkdir(exist_ok=True)
+    write_single_column_pdf(DEMO_KEYWORD_STUFFED, demo / "demo_keyword_stuffed.pdf")
+    write_single_column_pdf(DEMO_SUPPORT_OPS, demo / "demo_support_ops.pdf")
+    print("wrote 10 fixtures and 2 demo resumes to", HERE)
 
 
 if __name__ == "__main__":

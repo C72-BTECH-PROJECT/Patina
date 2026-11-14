@@ -16,3 +16,11 @@ nlp-engine\venv\Scripts\python -m pytest tests\eval -q
 ```
 
 `--no-write` prints the section without appending it.
+
+## Multiple-choice option report (card R-29)
+
+`mcq_option_report.py` generates pools with the real assessment-service code and the configured Gemini key (a LIVE run: it calls the LLM), then prints the share of MCQs whose correct option is the longest, the MCQs rejected by the option rule in every round (not only the accepted one), outcome, rounds and seconds per pool, and the correct-answer position spread of the served MCQs. A pool that fails is recorded with its error code and the run continues. The input is one invented job and candidate. Its metric functions, and the run itself against a fake LLM, are tested offline in `tests/assessment/test_option_rule.py`. `--write` appends one dated section to `RESULTS.md`; `--save-json` writes only generated content (questions, options, answer keys, rejected MCQs with reasons) and per-round outcomes.
+
+```
+assessment-service\.venv\Scripts\python eval\mcq_option_report.py --pools 3 --save-json eval\mcq_pools.json --write
+```

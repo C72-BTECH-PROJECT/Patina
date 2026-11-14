@@ -4,10 +4,12 @@ import { AlertTriangle, ChevronRight, RefreshCw, Users } from 'lucide-react';
 import Badge from '../Badge';
 import Button from '../Button';
 import EmptyState from '../EmptyState';
-import ScoreBadge from '../ScoreBadge';
+import ScoreBadge, {
+  AWAITING_ASSESSMENT, VerificationBadge, partialScoreLabel, showEvidenceLimited,
+} from '../ScoreBadge';
 import Spinner from '../Spinner';
 import CandidateModal from './CandidateModal';
-import { api, isAborted } from '../../lib/api';
+import { api, isAborted, isStillWorking, pollServerState, stillWorkingSeconds } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import {
   assessmentStateText, describeVoid, filterByStatus, formatWhen, scoringFailureText,
@@ -19,8 +21,11 @@ import {
  * "all applications" (no `jobId`) and for one job (`jobId`).
  *
  * Data: GET /api/recruiter/applications[?jobId=] (backend/Controllers/analysis.controller.js).
- * The server ranks the rows (composite descending, unscored last); this table keeps that
- * order and never re-ranks or re-bands. Actions:
+ * The server ranks the rows (R-27, D§7.1 W4: scored with the assessment over first, then
+ * scored applicants awaiting the assessment, then unscored; composite descending inside a
+ * group); this table keeps that order and never re-ranks or re-bands. A row with
+ * `score_state: 'awaiting_assessment'` leads with "Awaiting assessment" and shows its
+ * composite smaller, labelled as a partial score. Actions:
  *   shortlist / reject   POST /api/jobs/applications/shortlist { applicationId, status };
  *                        the row takes the status from the server's answer
  *   score again          POST /api/applications/:id/score; on `scored` the list is reloaded
@@ -93,18 +98,38 @@ export function ApplicationsError({ error, onRetry }) {
   );
 }
 
-function ScoreCell({ item, onScored }) {
+export function ScoreCell({ item, onScored }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
+  const [still, setStill] = useState(false); // R-33: reading the state after a lost answer
+
+  if (item.score && item.score_state === AWAITING_ASSESSMENT) {
+    // D§7.1 W4: the state first; the partial number smaller, labelled, and with no band
+    // (a bare low score is never shown for an applicant who has not been assessed).
+    // The composite stays the first <span> in this cell (tests/e2e reads it there).
+    return (
+      <div data-testid="application-score" data-state="scored" data-score-state={AWAITING_ASSESSMENT}>
+        <div className="text-body-sm font-semibold text-foreground" data-testid="awaiting-assessment">Awaiting assessment</div>
+        <div className="flex flex-wrap items-baseline gap-x-1.5">
+          <span className="text-body-sm font-medium text-muted-foreground tabular-nums">{String(item.score.composite)}</span>
+          <em className="not-italic text-caption text-muted-foreground" data-testid="partial-score-label">
+            {partialScoreLabel(item.score.subscores)}
+          </em>
+        </div>
+        <VerificationBadge verification={item.score.verification} className="mt-1" />
+      </div>
+    );
+  }
 
   if (item.score) {
     return (
-      <div data-testid="application-score" data-state="scored">
+      <div data-testid="application-score" data-state="scored" data-score-state={item.score_state || ''}>
         <div className="flex items-center gap-2">
           <span className="text-h3 font-extrabold text-foreground tabular-nums">{String(item.score.composite)}</span>
           <ScoreBadge band={item.score.band} />
+          <VerificationBadge verification={item.score.verification} />
         </div>
-        {item.score.evidence_limited && (
+        {showEvidenceLimited(item.score.evidence_limited, item.score.verification) && (
           <Badge variant="warning" className="mt-1" title="Scored on fewer than all three evidence sources">
             Evidence-limited
           </Badge>
@@ -126,7 +151,21 @@ function ScoreCell({ item, onScored }) {
         setMessage(scoringFailureText(data?.scoring?.reason));
       }
     } catch (err) {
-      setMessage(`Could not start scoring: ${err.message}`);
+      if (!isStillWorking(err)) {
+        setMessage(`Could not start scoring: ${err.message}`);
+      } else {
+        // R-33: a 504 or a dropped connection is not a failure; the score may still be saved.
+        // Read this application back (bounded) and show what the server holds.
+        setStill(true);
+        const out = await pollServerState(
+          (signal) => api.get(`/api/recruiter/applications/${encodeURIComponent(item.id)}`, { signal, cache: 'no-store' }),
+          (detail) => Boolean(detail?.score),
+        ).catch(() => null);
+        setStill(false);
+        if (out?.settled) onScored?.();
+        else if (out?.hasValue) setMessage(`The server did not answer in time and shows no score after ${stillWorkingSeconds()} s of checking. It may still be finishing: reload later.`);
+        else setMessage(`The server did not answer in time and the current state could not be read: ${out?.error?.message || 'no answer'}`);
+      }
     } finally {
       setBusy(false);
     }
@@ -145,6 +184,11 @@ function ScoreCell({ item, onScored }) {
         <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} aria-hidden="true" />
         {busy ? 'Scoring...' : 'Score again'}
       </button>
+      {still && (
+        <p className="mt-1 text-caption text-muted-foreground max-w-[16rem]" role="status" data-testid="still-working">
+          Still working: the server has not answered yet but may still be scoring. Checking every few seconds.
+        </p>
+      )}
       {message && <p className="mt-1 text-caption text-destructive max-w-[16rem]">{message}</p>}
     </div>
   );
@@ -285,11 +329,13 @@ function ApplicationsTable({ data, showJob = true, emptyText }) {
 
   const options = useMemo(() => statusFilterOptions(items), [items]);
   const visible = useMemo(() => filterByStatus(items, statusFilter), [items, statusFilter]);
-  // Rank = position in the server's ranking among scored rows; unscored rows have none.
+  // Rank = position in the server's ranking among scored rows whose assessment is over.
+  // Rows awaiting the assessment (D§7.1 W4) and unscored rows have none: a partial score
+  // is never ranked against a full one.
   const rankOf = useMemo(() => {
     const m = new Map();
     let n = 0;
-    for (const i of items) if (i.score) m.set(i.id, (n += 1));
+    for (const i of items) if (i.score && i.score_state !== AWAITING_ASSESSMENT) m.set(i.id, (n += 1));
     return m;
   }, [items]);
 
@@ -338,7 +384,7 @@ function ApplicationsTable({ data, showJob = true, emptyText }) {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-caption text-muted-foreground">
-            Showing {visible.length} of {items.length}. Ranked by credibility score; unscored applications last.
+            Showing {visible.length} of {items.length}. Ranked by credibility score; applicants awaiting the assessment next, as their own group; unscored last.
           </span>
           <Button size="sm" variant="outline" onClick={reload} loading={status === 'loading'}>
             Refresh

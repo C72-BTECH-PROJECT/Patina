@@ -65,6 +65,23 @@ export const ANSWER_KEY_FIELDS = Object.freeze([
   'correct_option', 'correct_answer', 'ideal_answer', 'key_points', 'recruiter_feedback', 'answer_key',
 ]);
 
+// R-37: `explanation` is a field of the answer key too (assessment-service/app/validators.py:188),
+// but score and application responses carry the score's own, unrelated `explanation` record.
+// So it counts as a key field on every assessment response, and stays allowed everywhere else.
+export const ASSESSMENT_RESPONSE_PATH = /^\/api\/assessment\//;
+export const ASSESSMENT_ONLY_KEY_FIELDS = Object.freeze(['explanation']);
+
+/** The answer-key field names to look for in the body of a response to `path`. */
+export const answerKeyFieldsFor = (path) =>
+  (ASSESSMENT_RESPONSE_PATH.test(path || '') ? [...ANSWER_KEY_FIELDS, ...ASSESSMENT_ONLY_KEY_FIELDS] : ANSWER_KEY_FIELDS);
+
+/**
+ * Every answer-key field in the recorded responses (`recordApiResponses().entries`), each as
+ * 'GET /api/assessment/status $.result.results[0].explanation'. Empty means no leak was seen.
+ */
+export const findAnswerKeyLeaks = (entries) =>
+  entries.flatMap((e) => findFieldNames(e.body, answerKeyFieldsFor(e.path)).map((where) => `${e.method} ${e.path} ${where}`));
+
 /** Every place in `value` where an object key is one of `fields`: ['$.results[0].ideal_answer', ...]. */
 export function findFieldNames(value, fields = ANSWER_KEY_FIELDS, path = '$', out = []) {
   if (Array.isArray(value)) {

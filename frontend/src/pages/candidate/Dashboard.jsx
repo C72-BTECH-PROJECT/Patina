@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, ArrowRight, Briefcase, FileUp, ListChecks } from 'lucide-react';
-import ScoreBadge from '../../components/ScoreBadge';
+import ScoreBadge, { VerificationBadge } from '../../components/ScoreBadge';
 import { api } from '../../lib/api';
 import {
   ScoreAgainButton, StatusBadge, assessmentStateText, scoringReasonText,
@@ -10,7 +10,7 @@ import {
 // R-16 (D§8.2): "My applications" replaces the static marketing page.
 // Endpoints:
 //   GET  /api/jobs/my-applications        [{ id, job_id, job_title, status, submitted_at,
-//                                           scoring: { state }, score: { composite, band } | null }]
+//                                           scoring: { state }, score: { composite, band, verification } | null }]
 //                                         score = the newest score row for that job
 //   GET  /api/assessment/status?jobId=    per row: { state, ... }
 //   POST /api/applications/:id/score      "Score again"
@@ -36,6 +36,7 @@ function ScoreCell({ app, onScored, onFailed }) {
             </span>
             <span className="text-xs text-muted-foreground">/100</span>
             <ScoreBadge band={score.band} />
+            <VerificationBadge verification={score.verification} />
           </>
         ) : (
           <span className="text-sm font-medium text-foreground">Scored</span>

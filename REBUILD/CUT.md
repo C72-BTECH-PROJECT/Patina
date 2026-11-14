@@ -70,7 +70,7 @@ Each line is what we show and what we say about it.
 | PFQS and difficulty control (3.3, 3.4) | Single-prompt generation | The two-step plan, unless S-5 lands |
 | Rubric grading (3.5, 3.6) | Deterministic MCQ grading; short answers graded against generated key points with schema-bound output | Predefined, calibrated rubrics |
 | Inconsistency flags (4.6, 5.9) | An honest "not computed" panel | The flags, unless S-2 lands |
-| Weights (4.3) | Documented, stored with every score | Any calibration; labelled provisional |
+| Weights (4.3) | D§7.1 (R-27): résumé 0.20 fixed, GitHub 0.35, assessment 0.45; GitHub never takes the assessment's share (ceiling 55 before the assessment, 20 for a résumé alone); `verification` (unverified / partly verified / verified) and the unearned share shown beside the band; "Awaiting assessment" leads in recruiter views; `weights_version` stored with every new score (`w2-2026-11-13`; older rows read as v1 0.40 / 0.35 / 0.25) | Any calibration; labelled provisional |
 | Anti-cheating (GR-1) | The list-A controls | Proctoring, identity, AI-answer detection |
 | OAuth 2.0 login (0.4), HTTPS (0.6) | Password login with server sessions, on localhost | OAuth login, TLS |
 | Repository entity (0.2, 2.11) | Snapshot inside the score record | Its own table |

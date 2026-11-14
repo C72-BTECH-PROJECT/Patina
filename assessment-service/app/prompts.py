@@ -1,10 +1,14 @@
 
 import json
 
+from app import config
+
 # The one PROMPT_VERSION (R-07). Stamped on every generated assessment.
 # v2: GitHub evidence truncated and passed only when supplied; the "github"
 # source is forbidden in the prompt when it is absent; JSON response mode.
-PROMPT_VERSION = "assessment-v2"
+# v3 (R-29): the four MCQ options must be of similar length and the same
+# grammatical form, all plausible; the length limit is stated in the prompt.
+PROMPT_VERSION = "assessment-v3"
 
 # Input caps, in characters (lists in items). GitHub evidence is serialised and
 # capped like the resume and job text.
@@ -46,6 +50,7 @@ def build_generation_prompt(candidate_input: dict) -> str:
     }
 
     context_json = json.dumps(trusted_context, ensure_ascii=False)
+    length_ratio = config.MCQ_MAX_LENGTH_RATIO
 
     if has_github:
         source_rule = (
@@ -92,7 +97,15 @@ Create exactly 20 questions:
 MCQ RULES:
 - Exactly four options labelled A, B, C, D.
 - Exactly one defensibly correct option.
-- Include plausible but incorrect distractors.
+- Include plausible but incorrect distractors: each one should tempt a candidate
+  who knows the topic only partly, and be written with the same care as the
+  correct option.
+- All four options must be of similar length. The correct option must not be
+  longer, more detailed or more qualified than the others: a question whose
+  correct option is more than {length_ratio:g} times the average length of the
+  three other options is rejected.
+- All four options must have the same grammatical form: all short noun phrases,
+  or all full sentences, or all code; all end with a full stop or none do.
 - Never use "all of the above" or "none of the above".
 - Give a concise explanation of why the correct option is correct.
 

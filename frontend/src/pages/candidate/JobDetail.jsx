@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Briefcase, MapPin, Layers, Sparkles, CheckCircle, Loader2, FileUp, AlertCircle, ListChecks, ArrowRight,
 } from 'lucide-react';
-import ScoreBadge from '../../components/ScoreBadge';
-import { api } from '../../lib/api';
+import ScoreBadge, { VerificationBadge } from '../../components/ScoreBadge';
+import {
+  api, isAborted, isStillWorking, pollServerState, STILL_WORKING_POLL_MS, stillWorkingSeconds,
+} from '../../lib/api';
 import { ScoreAgainButton, StatusBadge, scoringReasonText } from './applicationState';
 
 // R-16 (D§4.1, Y1). Endpoints:
@@ -16,6 +18,10 @@ import { ScoreAgainButton, StatusBadge, scoringReasonText } from './applicationS
 //   POST /api/jobs/:id/apply           201 { ...application, scoring: { status, reason } };
 //                                      the application counts even when scoring failed
 //   POST /api/applications/:id/score   "Score again": { applicationId, scoring: { status, reason } }
+// R-33: a repeated apply answers 200 { ...existing application, already_applied: true,
+// scoring: { state }, score }. A gateway timeout (504) or a dropped connection on apply is
+// "Still working": the page reads GET /api/jobs/my-applications every few seconds (lib/api.js
+// pollServerState, bounded) until this job's row is scored, then shows the row the server holds.
 
 /**
  * The scoring state of this application. `scoring` is either the object an apply or
@@ -42,6 +48,7 @@ function ScoringState({ application, scoring, onScoring, retryError, onRetryErro
             </span>
             <span className="text-xs text-muted-foreground">/100</span>
             <ScoreBadge band={application.score.band} />
+            <VerificationBadge verification={application.score.verification} />
           </span>
         )}
         <Link
@@ -101,6 +108,11 @@ function CandidateJobDetail() {
   const [applyError, setApplyError] = useState('');
   const [justApplied, setJustApplied] = useState(false);
   const [retryError, setRetryError] = useState('');
+  // R-33: reading the real state after an apply whose answer did not arrive.
+  const [stillWorking, setStillWorking] = useState(false);
+  const [stillNote, setStillNote] = useState('');
+  const applyCtrlRef = useRef(null);
+  useEffect(() => () => applyCtrlRef.current?.abort(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,21 +155,64 @@ function CandidateJobDetail() {
 
   const applied = Boolean(application) || job?.applied === true;
 
+  // R-33: the apply's answer was lost (504 or a dropped connection), but core may still be
+  // saving and scoring it. Read this candidate's applications until this job's row is
+  // scored, for a bounded time, then show the row as the server holds it (or say there is
+  // none). Nothing is assumed: every state shown comes from a read.
+  const readBackApplication = async () => {
+    applyCtrlRef.current?.abort();
+    const ctrl = new AbortController();
+    applyCtrlRef.current = ctrl;
+    setStillWorking(true);
+    const rowOf = (rows) => (Array.isArray(rows) ? rows.find((r) => r.job_id === id) : null) || null;
+    try {
+      const out = await pollServerState(
+        (signal) => api.get('/api/jobs/my-applications', { signal, cache: 'no-store' }),
+        (rows) => rowOf(rows)?.scoring?.state === 'scored',
+        { signal: ctrl.signal },
+      );
+      const row = out.hasValue ? rowOf(out.value) : null;
+      if (row) {
+        setApplication(row);
+        setScoring(row.scoring || null);
+        setJustApplied(true);
+        setApplicationsError('');
+      }
+      if (out.settled) return;
+      if (row) {
+        setStillNote(`The server holds your application, but no score after ${stillWorkingSeconds()} s of checking. Scoring may still be finishing: reload this page later, or use Score again.`);
+      } else if (out.hasValue) {
+        setStillNote(`The server holds no application for this job after ${stillWorkingSeconds()} s of checking. You can apply again; applying twice never creates a second application.`);
+      } else {
+        setStillNote(`The server did not answer in time, and your applications could not be read (${out.error?.message || 'no answer'}). Reload this page before applying again; applying twice never creates a second application.`);
+      }
+    } catch (err) {
+      if (!isAborted(err)) setStillNote(`Your applications could not be read: ${err.message}`);
+    } finally {
+      if (!ctrl.signal.aborted) setStillWorking(false);
+    }
+  };
+
   const handleApply = async () => {
-    if (applying || applied) return;
+    if (applying || applied || stillWorking) return;
     setApplying(true);
     setApplyError('');
+    setStillNote('');
+    let lost = false;
     try {
       const data = await api.post(`/api/jobs/${id}/apply`, {});
       setApplication(data);
       setScoring(data?.scoring || null);
-      setJustApplied(true);
+      setJustApplied(data?.already_applied ? 'already' : true);
       // Scored: read the row back for its composite and band. A failed scoring keeps
-      // the apply response's reason (the list does not store one).
-      if (data?.scoring?.status === 'scored') await loadApplication();
+      // the apply response's reason (the list does not store one). A repeated apply
+      // (200, already_applied) carries the list's `scoring.state`.
+      if (data?.scoring?.status === 'scored' || data?.scoring?.state === 'scored') await loadApplication();
     } catch (err) {
-      if (err.status === 409) {
-        // Already applied: read the existing application instead.
+      if (isStillWorking(err)) {
+        lost = true;
+      } else if (err.status === 409) {
+        // Already applied (answer of a core older than R-33): read the existing application.
         await loadApplication();
       } else if (err.status === 400 && err.body?.code === 'RESUME_REQUIRED') {
         setHasResume(false);
@@ -168,6 +223,7 @@ function CandidateJobDetail() {
     } finally {
       setApplying(false);
     }
+    if (lost) await readBackApplication();
   };
 
   // Lines that start with "#" are headings (hashes stripped, shown bold).
@@ -296,7 +352,7 @@ function CandidateJobDetail() {
               <button
                 type="button"
                 onClick={handleApply}
-                disabled={applying || applied || hasResume === false}
+                disabled={applying || stillWorking || applied || hasResume === false}
                 data-testid="apply-button"
                 className={`inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-all ${
                   applied
@@ -308,6 +364,11 @@ function CandidateJobDetail() {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Applying and scoring...
+                  </>
+                ) : stillWorking && !applied ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Still working...
                   </>
                 ) : applied ? (
                   <>
@@ -322,9 +383,23 @@ function CandidateJobDetail() {
                 )}
               </button>
               {application?.status && <StatusBadge status={application.status} />}
-              {justApplied && <span className="text-sm font-medium text-success">Application submitted.</span>}
+              {justApplied && (
+                <span className="text-sm font-medium text-success">
+                  {justApplied === 'already' ? 'You had already applied to this job.' : 'Application submitted.'}
+                </span>
+              )}
               {applyError && <span className="text-sm font-medium text-destructive">{applyError}</span>}
             </div>
+            {stillWorking && (
+              <p className="mt-3 text-sm text-muted-foreground" role="status" data-testid="still-working">
+                Still working: the server has not answered yet, but it may still be saving and scoring your
+                application. This page checks with the server every {Math.round(STILL_WORKING_POLL_MS / 1000)} s
+                for up to {stillWorkingSeconds()} s.
+              </p>
+            )}
+            {!stillWorking && stillNote && (
+              <p className="mt-3 text-sm text-muted-foreground" role="status" data-testid="still-working-note">{stillNote}</p>
+            )}
 
             {application && (
               <ScoringState

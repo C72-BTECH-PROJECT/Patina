@@ -51,11 +51,15 @@ function createCoreProxy(cfg, timeoutMs) {
         if (typeof res?.status !== 'function') { res?.destroy?.(); return; }
         if (res.headersSent) { res.destroy(); return; }
         if (req.gatewayProxyTimedOut) {
+          // R-33: the gateway stopped waiting, but core did not stop working: an apply,
+          // score or grade can still complete and be saved after this answer. The body
+          // says so, so a client reads the real state instead of reporting a failure.
           console.error(`[gateway] request_id=${req.requestId || '-'} core did not answer within ${timeoutMs} ms`);
           res.status(504).json({
             error: 'upstream_timeout',
-            message: 'The server took too long to respond. Please try again.',
+            message: 'The server did not answer in time, but it may still be completing this request. Check the current state before trying again.',
             service: 'core',
+            may_still_complete: true,
           });
           return;
         }

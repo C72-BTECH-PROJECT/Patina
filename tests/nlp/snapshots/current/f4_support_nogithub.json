@@ -2,7 +2,15 @@
   "entities": {
     "candidate_name": "Samuel Adeyemi",
     "education": [
-      "HND in Computing - Example College Leeds (2015 - 2017)"
+      {
+        "dates": "2015 – 2017",
+        "degree": "HND in Computing",
+        "grade": null,
+        "graduation_year": 2017,
+        "honours": null,
+        "institution": "Example College Leeds",
+        "text": "HND in Computing - Example College Leeds (2015 - 2017)"
+      }
     ],
     "email": "samuel.adeyemi@example.com",
     "experience": [
@@ -36,20 +44,22 @@
     ],
     "github": null,
     "linkedin": null,
+    "links": [],
     "phone": null,
     "projects": [],
-    "skill_count": 6,
+    "skill_count": 7,
     "skills": [
       "python",
       "oracle",
       "aws",
       "jenkins",
-      "github",
+      "splunk",
+      "cloudwatch",
       "sql"
     ]
   },
   "filename": "f4_support_nogithub.docx",
-  "parser_version": "nlp-engine@2.0.0",
+  "parser_version": "nlp-engine@2.2.0",
   "preprocessing": {
     "noun_chunks_preview": [
       "samuel adeyemi",
@@ -96,7 +106,7 @@
       "semantic_score": 0.4,
       "skill_coverage": 0.6
     },
-    "focused_score": 0.6231,
+    "focused_score": 0.6488,
     "full_text_score": 0.6671,
     "jd_embedding_size": 384,
     "jd_skills": [
@@ -113,9 +123,10 @@
     ],
     "jd_source": "structured_skills",
     "match_level": "Weak Match",
-    "match_reason": "Matched 3 of 10 job skills (from the role's listed required/preferred skills); missing: linux, bash, servicenow, jira, itil, splunk, nagios.",
+    "match_reason": "Matched 4 of 10 job skills (from the role's listed required/preferred skills); missing: linux, bash, servicenow, jira, itil, nagios.",
     "matched_skills": [
       "sql",
+      "splunk",
       "oracle",
       "python"
     ],
@@ -125,7 +136,6 @@
       "servicenow",
       "jira",
       "itil",
-      "splunk",
       "nagios"
     ],
     "resume_embedding_size": 384,
@@ -134,12 +144,13 @@
       "oracle",
       "aws",
       "jenkins",
-      "github",
+      "splunk",
+      "cloudwatch",
       "sql"
     ],
-    "semantic_score": 0.6385,
-    "similarity_score": 0.4354,
-    "skill_coverage": 0.3
+    "semantic_score": 0.6552,
+    "similarity_score": 0.5021,
+    "skill_coverage": 0.4
   },
   "status": "success"
 }

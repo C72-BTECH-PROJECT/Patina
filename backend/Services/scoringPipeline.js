@@ -13,7 +13,7 @@
 //     -> insert `scores`
 //
 //   scoreApplication({ candidateId, job? | jobId?, requestId?, assessmentOnlyFallback? }) resolves to
-//     { status: 'scored', reason: null, score: { id, composite, band, evidenceLimited, weights, createdAt },
+//     { status: 'scored', reason: null, score: { id, composite, band, verification, evidenceLimited, weights, createdAt },
 //       scoreRow, resumeId, parserVersion, githubReason, parsingReason }
 //   or
 //     { status: 'failed', reason }   reason is one of SCORING_FAILURE_REASONS
@@ -209,7 +209,7 @@ export async function scoreApplication({ candidateId, job = null, jobId = null, 
     if (insertError || !row) return failed('score_insert_failed', { ...ctx, cause: insertError || 'no row returned' });
 
     const githubReason = github?.ok ? null : (github?.reasonCode || null);
-    console.log(`[scoring] request_id=${requestId || '-'} job=${job.id} scored composite=${record.composite} band=${record.band} github=${githubReason || 'ok'} parsing=${parsingReason || 'ok'}`);
+    console.log(`[scoring] request_id=${requestId || '-'} job=${job.id} scored composite=${record.composite} band=${record.band} verification=${record.verification} weights=${record.weights_version} github=${githubReason || 'ok'} parsing=${parsingReason || 'ok'}`);
     return {
       status: 'scored',
       reason: null,
@@ -217,6 +217,8 @@ export async function scoreApplication({ candidateId, job = null, jobId = null, 
         id: row.id,
         composite: Number(row.composite_score),
         band: record.band,
+        // D§7.1 W3: beside the band, wherever the band goes.
+        verification: record.verification,
         evidenceLimited: row.evidence_limited,
         weights: row.weights,
         createdAt: row.created_at ?? null,

@@ -1,0 +1,143 @@
+{
+  "entities": {
+    "candidate_name": "Casey Brightwater",
+    "education": [
+      {
+        "dates": "2019 – 2022",
+        "degree": "B.Sc.",
+        "grade": null,
+        "graduation_year": 2022,
+        "honours": null,
+        "institution": "Example College",
+        "text": "B.Sc. - Example College (2019 - 2022)"
+      }
+    ],
+    "email": "casey.brightwater@example.com",
+    "experience": [
+      {
+        "dates": "2023 – Present",
+        "highlights": [
+          "Worked with Python, SQL, PostgreSQL, Docker, Git, REST API, React, Redis, AWS, Kubernetes."
+        ],
+        "organisation": "Software Professional",
+        "title": "Tailspin Toys ()"
+      }
+    ],
+    "github": null,
+    "linkedin": null,
+    "links": [],
+    "phone": "+12025550187",
+    "projects": [],
+    "skill_count": 11,
+    "skills": [
+      "python",
+      "react",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "sql",
+      "rest",
+      "api"
+    ]
+  },
+  "filename": "demo_keyword_stuffed.pdf",
+  "parser_version": "nlp-engine@2.2.0",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "casey brightwater",
+      "casey.brightwater@example.com",
+      "| +1",
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react"
+    ],
+    "sentence_count": 5,
+    "token_count": 84,
+    "tokens_preview": [
+      "casey",
+      "brightwater",
+      "summary",
+      "result",
+      "drive",
+      "professional",
+      "skilled",
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "rest",
+      "api",
+      "react",
+      "redis",
+      "aws",
+      "kubernetes",
+      "skills",
+      "python"
+    ]
+  },
+  "raw_text": "Casey Brightwater\ncasey.brightwater@example.com | +1 (202) 555-0187\nSUMMARY\nResults-driven professional skilled in Python, SQL, PostgreSQL, Docker, Git,\nREST API, React, Redis, AWS and Kubernetes.\nSKILLS\nPython, SQL, PostgreSQL, Docker, Git, REST API, React, Redis, AWS, Kubernetes\nPython | SQL | PostgreSQL | Docker | Git | REST API | React | Redis | AWS | Kubernetes\nKeywords: Python developer, SQL expert, PostgreSQL expert, Docker expert,\nGit expert, REST API expert, React expert, Redis expert, AWS expert, Kubernetes expert\nEXPERIENCE\nSoftware Professional - Tailspin Toys (2023 - Present)\n- Worked with Python, SQL, PostgreSQL, Docker, Git, REST API, React, Redis, AWS, Kubernetes.\nEDUCATION\nB.Sc. - Example College (2019 - 2022)",
+  "raw_text_preview": "Casey Brightwater\ncasey.brightwater@example.com | +1 (202) 555-0187\nSUMMARY\nResults-driven professional skilled in Python, SQL, PostgreSQL, Docker, Git,\nREST API, React, Redis, AWS and Kubernetes.\nSKILLS\nPython, SQL, PostgreSQL, Docker, Git, REST API, React, Redis, AWS, Kubernetes\nPython | SQL | Pos",
+  "raw_text_truncated": false,
+  "semantic_analysis": {
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
+    "focused_score": 0.7321,
+    "full_text_score": 0.6981,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react",
+      "redis",
+      "aws",
+      "kubernetes"
+    ],
+    "jd_source": "structured_skills",
+    "match_level": "Strong Match",
+    "match_reason": "All 10 job skills (from the role's listed required/preferred skills) were found in the resume.",
+    "matched_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react",
+      "redis",
+      "aws",
+      "kubernetes"
+    ],
+    "missing_skills": [],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "python",
+      "react",
+      "postgresql",
+      "redis",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "sql",
+      "rest api"
+    ],
+    "semantic_score": 0.7202,
+    "similarity_score": 0.8881,
+    "skill_coverage": 1.0
+  },
+  "status": "success"
+}

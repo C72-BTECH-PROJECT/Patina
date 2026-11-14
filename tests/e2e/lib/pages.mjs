@@ -92,6 +92,10 @@ export async function checkDrilldown(drill, detail, label) {
     }
   }
   const sum = Object.values(weights).reduce((a, b) => a + b, 0);
-  expect(Math.abs(sum - 1), `${label}: weights ${JSON.stringify(weights)} sum to 1 within 0.001`).toBeLessThanOrEqual(0.001);
+  // D§7.1: before the assessment the weights do not sum to 1; the rest is the stored unearned share.
+  const unearned = Number(detail.explanation?.unearned_weight ?? 0);
+  expect(unearned, `${label}: unearned weight is between 0 and 0.8`).toBeGreaterThanOrEqual(0);
+  expect(unearned, `${label}: unearned weight is between 0 and 0.8`).toBeLessThanOrEqual(0.8);
+  expect(Math.abs(sum + unearned - 1), `${label}: weights ${JSON.stringify(weights)} plus unearned ${unearned} sum to 1 within 0.001`).toBeLessThanOrEqual(0.001);
   return { composite, weights, available };
 }

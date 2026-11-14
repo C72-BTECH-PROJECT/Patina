@@ -1,0 +1,147 @@
+{
+  "entities": {
+    "candidate_name": "TOBIAS WREN",
+    "education": [
+      {
+        "dates": "2016 – 2019",
+        "degree": "B.Sc. in Computer Science",
+        "grade": null,
+        "graduation_year": 2019,
+        "honours": null,
+        "institution": "Example University of Leeds",
+        "text": "B.Sc. in Computer Science · Example University of Leeds · 2016 - 2019"
+      }
+    ],
+    "email": "tobias.wren@example.com",
+    "experience": [
+      {
+        "dates": "Mar 2020 – Present",
+        "highlights": [],
+        "organisation": "Proseware Cloud ()",
+        "title": "Site Reliability Engineer"
+      },
+      {
+        "dates": null,
+        "highlights": [
+          "Wrote Bash and Python tooling for Linux fleet patching."
+        ],
+        "organisation": null,
+        "title": "Ran Jenkins pipelines that build Docker images and deploy them to AWS."
+      }
+    ],
+    "github": null,
+    "linkedin": "linkedin.com/in/example-tobias-wren",
+    "links": [
+      "linkedin.com/in/example-tobias-wren"
+    ],
+    "phone": "+12025550123",
+    "projects": [],
+    "skill_count": 8,
+    "skills": [
+      "python",
+      "bash",
+      "aws",
+      "docker",
+      "jenkins",
+      "git",
+      "linux",
+      "sql"
+    ]
+  },
+  "filename": "f9_table_layout.docx",
+  "parser_version": "nlp-engine@2.2.0",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "| +1",
+      "555-0123\nskills\nlinux",
+      "bash",
+      "sql",
+      "python",
+      "docker",
+      "jenkins",
+      "git",
+      "aws\neducation\nb.sc",
+      "leeds"
+    ],
+    "sentence_count": 5,
+    "token_count": 40,
+    "tokens_preview": [
+      "tobias",
+      "wren",
+      "skills",
+      "linux",
+      "bash",
+      "sql",
+      "python",
+      "docker",
+      "jenkins",
+      "git",
+      "aws",
+      "education",
+      "computer",
+      "science",
+      "example",
+      "university",
+      "leeds",
+      "experience",
+      "site",
+      "reliability"
+    ]
+  },
+  "raw_text": "TOBIAS WREN\ntobias.wren@example.com | +1 (202) 555-0123\nSKILLS\nLinux, Bash, SQL, Python, Docker, Jenkins, Git, AWS\nEDUCATION\nB.Sc. in Computer Science\nExample University of Leeds\n2016 - 2019\nEXPERIENCE\nSite Reliability Engineer - Proseware Cloud (Mar 2020 - Present)\nRan Jenkins pipelines that build Docker images and deploy them to AWS.\nWrote Bash and Python tooling for Linux fleet patching.\nlinkedin.com/in/example-tobias-wren",
+  "raw_text_preview": "TOBIAS WREN\ntobias.wren@example.com | +1 (202) 555-0123\nSKILLS\nLinux, Bash, SQL, Python, Docker, Jenkins, Git, AWS\nEDUCATION\nB.Sc. in Computer Science\nExample University of Leeds\n2016 - 2019\nEXPERIENCE\nSite Reliability Engineer - Proseware Cloud (Mar 2020 - Present)\nRan Jenkins pipelines that build ",
+  "raw_text_truncated": false,
+  "semantic_analysis": {
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
+    "focused_score": 0.4617,
+    "full_text_score": 0.4415,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "sql",
+      "linux",
+      "bash",
+      "servicenow",
+      "jira",
+      "itil",
+      "splunk",
+      "nagios",
+      "oracle",
+      "python"
+    ],
+    "jd_source": "structured_skills",
+    "match_level": "Weak Match",
+    "match_reason": "Matched 4 of 10 job skills (from the role's listed required/preferred skills); missing: servicenow, jira, itil, splunk, nagios, oracle.",
+    "matched_skills": [
+      "sql",
+      "linux",
+      "bash",
+      "python"
+    ],
+    "missing_skills": [
+      "servicenow",
+      "jira",
+      "itil",
+      "splunk",
+      "nagios",
+      "oracle"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "python",
+      "bash",
+      "aws",
+      "docker",
+      "jenkins",
+      "git",
+      "linux",
+      "sql"
+    ],
+    "semantic_score": 0.4546,
+    "similarity_score": 0.4218,
+    "skill_coverage": 0.4
+  },
+  "status": "success"
+}

@@ -5,10 +5,13 @@ import {
   AlertCircle, ArrowRight, Briefcase, Code2, FolderGit2, GraduationCap, LayoutDashboard, Wrench,
 } from 'lucide-react';
 import Badge from '../../components/Badge';
-import ScoreBadge, { bandTone } from '../../components/ScoreBadge';
+import ScoreBadge, {
+  VerificationBadge, bandTone, showEvidenceLimited, weightsVersionLabel,
+} from '../../components/ScoreBadge';
 import Spinner from '../../components/Spinner';
 import ScoreBreakdown from '../../components/recruiter/ScoreBreakdown';
 import { api } from '../../lib/api';
+import { EDUCATION_EMPTY_ENTRY, educationLine } from '../../lib/education';
 import { ScoreAgainButton, StatusBadge, scoringReasonText } from './applicationState';
 
 // R-16 (D§8.2, F13, F14): the result of ONE application.
@@ -81,6 +84,58 @@ function ScoreRing({ value, band }) {
     </div>
   );
 }
+
+/**
+ * R-27 (D§7.1 W3): what would verify this score further, from the stored sub-scores.
+ * The assessment page itself says whether an attempt is still open, so this names the
+ * step and links there; it never claims an attempt is available.
+ */
+export const nextVerificationStep = (analysis) => {
+  const subs = analysis?.subScores || {};
+  const has = (key) => subs[key]?.available === true;
+  if (!has('assessment_results')) {
+    const unearned = Number(analysis?.explanation?.unearned_weight);
+    return {
+      kind: 'assessment',
+      text: `Next step: complete the assessment for this job. It is the largest part of the score${
+        Number.isFinite(unearned) && unearned > 0 ? `, and ${Math.round(unearned * 100)}% of your score is not earned until it is done` : ''
+      }.`,
+    };
+  }
+  if (!has('github_evidence')) {
+    return {
+      kind: 'github',
+      text: 'Your score is partly verified by the assessment. GitHub is optional and its absence costs nothing; a GitHub profile link on your résumé, with recent public work, would add a second independent source.',
+    };
+  }
+  return null;
+};
+
+/**
+ * R-38: the parser's résumé-to-job figure (the parsing sub-score, 0-100), shown as
+ * "résumé match to the job description". The parser's own label ("Strong Match") is
+ * not shown: beside a low or unverified composite it read as a verdict. Null when
+ * parsing produced no value.
+ */
+export const resumeMatchFigure = (analysis) => {
+  const sub = analysis?.subScores?.parsing_semantic_alignment;
+  if (!sub || sub.available !== true) return null;
+  const v = Number(sub.value);
+  return sub.value !== null && sub.value !== undefined && Number.isFinite(v) ? v : null;
+};
+
+/**
+ * R-38: the stored GitHub-account note ("taken from the link on the résumé ...") only
+ * when the résumé this score used has a GitHub link (or GitHub evidence was used).
+ */
+export const showGithubOwnershipNote = (analysis) => {
+  if (!analysis?.explanation?.github_account?.note) return false;
+  const github = analysis.subScores?.github_evidence;
+  if (github?.available === true) return true;
+  if (github?.components?.reason_code === 'no_github_link') return false;
+  const link = analysis.candidate?.github;
+  return typeof link === 'string' && link.trim() !== '';
+};
 
 /** A parsed-entity block: what the parser found, or that it found nothing. */
 function EntitySection({ icon: Icon, title, count, children, empty }) {
@@ -297,6 +352,9 @@ function ApplicationResult({ applicationId }) {
   const projects = analysis.projects || [];
   const explanation = analysis.explanation;
   const hasFactors = Array.isArray(explanation?.factors) && explanation.factors.length > 0;
+  const nextStep = nextVerificationStep(analysis);
+  const verification = analysis.verification ?? explanation?.verification ?? null;
+  const resumeMatch = resumeMatchFigure(analysis);
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -313,22 +371,45 @@ function ApplicationResult({ applicationId }) {
           <div className="flex-1 text-center md:text-left">
             <div className="flex flex-wrap items-center gap-2 justify-center md:justify-start mb-3">
               <ScoreBadge band={analysis.band} />
-              {analysis.matchLevel && <Badge variant="outline">{analysis.matchLevel}</Badge>}
-              {analysis.evidenceLimited && <Badge variant="warning">Evidence-limited</Badge>}
+              <VerificationBadge verification={verification} />
+              {showEvidenceLimited(analysis.evidenceLimited, verification) && <Badge variant="warning">Evidence-limited</Badge>}
             </div>
-            {explanation?.summary && (
-              <p className="text-body-sm text-foreground leading-relaxed" data-testid="score-explanation">
+            {resumeMatch !== null && (
+              <p className="text-body-sm text-foreground" data-testid="resume-match">
+                Résumé match to the job description: <span className="font-semibold tabular-nums">{String(resumeMatch)}/100</span>
+                <span className="block text-caption text-muted-foreground">
+                  How closely the résumé's text and skills match the job description. It is one part of the score, not a verdict on the application.
+                </span>
+              </p>
+            )}
+            {/* The breakdown below prints the stored summary; it is shown here only when there is no breakdown. */}
+            {!hasFactors && explanation?.summary && (
+              <p className="mt-2 text-body-sm text-foreground leading-relaxed" data-testid="score-explanation">
                 {explanation.summary}
               </p>
             )}
             {explanation?.band_thresholds?.note && (
               <p className="mt-2 text-caption text-muted-foreground">{explanation.band_thresholds.note}</p>
             )}
+            {nextStep && (
+              <div className="mt-3 p-3 rounded-lg border border-border bg-muted text-left" data-testid="next-step" data-next-step={nextStep.kind}>
+                <p className="text-body-sm text-foreground">{nextStep.text}</p>
+                {nextStep.kind === 'assessment' && analysis.jobId && (
+                  <Link
+                    to={`/candidate/assessment?jobId=${encodeURIComponent(analysis.jobId)}`}
+                    className="mt-1 inline-flex items-center gap-1 text-body-sm font-medium text-primary no-underline hover:underline"
+                  >
+                    Go to the assessment
+                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                  </Link>
+                )}
+              </div>
+            )}
             <p className="mt-2 text-caption text-muted-foreground">
-              The weights are provisional: a design choice, not yet calibrated.
+              The weights are provisional: a design choice, not yet calibrated. Weights version: {weightsVersionLabel(explanation)}.
             </p>
-            {explanation?.github_account?.note && (
-              <p className="mt-2 text-caption text-muted-foreground">{explanation.github_account.note}</p>
+            {showGithubOwnershipNote(analysis) && (
+              <p className="mt-2 text-caption text-muted-foreground" data-testid="github-ownership-note">{explanation.github_account.note}</p>
             )}
           </div>
         </div>
@@ -386,8 +467,10 @@ function ApplicationResult({ applicationId }) {
 
           <EntitySection icon={GraduationCap} title="Education" count={education.length} empty="No education entries were found.">
             <ul className="space-y-1.5 list-disc pl-5">
-              {education.map((line, i) => (
-                <li key={i} className="text-body-sm text-foreground">{typeof line === 'string' ? line : JSON.stringify(line)}</li>
+              {education.map((entry, i) => (
+                <li key={i} className="text-body-sm text-foreground">
+                  {educationLine(entry) || <span className="text-muted-foreground">{EDUCATION_EMPTY_ENTRY}</span>}
+                </li>
               ))}
             </ul>
           </EntitySection>

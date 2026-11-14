@@ -13,7 +13,7 @@
 //     rawTextTruncated,  true when the parser cut the text at its cap
 //     parserVersion,     the version string the parser reported
 //     semanticAnalysis,  the parser's similarity block, or null when no job was given
-//     storagePath,       the object that was parsed (`candidates/<id>/resume.<ext>`)
+//     storagePath,       the object that was parsed (`candidates/<id>/resume-<stamp>-<rand>.<ext>`)
 //   }
 // Upload parses before it stores, so it uses the two halves directly:
 // parseResumeBytes (parse only, persists nothing) and saveParsedResume (insert
@@ -21,9 +21,12 @@
 // Any failure throws ResumePipelineError { code, status, message, reason?, cause? };
 // `message` is a fixed sentence that is safe to send to the client.
 //
-// Storage path: one form, `candidates/<candidateId>/resume.<ext>` with ext
-// `pdf` or `docx`. Older uploads may carry an upper-case extension
-// (`resume.PDF`); they are read, never written.
+// Storage path (R-38): every upload gets its own object key in the candidate's
+// folder, `candidates/<candidateId>/resume-<UTC stamp>-<8 hex>.<ext>` (ext `pdf` or
+// `docx`), written once and never overwritten. The current résumé is the newest
+// object in the folder. Objects written before R-38 at the fixed key
+// `candidates/<id>/resume.<ext>` (any case) are still read, never written.
+import { createHash, randomBytes } from 'crypto';
 import path from 'path';
 
 import supabase from '../Config/supabase.js';
@@ -39,7 +42,8 @@ const nlpTimeoutMs = () => {
   return Number.isFinite(n) && n > 0 ? n : NLP_TIMEOUT_MS_DEFAULT;
 };
 
-const STORED_NAME_RE = /^resume\.(pdf|docx)$/i;
+// `resume.<ext>` (before R-38) or `resume-<YYYYMMDDTHHMMSSmmmZ>-<8 hex>.<ext>`.
+const STORED_NAME_RE = /^resume(?:-\d{8}T\d{9}Z-[0-9a-f]{8})?\.(pdf|docx)$/i;
 const TOKEN_RE = /^[a-z_]{1,64}$/;
 const UNREADABLE_REASONS = new Set(['no_text_layer', 'empty', 'corrupt']);
 
@@ -90,24 +94,35 @@ export class ResumePipelineError extends Error {
   }
 }
 
-/** The one storage path a resume is written to. `ext` is '.pdf' or '.docx'. */
-export const canonicalResumePath = (candidateId, ext) => {
+/**
+ * R-38: a new, never-used storage key for one upload. `ext` is '.pdf' or '.docx'.
+ * Supabase serves downloads through a CDN whose cache is keyed by the object path and
+ * is purged only some time after an overwrite (live: about 50 s), so a re-upload to a
+ * fixed key was read back as the previous résumé. A key that is written once and never
+ * overwritten has no older version for any cache to hold.
+ */
+export const newResumePath = (candidateId, ext, now = new Date()) => {
   const e = String(ext || '').toLowerCase();
   if (!Object.hasOwn(RESUME_TYPES, e)) throw new Error(`unsupported resume extension: ${e}`);
-  return `candidates/${candidateId}/resume${e}`;
+  const stamp = now.toISOString().replace(/[-:]/g, '').replace('.', '');
+  return `candidates/${candidateId}/resume-${stamp}-${randomBytes(4).toString('hex')}${e}`;
 };
 
 /**
- * Every stored resume object of a candidate (`candidates/<id>/resume.pdf|docx`,
- * any case), newest first. A storage error throws `storage_error`: it is never
- * reported as "no resume" (B9).
+ * Every stored resume object of a candidate (`candidates/<id>/resume-<stamp>-<rand>.<ext>`,
+ * and the pre-R-38 `resume.<ext>` in any case), newest first. A storage error throws
+ * `storage_error`: it is never reported as "no resume" (B9). Replaced uploads stay in
+ * the folder (nothing deletes them; ISSUES.md retention entry), so the list asks the
+ * storage API for the newest first, and sorts again here.
  */
 export async function listStoredResumes(candidateId) {
   const folder = `candidates/${candidateId}`;
   let data;
   let error;
   try {
-    ({ data, error } = await supabase.storage.from(RESUME_BUCKET).list(folder, { limit: 100 }));
+    ({ data, error } = await supabase.storage.from(RESUME_BUCKET).list(folder, {
+      limit: 100, search: 'resume', sortBy: { column: 'updated_at', order: 'desc' },
+    }));
   } catch (err) {
     throw new ResumePipelineError('storage_error', { cause: err, detail: 'storage list threw' });
   }
@@ -115,13 +130,75 @@ export async function listStoredResumes(candidateId) {
   const stamp = (f) => Date.parse(f.updated_at || f.created_at || '') || 0;
   return (Array.isArray(data) ? data : [])
     .filter((f) => typeof f?.name === 'string' && STORED_NAME_RE.test(f.name))
-    .sort((a, b) => stamp(b) - stamp(a))
+    .sort((a, b) => stamp(b) - stamp(a) || String(b.name).localeCompare(String(a.name)))
     .map((f) => ({
       name: f.name,
       path: `${folder}/${f.name}`,
       ext: path.extname(f.name).toLowerCase(),
       updatedAt: f.updated_at || f.created_at || null,
+      // R-38: what the stored object IS, from the storage database (the list is a
+      // database read, never served from the CDN), to check a download against.
+      md5: md5OfETag(f.metadata?.eTag),
+      size: Number.isInteger(f.metadata?.size) && f.metadata.size >= 0 ? f.metadata.size : null,
     }));
+}
+
+// A single-part upload's eTag is the MD5 of the bytes ("<32 hex>"); a multipart
+// eTag ("<hex>-<parts>") is not, and is not used.
+function md5OfETag(etag) {
+  const v = typeof etag === 'string' ? etag.replace(/"/g, '').trim().toLowerCase() : '';
+  return /^[0-9a-f]{32}$/.test(v) ? v : null;
+}
+
+/**
+ * R-38: the name to SHOW for a stored résumé. `name` is a `resumes.file_name`: the
+ * name the candidate uploaded, or, on rows that could not recover it, the storage
+ * key. A storage key, an empty name, or a name whose extension is not the object's
+ * own is never shown: the answer is then the neutral `résumé.<ext>`. Otherwise the
+ * last path segment, with control characters removed, whitespace collapsed, and
+ * the stem cut to 100 characters.
+ */
+export const RESUME_DISPLAY_STEM = 'résumé';
+export function displayFileName(name, ext) {
+  const e = String(ext || '').toLowerCase();
+  const safeExt = Object.hasOwn(RESUME_TYPES, e) ? e : '';
+  const neutral = `${RESUME_DISPLAY_STEM}${safeExt}`;
+  const base = String(name ?? '').split(/[\\/]/).pop()
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!base || STORED_NAME_RE.test(base) || !safeExt) return neutral;
+  const nameExt = path.extname(base).toLowerCase();
+  if (nameExt !== safeExt) return neutral;
+  const stem = base.slice(0, base.length - nameExt.length).trim().slice(0, 100).trim();
+  return stem ? `${stem}${safeExt}` : neutral;
+}
+
+/**
+ * R-38: the name the candidate uploaded the object at `fileRef` under, from the
+ * upload's `resumes` row (the earliest row of this candidate with that `file_ref`
+ * whose `file_name` is not a storage key). Null when no such row exists (an object
+ * stored before R-38, or kept while the parser was down) or the lookup fails: the
+ * name is a label, so a failed lookup never fails the caller.
+ */
+export async function uploadedFileName(candidateId, fileRef) {
+  if (!candidateId || typeof fileRef !== 'string' || !fileRef) return null;
+  try {
+    const { data, error } = await supabase
+      .from('resumes')
+      .select('file_name, created_at')
+      .eq('candidate_id', candidateId)
+      .eq('file_ref', fileRef)
+      .order('created_at', { ascending: true })
+      .limit(20);
+    if (error || !Array.isArray(data)) return null;
+    const row = data.find((r) => typeof r?.file_name === 'string' && r.file_name.trim()
+      && !STORED_NAME_RE.test(r.file_name.split(/[\\/]/).pop().trim()));
+    return row ? row.file_name : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The candidate's current resume object (newest), or null when there is none. */
@@ -130,7 +207,27 @@ export async function findStoredResume(candidateId) {
   return files[0] || null;
 }
 
-async function downloadStored(objectPath) {
+// R-38 safety net. Supabase serves object downloads through its CDN (Cloudflare),
+// whose cache is keyed by the object path alone: a query nonce, the `authenticated/`
+// path, a request `Cache-Control` and a fresh signed URL were all answered from the
+// edge cache (`cf-cache-status: HIT`, read-only probe 2026-11-14). After an overwrite
+// the edge kept serving the previous bytes for about 50 s (live, R-38 verification).
+// Uploads now go to new keys (newResumePath), so this matters only for a pre-R-38
+// object at a fixed key; a download is still checked against what the storage
+// database says the object is (MD5 from its eTag, else its size) and fetched again,
+// after a short wait, while it does not match. Still stale after the waits ->
+// storage_error: nothing is ever parsed from bytes that are not that object.
+export const STALE_DOWNLOAD_RETRY_DELAYS_MS = Object.freeze([250, 500, 1000, 2000]);
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+/** Whether downloaded bytes are the object the list described: null when it cannot tell. */
+export function matchesStoredObject(buffer, { md5 = null, size = null } = {}) {
+  if (md5) return createHash('md5').update(buffer).digest('hex') === md5;
+  if (size !== null) return buffer.length === size;
+  return null;
+}
+
+async function downloadOnce(objectPath) {
   let data;
   let error;
   try {
@@ -142,6 +239,24 @@ async function downloadStored(objectPath) {
     throw new ResumePipelineError('storage_error', { cause: error || 'no data', detail: 'storage download failed' });
   }
   return Buffer.from(await data.arrayBuffer());
+}
+
+/** Download a stored resume; `expected` is { md5, size } from listStoredResumes. */
+async function downloadStored(objectPath, expected = {}) {
+  const delays = STALE_DOWNLOAD_RETRY_DELAYS_MS;
+  for (let attempt = 0; ; attempt += 1) {
+    const buffer = await downloadOnce(objectPath);
+    // null: the list gave nothing to check against (no eTag, no size); accepted as is.
+    if (matchesStoredObject(buffer, expected) !== false) return buffer;
+    if (attempt >= delays.length) {
+      throw new ResumePipelineError('storage_error', {
+        cause: 'downloaded bytes do not match the stored object',
+        detail: `storage download stale after ${attempt + 1} attempts (CDN copy of an overwritten object)`,
+      });
+    }
+    console.warn(`[resume] storage download did not match the stored object (stale CDN copy); retrying in ${delays[attempt]} ms`);
+    await sleep(delays[attempt]);
+  }
 }
 
 const tokenOrNull = (v) => (typeof v === 'string' && TOKEN_RE.test(v) ? v : null);
@@ -198,6 +313,29 @@ async function callParser({ buffer, ext, job, requestId }) {
 const arrayOr = (v) => (Array.isArray(v) ? v : []);
 const strOrNull = (v) => (typeof v === 'string' && v.trim() ? v : null);
 
+// Two spellings of one address ("https://www.x.com/a/" and "x.com/a") are one link.
+const linkKey = (url) => url.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, '').toLowerCase();
+
+/**
+ * R-30 follow-up: `resumes.project_links` (text[]) holds every web link the parser
+ * found: the GitHub and LinkedIn fields first, then `entities.links` (nlp-engine
+ * >= 2.1.0, document order), without duplicates. A parser before 2.1.0 sends no
+ * `links`, so the row keeps only GitHub and LinkedIn, as before. The GitHub account
+ * used for evidence is still `contact.github` alone; this list does not choose it.
+ */
+export function collectProjectLinks(contact, links) {
+  const out = [];
+  const seen = new Set();
+  for (const link of [contact?.github, contact?.linkedin, ...arrayOr(links)]) {
+    if (typeof link !== 'string' || !link.trim()) continue;
+    const key = linkKey(link);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(link.trim());
+  }
+  return out;
+}
+
 /**
  * Parse resume bytes that are not (or not yet) stored. Returns the parser's 200
  * body; throws ResumePipelineError otherwise. Persists nothing. Upload uses it
@@ -248,7 +386,7 @@ export async function saveParsedResume({ candidateId, job = null, storagePath, f
         experience: arrayOr(entities.experience),
         education: arrayOr(entities.education),
         projects: arrayOr(entities.projects),
-        project_links: [contact.github, contact.linkedin].filter(Boolean),
+        project_links: collectProjectLinks(contact, entities.links),
         parser_version: body.parser_version,
       })
       .select()
@@ -293,8 +431,9 @@ export async function runResumePipeline({ candidateId, job = null, requestId, st
     const found = await findStoredResume(candidateId);
     if (!found) throw new ResumePipelineError('no_resume');
     storagePath = found.path;
-    buffer = await downloadStored(found.path);
-    fileName = found.name;
+    buffer = await downloadStored(found.path, { md5: found.md5, size: found.size });
+    // R-38: keep the name the candidate uploaded this object under, not its storage key.
+    fileName = (await uploadedFileName(candidateId, found.path)) || found.name;
   }
 
   const parsed = await parseResumeBytes({ buffer, ext: path.extname(storagePath), job, requestId });

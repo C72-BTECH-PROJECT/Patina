@@ -1,0 +1,119 @@
+{
+  "entities": {
+    "candidate_name": "INES CALLOWAY",
+    "education": [],
+    "email": "ines.calloway@example.com",
+    "experience": [
+      {
+        "dates": "Jun 2021 – Present",
+        "highlights": [
+          "Built Django services over PostgreSQL with Redis caching."
+        ],
+        "organisation": "Lucerne Media ()",
+        "title": "Backend Developer"
+      }
+    ],
+    "github": null,
+    "linkedin": null,
+    "links": [],
+    "phone": "+12025550145",
+    "projects": [],
+    "skill_count": 5,
+    "skills": [
+      "python",
+      "django",
+      "postgresql",
+      "redis",
+      "docker"
+    ]
+  },
+  "filename": "f10_textbox_only.docx",
+  "parser_version": "nlp-engine@2.2.0",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "| +1",
+      "555-0145\nskills\npython",
+      "django",
+      "postgresql",
+      "redis, docker\nexperience\nbackend developer - lucerne media",
+      "jun 2021 - present"
+    ],
+    "sentence_count": 1,
+    "token_count": 21,
+    "tokens_preview": [
+      "ines",
+      "calloway",
+      "skill",
+      "python",
+      "django",
+      "postgresql",
+      "redis",
+      "docker",
+      "experience",
+      "backend",
+      "developer",
+      "lucerne",
+      "media",
+      "jun",
+      "present",
+      "build",
+      "django",
+      "service",
+      "postgresql",
+      "redis"
+    ]
+  },
+  "raw_text": "INES CALLOWAY\nines.calloway@example.com | +1 (202) 555-0145\nSKILLS\nPython, Django, PostgreSQL, Redis, Docker\nEXPERIENCE\nBackend Developer - Lucerne Media (Jun 2021 - Present)\n- Built Django services over PostgreSQL with Redis caching.",
+  "raw_text_preview": "INES CALLOWAY\nines.calloway@example.com | +1 (202) 555-0145\nSKILLS\nPython, Django, PostgreSQL, Redis, Docker\nEXPERIENCE\nBackend Developer - Lucerne Media (Jun 2021 - Present)\n- Built Django services over PostgreSQL with Redis caching.",
+  "raw_text_truncated": false,
+  "semantic_analysis": {
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
+    "focused_score": 0.7072,
+    "full_text_score": 0.5239,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react",
+      "redis",
+      "aws",
+      "kubernetes"
+    ],
+    "jd_source": "structured_skills",
+    "match_level": "Weak Match",
+    "match_reason": "Matched 4 of 10 job skills (from the role's listed required/preferred skills); missing: sql, git, rest api, react, aws, kubernetes.",
+    "matched_skills": [
+      "python",
+      "postgresql",
+      "docker",
+      "redis"
+    ],
+    "missing_skills": [
+      "sql",
+      "git",
+      "rest api",
+      "react",
+      "aws",
+      "kubernetes"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "python",
+      "django",
+      "postgresql",
+      "redis",
+      "docker"
+    ],
+    "semantic_score": 0.643,
+    "similarity_score": 0.4972,
+    "skill_coverage": 0.4
+  },
+  "status": "success"
+}

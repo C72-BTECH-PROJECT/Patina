@@ -1,8 +1,16 @@
 {
   "entities": {
-    "candidate_name": null,
+    "candidate_name": "Maya Okafor",
     "education": [
-      "B.Tech in Computer Science - Example Institute of Technology (2018 - 2022)"
+      {
+        "dates": "2018 – 2022",
+        "degree": "B.Tech in Computer Science",
+        "grade": null,
+        "graduation_year": 2022,
+        "honours": null,
+        "institution": "Example Institute of Technology",
+        "text": "B.Tech in Computer Science - Example Institute of Technology (2018 - 2022)"
+      }
     ],
     "email": "maya.okafor@example.com",
     "experience": [
@@ -27,9 +35,14 @@
     ],
     "github": "github.com/example-mokafor",
     "linkedin": "linkedin.com/in/example-maya-okafor",
+    "links": [
+      "github.com/example-mokafor",
+      "linkedin.com/in/example-maya-okafor",
+      "github.com/example-mokafor/ledgerly"
+    ],
     "phone": "+15550104477",
     "projects": [],
-    "skill_count": 15,
+    "skill_count": 14,
     "skills": [
       "python",
       "javascript",
@@ -41,7 +54,6 @@
       "aws",
       "docker",
       "git",
-      "github",
       "sql",
       "pytest",
       "rest",
@@ -49,7 +61,7 @@
     ]
   },
   "filename": "f1_dev_github.pdf",
-  "parser_version": "nlp-engine@2.0.0",
+  "parser_version": "nlp-engine@2.2.0",
   "preprocessing": {
     "noun_chunks_preview": [
       "maya okafor",
@@ -96,7 +108,7 @@
       "semantic_score": 0.4,
       "skill_coverage": 0.6
     },
-    "focused_score": 0.7765,
+    "focused_score": 0.8143,
     "full_text_score": 0.7605,
     "jd_embedding_size": 384,
     "jd_skills": [
@@ -140,13 +152,12 @@
       "aws",
       "docker",
       "git",
-      "github",
       "sql",
       "pytest",
       "rest api"
     ],
-    "semantic_score": 0.7709,
-    "similarity_score": 0.8484,
+    "semantic_score": 0.7955,
+    "similarity_score": 0.8582,
     "skill_coverage": 0.9
   },
   "status": "success"

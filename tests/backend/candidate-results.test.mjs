@@ -3,7 +3,7 @@
 // lead's ruling on R-16's backend gap).
 //
 //   GET /api/applications/:id/result   owner only; others (and unknown ids) get 404
-//   GET /api/jobs/my-applications      rows carry job_title and score { composite, band } | null
+//   GET /api/jobs/my-applications      rows carry job_title and score { composite, band, verification } | null
 //
 // Core's real routers and auth middleware run in process against the in-memory
 // Supabase stub (lib/supabase-stub.mjs). Nothing leaves loopback; no LLM is called.
@@ -200,6 +200,10 @@ test('the owner gets their newest score for that application, in the candidate-a
   assert.equal(s.jobTitle, jobA.title);
   assert.equal(s.credibilityScore, 62.25);
   assert.equal(s.band, 'medium');
+  // R-27 (D§7.1 W3, W5): verification from the stored sub-scores (résumé + assessment);
+  // a row written before W5 has no weights version (the v1 rule).
+  assert.equal(s.verification, 'partly_verified');
+  assert.equal(s.weightsVersion, null);
   assert.equal(s.evidenceLimited, true);
   assert.deepEqual(s.extractedSkills, ['python', 'docker'], 'skills of the resume the score was computed from');
   assert.equal(s.explanation.summary, 'Composite 62.25.');
@@ -268,7 +272,7 @@ test('a lookup error is a 500 JSON error, never "no score"', async () => {
   }
 });
 
-test('my-applications rows carry job_title and the newest score { composite, band } in one scores query', async () => {
+test('my-applications rows carry job_title and the newest score { composite, band, verification } in one scores query', async () => {
   seen.length = 0;
   const r = await mine(cand);
   assert.equal(r.res.status, 200, r.text);
@@ -276,10 +280,11 @@ test('my-applications rows carry job_title and the newest score { composite, ban
   assert.equal(seen.filter((s) => s === 'GET /rest/v1/jobs').length, 0, 'titles come from the applications embed');
   const byId = new Map(r.body.map((row) => [row.id, row]));
   assert.deepEqual(Object.keys(byId.get(appA.id)).sort(), ['id', 'job_id', 'job_title', 'score', 'scoring', 'status', 'submitted_at']);
-  assert.deepEqual(byId.get(appA.id).score, { composite: 62.25, band: 'medium' });
+  // R-28 (D§7.1 W3): the verification state goes wherever the band does (SUBS: assessment only).
+  assert.deepEqual(byId.get(appA.id).score, { composite: 62.25, band: 'medium', verification: 'partly_verified' });
   assert.deepEqual(byId.get(appA.id).scoring, { state: 'scored' });
   assert.equal(byId.get(appA.id).job_title, jobA.title);
-  assert.deepEqual(byId.get(appB.id).score, { composite: 74, band: 'medium' });
+  assert.deepEqual(byId.get(appB.id).score, { composite: 74, band: 'medium', verification: 'partly_verified' });
   assert.equal(byId.get(appB.id).job_title, jobB.title, 'closed job keeps its title');
   assert.equal(byId.get(appC.id).score, null);
   assert.deepEqual(byId.get(appC.id).scoring, { state: 'pending' });

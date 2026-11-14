@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import Badge from '../../components/Badge';
-import { api } from '../../lib/api';
+import {
+  api, isAborted, isStillWorking, pollServerState, STILL_WORKING_POLL_MS, stillWorkingSeconds,
+} from '../../lib/api';
 
 /**
  * Shared candidate-side vocabulary for one application (card R-16). Everything here
@@ -76,33 +78,83 @@ export const assessmentStateText = (state) =>
  * "Score again": POST /api/applications/:id/score. Calls `onResult(scoring)` with the
  * `{ status, reason }` object the server returned, or `onError(apiError)` when the
  * request itself failed. The application is never affected either way.
+ *
+ * R-33: a gateway timeout or a dropped connection is not a failure (the score may still
+ * be saved). The button shows "Still working" and reads GET /api/applications/:id/result
+ * every few seconds for a bounded time. When that read shows a score row, `onResult`
+ * gets `{ status: 'scored', reason: null }` (the server holds a score); otherwise the
+ * button says the server holds no score yet. It is only used while the application has
+ * no score, so "a score row exists" means this scoring completed.
  */
 export function ScoreAgainButton({ applicationId, onResult, onError, className = '' }) {
   const [busy, setBusy] = useState(false);
+  const [still, setStill] = useState(false);
+  const [note, setNote] = useState('');
+  const ctrlRef = useRef(null);
+  useEffect(() => () => ctrlRef.current?.abort(), []);
+
+  const readBack = async () => {
+    ctrlRef.current?.abort();
+    const ctrl = new AbortController();
+    ctrlRef.current = ctrl;
+    setStill(true);
+    try {
+      const out = await pollServerState(
+        (signal) => api.get(`/api/applications/${encodeURIComponent(applicationId)}/result`, { signal, cache: 'no-store' }),
+        (data) => Boolean(data?.score),
+        { signal: ctrl.signal },
+      );
+      if (out.settled) {
+        onResult?.({ status: 'scored', reason: null });
+      } else if (out.error && !out.hasValue) {
+        setNote(`The server did not answer in time, and the current state could not be read: ${out.error.message} Reload the page to see it.`);
+      } else {
+        setNote(`The server did not answer in time and still shows no score after ${stillWorkingSeconds()} s. It may still be finishing; reload the page later.`);
+      }
+    } catch (err) {
+      if (!isAborted(err)) setNote(`The current state could not be read: ${err.message}`);
+    } finally {
+      if (!ctrl.signal.aborted) setStill(false);
+    }
+  };
 
   const run = async () => {
-    if (busy || !applicationId) return;
+    if (busy || still || !applicationId) return;
     setBusy(true);
+    setNote('');
+    let stillWorking = false;
     try {
       const data = await api.post(`/api/applications/${applicationId}/score`);
       onResult?.(data?.scoring || null);
     } catch (err) {
-      onError?.(err);
+      if (isStillWorking(err)) stillWorking = true;
+      else onError?.(err);
     } finally {
       setBusy(false);
     }
+    if (stillWorking) await readBack();
   };
 
   return (
-    <button
-      type="button"
-      onClick={run}
-      disabled={busy || !applicationId}
-      data-testid="score-again-button"
-      className={`inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
-    >
-      <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} />
-      {busy ? 'Scoring...' : 'Score again'}
-    </button>
+    <span className="inline-flex flex-col items-start gap-1">
+      <button
+        type="button"
+        onClick={run}
+        disabled={busy || still || !applicationId}
+        data-testid="score-again-button"
+        className={`inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      >
+        <RefreshCw className={`h-3.5 w-3.5 ${busy || still ? 'animate-spin' : ''}`} />
+        {busy ? 'Scoring...' : still ? 'Still working...' : 'Score again'}
+      </button>
+      {still && (
+        <span className="text-xs text-muted-foreground" role="status" data-testid="still-working">
+          Still working: the server has not answered yet but may still be scoring. Checking every {Math.round(STILL_WORKING_POLL_MS / 1000)} s.
+        </span>
+      )}
+      {!still && note && (
+        <span className="text-xs text-muted-foreground" role="status" data-testid="still-working-note">{note}</span>
+      )}
+    </span>
   );
 }

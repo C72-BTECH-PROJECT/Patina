@@ -36,3 +36,4 @@ eval/resumes/
 eval/labels/
 !tests/fixtures/*.pdf
 !tests/fixtures/*.docx
+!tests/fixtures/demo/*.pdf

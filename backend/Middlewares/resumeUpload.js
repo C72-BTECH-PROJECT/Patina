@@ -12,6 +12,9 @@ import { MAX_RESUME_BYTES } from '../Config/uploadLimits.js';
 const parseResume = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_RESUME_BYTES + 1 },
+  // R-38: browsers send the file name as UTF-8; busboy's default (latin1) turned
+  // "Résumé.pdf" into "RÃ©sumÃ©.pdf" in `resumes.file_name`.
+  defParamCharset: 'utf8',
 }).single('resume');
 
 // Multer reports through next(err), and nothing else in core handles that, so

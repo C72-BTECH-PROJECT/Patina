@@ -2,17 +2,27 @@
   "entities": {
     "candidate_name": "Rosa Delgado",
     "education": [
-      "B.S. Computer Science",
-      "Example State University",
-      "2016 - 2020"
+      {
+        "dates": "2016 – 2020",
+        "degree": "B.S. Computer Science",
+        "grade": null,
+        "graduation_year": 2020,
+        "honours": null,
+        "institution": "Example State University",
+        "text": "B.S. Computer Science · Example State University · 2016 - 2020"
+      }
     ],
     "email": "rosa.delgado@example.com",
     "experience": [],
     "github": "github.com/example-rdelgado",
     "linkedin": null,
+    "links": [
+      "github.com/example-rdelgado",
+      "github.com/example-rdelgado/infra-lint"
+    ],
     "phone": "+15550109988",
     "projects": [],
-    "skill_count": 10,
+    "skill_count": 9,
     "skills": [
       "python",
       "fastapi",
@@ -21,13 +31,12 @@
       "docker",
       "kubernetes",
       "git",
-      "github",
       "terraform",
       "sql"
     ]
   },
   "filename": "f5_multicolumn.pdf",
-  "parser_version": "nlp-engine@2.0.0",
+  "parser_version": "nlp-engine@2.2.0",
   "preprocessing": {
     "noun_chunks_preview": [
       "rosa delgado\ncontact experience",
@@ -74,7 +83,7 @@
       "semantic_score": 0.4,
       "skill_coverage": 0.6
     },
-    "focused_score": 0.714,
+    "focused_score": 0.7135,
     "full_text_score": 0.607,
     "jd_embedding_size": 384,
     "jd_skills": [
@@ -115,12 +124,11 @@
       "docker",
       "kubernetes",
       "git",
-      "github",
       "terraform",
       "sql"
     ],
-    "semantic_score": 0.6765,
-    "similarity_score": 0.6906,
+    "semantic_score": 0.6762,
+    "similarity_score": 0.6905,
     "skill_coverage": 0.7
   },
   "status": "success"

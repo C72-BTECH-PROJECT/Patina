@@ -48,8 +48,9 @@ const nlpHandler = (req, res, rec) => {
 // ---- the fake assessment-service ----
 const SERVICE_LEAK = 'LEAKY-UPSTREAM gemini-3.5-flash 503 quota for key AIza';
 let genMode = 'ok';   // 'ok' | 'hold' | { status, body }
-let evalMode = 'ok';  // 'ok' | { status, body }
+let evalMode = 'ok';  // 'ok' | 'hold' | { status, body }
 const held = [];
+const heldEval = [];  // R-33: grading calls held open (evalMode 'hold')
 
 const makeBundle = (input) => {
   const id = randomUUID();
@@ -117,6 +118,7 @@ const asmHandler = (req, res, rec) => {
     return json(res, genMode.status, genMode.body);
   }
   if (rec.path === '/evaluate-assessment') {
+    if (evalMode === 'hold') { heldEval.push({ res, body: rec.body }); return undefined; }
     if (evalMode === 'ok') return json(res, 200, fakeEvaluate(rec.body));
     return json(res, evalMode.status, evalMode.body);
   }
@@ -848,4 +850,47 @@ test('ASSESSMENT_PREPARE_ON_APPLY=false: apply does not prepare; status then pre
     if (v === undefined) delete process.env.ASSESSMENT_PREPARE_ON_APPLY; else process.env.ASSESSMENT_PREPARE_ON_APPLY = v;
     assert.equal(svc.prepareOnApply(), true, String(v));
   }
+});
+
+// ---- R-33: evaluate is safe to repeat (the browser may re-submit after a gateway 504) ----
+test('R-33: a repeated evaluate while the first is still grading -> 409 grading_in_progress (state grading_pending) and no second grading call; after it completes a repeat -> 409 completed; one new score row', async () => {
+  const { c, job } = (() => { const x = newCandidate(); const j = seedJob(); seedResumeFile(x); return { c: x, job: j }; })();
+  assert.equal((await apply(c, job.id)).res.status, 201);
+  await settled(c, job.id);
+  const s = await start(c, job.id);
+  assert.equal(s.res.status, 200, s.text);
+  const answers = answerAll(s.body.questions);
+  const scoresBefore = scoresFor(c, job.id).length;
+  const gradeCalls = () => asm.requests.filter((r) => r.path === '/evaluate-assessment').length;
+  const callsBefore = gradeCalls();
+
+  // The first submit is held at the grader: this is the request a gateway 504 cut off.
+  evalMode = 'hold';
+  const first = evaluate(c, s.body.assessmentId, answers);
+  await waitFor(() => heldEval.length === 1, 'the first grading call to reach the grader');
+
+  // What the page reads while it shows "Still working", and a second submit.
+  assert.equal((await status(c, job.id)).body.state, 'grading_pending');
+  const repeat = await evaluate(c, s.body.assessmentId, answers);
+  assert.equal(repeat.res.status, 409, repeat.text);
+  assert.equal(repeat.body.error, 'grading_in_progress');
+  assert.equal(repeat.body.state, 'grading_pending');
+  assert.equal(gradeCalls(), callsBefore + 1, 'the repeat did not start a second grading call');
+
+  // The first run completes even though its caller may be gone.
+  evalMode = 'ok';
+  const h = heldEval.shift();
+  json(h.res, 200, fakeEvaluate(h.body));
+  const done = await first;
+  assert.equal(done.res.status, 200, done.text);
+  assert.equal(done.body.state, 'completed');
+
+  const st = await status(c, job.id);
+  assert.equal(st.body.state, 'completed');
+  assert.equal(st.body.result.score, done.body.score, 'status serves the stored result');
+  const again = await evaluate(c, s.body.assessmentId, answers);
+  assert.equal(again.res.status, 409, again.text);
+  assert.equal(again.body.state, 'completed');
+  assert.equal(gradeCalls(), callsBefore + 1, 'graded exactly once');
+  assert.equal(scoresFor(c, job.id).length, scoresBefore + 1, 'exactly one new score row');
 });

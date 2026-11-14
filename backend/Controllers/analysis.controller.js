@@ -1,5 +1,7 @@
 import supabase from '../Config/supabase.js';
-import { GITHUB_OWNERSHIP_NOTE, SUBSCORE_KEYS, UNPROCTORED_NOTE, scoreBand } from '../Services/explainability.js';
+import {
+  GITHUB_OWNERSHIP_NOTE, SUBSCORE_KEYS, UNPROCTORED_NOTE, scoreBand, scoreState, scoreVerification,
+} from '../Services/explainability.js';
 import {
   attemptPhase, isVoided, loadAttempts, maxAttempts, poolOf, startedAtOf, summariseAttempts,
 } from '../Services/assessmentService.js';
@@ -15,11 +17,13 @@ import { logError, sendError } from '../Middlewares/errorHandler.js';
 import {
   RESUME_BUCKET,
   ResumePipelineError,
-  canonicalResumePath,
+  displayFileName,
   findStoredResume,
   listStoredResumes,
+  newResumePath,
   parseResumeBytes,
   saveParsedResume,
+  uploadedFileName,
 } from '../Services/resumePipeline.js';
 import { scoreApplication, scoringSummary } from '../Services/scoringPipeline.js';
 
@@ -39,6 +43,19 @@ import { scoreApplication, scoringSummary } from '../Services/scoringPipeline.js
 // per-source `*Score` fields: null means "that engine produced no evidence", never
 // zero. R-13 (B3, B4): no "Candidate" placeholder name (null when the resume names
 // nobody) and no `location` (it was the job's location, not the candidate's).
+const extOf = (name) => {
+  const m = /\.([a-z0-9]+)$/i.exec(String(name || ''));
+  return m ? `.${m[1].toLowerCase()}` : '';
+};
+
+// R-38: the shown name of the stored object at `fileRef`: `known` (a `resumes.file_name`)
+// when that is the uploaded name, else the upload row's name, else `résumé.<ext>`.
+const originalFileName = async (candidateId, fileRef, ext, known = null) => {
+  const shown = displayFileName(known, ext);
+  if (shown !== displayFileName(null, ext)) return shown;
+  return displayFileName(await uploadedFileName(candidateId, fileRef), ext);
+};
+
 const serializeCandidate = ({ score, resume, job }) => {
   const contact = resume?.contact || {};
   const skills = Array.isArray(resume?.skills) ? resume.skills : [];
@@ -60,6 +77,9 @@ const serializeCandidate = ({ score, resume, job }) => {
       phone: text(contact.phone),
       github: text(contact.github),
       linkedin: text(contact.linkedin),
+      // R-30 follow-up: every web link stored with the resume (resumePipeline.js
+      // collectProjectLinks); a row parsed before nlp-engine 2.1.0 holds GitHub and LinkedIn only.
+      links: Array.isArray(resume?.project_links) ? resume.project_links.map(text).filter(Boolean) : [],
     },
     extractedSkills: skills,
     experience: Array.isArray(resume?.experience) ? resume.experience : [],
@@ -68,6 +88,11 @@ const serializeCandidate = ({ score, resume, job }) => {
     credibilityScore: Number(score.composite_score),
     // D§7: the one band, from explainability.js (thresholds live there only).
     band: scoreBand(score.composite_score),
+    // D§7.1 W3, W5: how far the score is verified (derived from the stored sub-scores,
+    // so rows written before W3 get it too) and the weight rule it was computed with
+    // (null for a row written before W5: the v1 rule).
+    verification: scoreVerification(subScores),
+    weightsVersion: typeof explanation?.weights_version === 'string' ? explanation.weights_version : null,
     matchLevel: subScores[SUBSCORE_KEYS.PARSING]?.components?.match_level ?? null,
 
     // Explainability payload (FR-13, GF-5).
@@ -85,25 +110,17 @@ const serializeCandidate = ({ score, resume, job }) => {
     githubScore: subScoreValue(SUBSCORE_KEYS.GITHUB),
     assessmentScore: subScoreValue(SUBSCORE_KEYS.ASSESSMENT),
 
-    resumeFileName: resume?.file_name ?? null,
+    // R-38: the name the candidate uploaded, or a neutral `résumé.<ext>`; never the storage key.
+    resumeFileName: resume ? displayFileName(resume.file_name, extOf(resume.file_ref || resume.file_name)) : null,
     appliedAt: score.created_at,
   };
 };
 
-// R-09: after a new resume is kept, remove the candidate's other resume objects
-// (a different extension), so the profile has exactly one. Best effort: a
-// failure is logged; readers take the newest object (listStoredResumes), so a
-// leftover file is never read as the current resume.
-const pruneOtherResumes = async (req, candidateId, keepPath) => {
-  try {
-    const stale = (await listStoredResumes(candidateId)).map((f) => f.path).filter((p) => p !== keepPath);
-    if (stale.length === 0) return;
-    const { error } = await supabase.storage.from(RESUME_BUCKET).remove(stale);
-    if (error) logError(req, '[resume] old resume cleanup failed', error);
-  } catch (err) {
-    logError(req, '[resume] old resume cleanup failed', err);
-  }
-};
+// R-38: the R-09 cleanup that removed the candidate's other résumé objects after an
+// upload is gone. Each upload now has its own key (resumePipeline.js newResumePath)
+// and readers take the newest object, so earlier uploads stay in the folder until
+// a retention rule decides otherwise (ISSUES.md, "Account deletion leaves storage
+// files behind"). Nothing in core deletes a stored résumé.
 
 // Returns whether the current candidate has a resume in Supabase Storage.
 // A storage error is an error, never "no resume uploaded" (B9).
@@ -126,15 +143,61 @@ export const getMyResumeStatus = async (req, res) => {
   });
 };
 
+export const SCORED_FILE_UNAVAILABLE_NOTE = "Showing the candidate's latest résumé; the scored file is not available.";
+export const NO_APPLICATION_NOTE = "Showing the candidate's latest résumé; no application was named, so the scored file is not known.";
+
+/**
+ * R-38: the stored file an application's CURRENT score was built from: newest `scores`
+ * row for the candidate and job -> its `resumes` row -> `file_ref`. Null when there is
+ * no score, the row has no `file_ref` (rows before R-38), or that object is not among
+ * the candidate's own stored résumés (`files`, from listStoredResumes, which lists
+ * only `candidates/<candidateId>/`). Throws on a lookup error.
+ */
+async function scoredResumeFile(candidateId, jobId, files) {
+  const { data: scoreRows, error: scoreError } = await supabase
+    .from('scores')
+    .select('id, resume_id, created_at')
+    .eq('candidate_id', candidateId)
+    .eq('job_id', jobId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (scoreError) throw Object.assign(new Error('score lookup failed'), { cause: scoreError });
+  const resumeId = scoreRows?.[0]?.resume_id;
+  if (!resumeId) return null;
+  const { data: rows, error: resumeError } = await supabase
+    .from('resumes')
+    .select('id, candidate_id, file_ref, file_name')
+    .eq('id', resumeId)
+    .limit(1);
+  if (resumeError) throw Object.assign(new Error('resume lookup failed'), { cause: resumeError });
+  const row = rows?.[0];
+  const ref = typeof row?.file_ref === 'string' ? row.file_ref : '';
+  if (!row || row.candidate_id !== candidateId || !ref.startsWith(`candidates/${candidateId}/`)) return null;
+  const file = files.find((f) => f.path === ref);
+  return file ? { ...file, displayName: await originalFileName(candidateId, ref, file.ext, row.file_name) } : null;
+}
+
 // Generates a signed URL for a candidate's resume. Intended for recruiters
 // reviewing applicants; the frontend opens this URL in a new tab.
 // T-0029 (I-0056): only for a candidate who applied to one of this recruiter's
 // jobs. "Not yours" and "no résumé" give the same 404, so ids cannot be probed.
+// R-38: `?applicationId=` names the application; the link is then the file its
+// current score was built from. When that file cannot be given (no score, a row
+// from before R-38 with no key, or the object is gone), or no application is named,
+// it is the candidate's newest file and the answer says so:
+//   200 { url, fileName, source: 'scored' | 'latest', note: null | sentence }
+// The application must be this candidate's, to one of this recruiter's jobs (404
+// otherwise, the same answer as "not yours"). The signed key is always one listed
+// under `candidates/<candidateId>/`.
 export const getCandidateResume = async (req, res) => {
   try {
     const { candidateId } = req.params;
     if (!isUuid(candidateId)) {
       return res.status(400).json({ error: 'invalid_candidate_id', message: 'candidateId must be a UUID.' });
+    }
+    const applicationId = req.query?.applicationId;
+    if (applicationId !== undefined && !isUuid(applicationId)) {
+      return res.status(400).json({ error: 'invalid_application_id', message: 'applicationId must be a UUID.' });
     }
 
     const { data: applied, error: appliedError } = await supabase
@@ -151,10 +214,29 @@ export const getCandidateResume = async (req, res) => {
       return res.status(404).json({ error: 'not_found', message: 'No resume found for this candidate.' });
     }
 
+    // R-38: the named application, held to the same rule (this candidate, this recruiter's job).
+    let application = null;
+    if (applicationId !== undefined) {
+      const { data: appRow, error: appError } = await supabase
+        .from('applications')
+        .select('id, candidate_id, job_id, job:jobs!inner(recruiter_id)')
+        .eq('id', applicationId)
+        .eq('candidate_id', candidateId)
+        .eq('job.recruiter_id', req.session.userId)
+        .maybeSingle();
+      if (appError) {
+        return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load resume', cause: appError, context: 'resume link: application lookup' });
+      }
+      if (!appRow || appRow.candidate_id !== candidateId || appRow.job?.recruiter_id !== req.session.userId) {
+        return res.status(404).json({ error: 'not_found', message: 'No resume found for this candidate.' });
+      }
+      application = appRow;
+    }
+
     // B9 (R-09): a storage-list error is an error, not "no resume".
-    let resumeFile;
+    let files;
     try {
-      resumeFile = await findStoredResume(candidateId);
+      files = await listStoredResumes(candidateId);
     } catch (err) {
       if (err instanceof ResumePipelineError) {
         return sendError(req, res, { status: 500, error: 'storage_error', message: 'Failed to load resume', cause: err.cause, context: 'resume link storage list' });
@@ -162,11 +244,30 @@ export const getCandidateResume = async (req, res) => {
       throw err;
     }
 
+    let resumeFile = null;
+    let note = application ? SCORED_FILE_UNAVAILABLE_NOTE : NO_APPLICATION_NOTE;
+    if (application) {
+      try {
+        resumeFile = await scoredResumeFile(candidateId, application.job_id, files);
+      } catch (err) {
+        return sendError(req, res, { status: 500, error: 'database_error', message: 'Failed to load resume', cause: err.cause || err, context: 'resume link: scored file lookup' });
+      }
+      if (resumeFile) note = null;
+    }
+    const source = resumeFile ? 'scored' : 'latest';
+    if (!resumeFile && files[0]) {
+      resumeFile = { ...files[0], displayName: await originalFileName(candidateId, files[0].path, files[0].ext) };
+    }
+
     if (!resumeFile) {
       return res.status(404).json({ error: 'not_found', message: 'No resume found for this candidate.' });
     }
 
     const storagePath = resumeFile.path;
+    // Defence in depth: only a key inside this candidate's own folder is ever signed.
+    if (!storagePath.startsWith(`candidates/${candidateId}/`) || storagePath.slice(`candidates/${candidateId}/`.length).includes('/')) {
+      return sendError(req, res, { status: 500, error: 'internal_error', message: 'Failed to load resume', cause: 'resume key outside the candidate folder', context: 'resume link' });
+    }
     const { data: signed, error: signedError } = await supabase.storage
       .from('resumes')
       .createSignedUrl(storagePath, 60);
@@ -175,7 +276,7 @@ export const getCandidateResume = async (req, res) => {
       return sendError(req, res, { status: 500, error: 'storage_error', message: 'Could not generate resume link.', cause: signedError || 'no signed URL returned', context: 'resume signed URL' });
     }
 
-    return res.json({ url: signed.signedUrl, fileName: resumeFile.name });
+    return res.json({ url: signed.signedUrl, fileName: resumeFile.displayName, source, note });
   } catch (err) {
     return sendError(req, res, { status: 500, error: 'internal_error', message: 'Failed to load resume', cause: err, context: 'resume link' });
   }
@@ -184,7 +285,8 @@ export const getCandidateResume = async (req, res) => {
 // R-09 (D§4.1, reworked): upload parses the in-memory file first, then decides
 // what to store, so an unreadable re-upload never touches an earlier resume.
 //   400  no file, unsupported extension, or bytes that do not match it (nothing parsed or stored)
-//   201  parsed: stored at `candidates/<id>/resume.<ext>` (replacing), `resumes` row persisted,
+//   201  parsed: stored at a new key `candidates/<id>/resume-<stamp>-<rand>.<ext>` (R-38: never
+//        an overwrite), `resumes` row persisted with that key as `file_ref`,
 //        { message, fileName, size, parsed: {...} }
 //   422  unreadable_document { error, reason, message, stored: false }: nothing stored
 //   415  the parser refused the type { error, message, stored: false }: nothing stored
@@ -192,8 +294,7 @@ export const getCandidateResume = async (req, res) => {
 //   503  parser_unavailable: the file IS stored so it can be parsed later (`fileKept: true`)
 //   500  storage_error when storing fails (no `resumes` row); database_error when the row
 //        insert fails after the file was stored (`fileKept: true`)
-// After a file is stored, the candidate's resume objects with the other extension are
-// removed (best effort), so a profile keeps exactly one resume.
+// The newest object in the candidate's folder is the current resume; earlier ones are kept.
 export const uploadResume = [
   resumeUpload,
   requireResumeFile,
@@ -201,13 +302,13 @@ export const uploadResume = [
     const candidateId = req.session.userId;
     const requestId = req.requestId || resolveRequestId(req);
     const ext = req.resumeExt;
-    const storagePath = canonicalResumePath(candidateId, ext);
+    const storagePath = newResumePath(candidateId, ext);
     const fileName = req.file.originalname;
 
     const storeFile = async () => {
       const { error } = await supabase.storage
         .from(RESUME_BUCKET)
-        .upload(storagePath, req.file.buffer, { contentType: RESUME_TYPES[ext].contentType, upsert: true });
+        .upload(storagePath, req.file.buffer, { contentType: RESUME_TYPES[ext].contentType, upsert: false });
       return error || null;
     };
     const storageFailed = (cause) => sendError(req, res, {
@@ -228,12 +329,11 @@ export const uploadResume = [
       const fixedMessage = err.message;
 
       if (err.code === 'parser_unavailable') {
-        // The one case where an unparsed file is stored, and so replaces an earlier
-        // resume of the same extension: the parser is down, not the file at fault,
-        // and the candidate's upload is kept so it can be parsed later.
+        // The one case where an unparsed file is stored, and so becomes the current
+        // resume: the parser is down, not the file at fault, and the candidate's
+        // upload is kept so it can be parsed later.
         const storeError = await storeFile();
         if (storeError) return storageFailed(storeError);
-        await pruneOtherResumes(req, candidateId, storagePath);
         return res.status(503).json({
           error: 'parser_unavailable',
           message: 'Your resume was saved, but it could not be read right now because the resume parser is unavailable. Please try again later.',
@@ -250,10 +350,9 @@ export const uploadResume = [
       });
     }
 
-    // 2. Parsed: store the file (replacing), then persist the row.
+    // 2. Parsed: store the file under its new key, then persist the row.
     const storeError = await storeFile();
     if (storeError) return storageFailed(storeError);
-    await pruneOtherResumes(req, candidateId, storagePath);
 
     let result;
     try {
@@ -446,18 +545,24 @@ export const getCandidateAnalysis = async (req, res) => {
 //     job: { id, title },
 //     candidate: { id, name, email },      name from the account profile (null when it
 //                                          has none), never from the parsed resume
-//     score: null | { id, composite, band, evidence_limited, created_at,
+//     score: null | { id, composite, band, verification, evidence_limited, created_at,
 //                     subscores: { <key>: { available, value, weight, reason? } | null },
 //                     skills },            skills of the resume the score was computed from
 //     scoring: { state: 'scored' | 'pending' },   pending = no score row yet (Y1); no
 //                                          failure reason is stored, so none is given
+//     score_state: 'awaiting_assessment' | 'final',   D§7.1 W4: awaiting until the
+//                                          assessment state is `completed` or
+//                                          `attempts_used` (explainability.js scoreState);
+//                                          while awaiting, `score` is a partial score
 //     assessment: { state, reason?, assessment_id, attempts: { used, max },
 //                   score_of_record: null | { assessment_id, score, completed_at },
 //                   voided: [{ assessment_id, by, role, at, reason, prior_state }] } }
 //
 // `score` is the NEWEST `scores` row for that candidate and job (rows are inserted,
-// never updated; D§3). Sorted by composite descending, unscored last; ties by
-// applied_at descending, then id. `assessment.state` comes from the same function
+// never updated; D§3). Ranked in three groups (D§7.1 W4): scored with the assessment
+// over (`final`), then scored and awaiting the assessment, then unscored; inside a
+// group by composite descending, ties by applied_at descending, then id. A partial
+// score is never ranked against a full one. `assessment.state` comes from the same function
 // the candidate status endpoint uses (assessment.controller.js candidateView) in its
 // observe-only mode: a recruiter read never starts a preparation (no LLM generation)
 // and never voids a row; it does finalise an expired started attempt (R-12). States:
@@ -501,6 +606,7 @@ const scoreSummary = (row, skillsByResume) => ({
   id: row.id,
   composite: Number(row.composite_score),
   band: scoreBand(row.composite_score),
+  verification: scoreVerification(row.subscores),
   evidence_limited: row.evidence_limited === true,
   subscores: Object.fromEntries(Object.values(SUBSCORE_KEYS).map((key) => [
     key, subscoreSummary(row.subscores?.[key], row.weights?.[key]),
@@ -575,12 +681,19 @@ const applicationItem = ({ app, job, identity, newest, skillsByResume, assessmen
   candidate: { id: app.candidate_id, name: identity?.name ?? null, email: identity?.email ?? null },
   score: newest ? scoreSummary(newest, skillsByResume) : null,
   scoring: { state: newest ? 'scored' : 'pending' },
+  score_state: scoreState(assessment?.state),
   assessment,
 });
 
+// D§7.1 W4: 0 = scored, assessment over; 1 = scored, awaiting the assessment; 2 = unscored.
+const rankGroup = (item) => {
+  if (!item.score) return 2;
+  return item.score_state === 'final' ? 0 : 1;
+};
+
 const byCompositeThenApplied = (a, b) => {
-  if (a.score && !b.score) return -1;
-  if (!a.score && b.score) return 1;
+  const group = rankGroup(a) - rankGroup(b);
+  if (group) return group;
   if (a.score && b.score && a.score.composite !== b.score.composite) return b.score.composite - a.score.composite;
   return stampOf(b.applied_at) - stampOf(a.applied_at) || String(a.id).localeCompare(String(b.id));
 };

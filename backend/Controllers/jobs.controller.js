@@ -6,7 +6,7 @@ import { resolveRequestId } from '../Services/internalHttp.js';
 import { ResumePipelineError, findStoredResume } from '../Services/resumePipeline.js';
 import { scoreApplication, scoringSummary } from '../Services/scoringPipeline.js';
 import { prepareOnApply, triggerPreparation } from '../Services/assessmentService.js';
-import { scoreBand } from '../Services/explainability.js';
+import { scoreBand, scoreVerification } from '../Services/explainability.js';
 
 const formatJob = (job) => ({
   id: job.id,
@@ -103,6 +103,10 @@ export const createJob = async (req, res) => {
 };
 
 export const getJobById = async (req, res) => {
+  // Not a UUID: no such job (the database would answer an invalid-input error).
+  if (!isUuid(req.params.id)) {
+    return res.status(404).json({ message: 'Job not found.' });
+  }
   const { data: job, error } = await supabase
     .from('jobs')
     .select('*')
@@ -110,29 +114,80 @@ export const getJobById = async (req, res) => {
     .eq('status', 'published')
     .maybeSingle();
 
-  if (error || !job) {
+  // R-38: a failed lookup is an error (500), never "Job not found".
+  if (error) {
+    return sendError(req, res, { status: 500, error: 'database_error', message: 'Could not load this job. Please try again.', cause: error, context: 'job detail: job lookup' });
+  }
+  if (!job) {
     return res.status(404).json({ message: 'Job not found.' });
   }
 
   // Candidates also learn whether they already applied, so the UI can render
   // the job as applied instead of leaving the Apply button clickable.
+  // R-33: a failed applications lookup is an error (500), never "not applied".
   let applied = false;
   if (req.session?.role === 'CANDIDATE') {
-    const { data: existing } = await supabase
+    const { data: existing, error: appliedError } = await supabase
       .from('applications')
       .select('id, status, submitted_at')
       .eq('candidate_id', req.session.userId)
       .eq('job_id', job.id)
       .maybeSingle();
+    if (appliedError) {
+      return sendError(req, res, { status: 500, error: 'database_error', message: 'Could not check whether you applied to this job.', cause: appliedError, context: 'job detail: applied check' });
+    }
     applied = Boolean(existing);
   }
 
   return res.json({ ...formatJob(job), applied });
 };
+/**
+ * R-33: the answer to a repeated apply. The application row as stored, plus its
+ * scoring state derived as GET /my-applications derives it (a score row exists for
+ * this candidate and job: `scored`, else `pending`; no failure reason is stored) and
+ * the newest score { composite, band } or null. A lookup error is an error (500),
+ * never an invented state.
+ *   200 { ...application row, already_applied: true, scoring: { state }, score }
+ */
+async function sendExistingApplication(req, res, candidateId, jobId) {
+  const { data: existing, error: lookupError } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('candidate_id', candidateId)
+    .eq('job_id', jobId)
+    .maybeSingle();
+  if (lookupError || !existing) {
+    return sendError(req, res, { status: 500, error: 'database_error', message: 'You have applied to this job, but your application could not be read. Please reload the page.', cause: lookupError || 'duplicate key but no row found', context: 'apply: repeat lookup' });
+  }
+  const { data: scoreRows, error: scoresError } = await supabase
+    .from('scores')
+    .select('id, composite_score, subscores, created_at')
+    .eq('candidate_id', candidateId)
+    .eq('job_id', jobId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (scoresError) {
+    return sendError(req, res, { status: 500, error: 'database_error', message: 'You have applied to this job, but its score could not be read. Please reload the page.', cause: scoresError, context: 'apply: repeat score lookup' });
+  }
+  const newest = (scoreRows || [])[0] || null;
+  return res.status(200).json({
+    ...existing,
+    already_applied: true,
+    scoring: { state: newest ? 'scored' : 'pending' },
+    // Same shape as a GET /my-applications row (R-28 adds verification, D§7.1 W3).
+    score: newest
+      ? { composite: Number(newest.composite_score), band: scoreBand(newest.composite_score), verification: scoreVerification(newest.subscores) }
+      : null,
+  });
+}
+
 // R-10 (D§4.1, Y1): apply saves the application first, then scores it in the same
 // request. Condition of Y1: a scoring failure of any kind never undoes or blocks
 // the application. The response is always 201 once the row is saved:
 //   201 { ...application row, scoring: { status: 'scored' | 'failed', reason } }
+// R-33: a repeated apply for a job already applied to answers
+//   200 { ...existing row, already_applied: true, scoring: { state }, score }
+// (sendExistingApplication); it never inserts, scores or prepares anything.
 // `reason` is a stable code (scoringPipeline.js SCORING_FAILURE_REASONS), never
 // upstream text, and it is not stored: afterwards the application reads as
 // `pending` until a score row exists, and POST /api/applications/:id/score retries.
@@ -189,10 +244,10 @@ export const applyToJob = async (req, res) => {
     .single();
 
   if (error) {
-    // Postgres error 23505 = unique (candidate_id, job_id) violated -> already applied
-    if (error.code === '23505') {
-      return res.status(409).json({ message: 'You have already applied for this job.' });
-    }
+    // Postgres error 23505 = unique (candidate_id, job_id) violated -> already applied.
+    // R-33: a repeat (e.g. a retry after a gateway timeout) is harmless: 200 with the
+    // existing application and its scoring state; nothing is inserted or re-scored.
+    if (error.code === '23505') return sendExistingApplication(req, res, candidateId, jobId);
     return sendError(req, res, { status: 500, error: 'database_error', message: 'Could not submit application.', cause: error, context: 'apply: insert' });
   }
 
@@ -246,7 +301,7 @@ export const getMyApplications = async (req, res) => {
     if (rows.length) {
       const { data: scoreRows, error: scoresError } = await supabase
         .from('scores')
-        .select('id, job_id, composite_score, created_at')
+        .select('id, job_id, composite_score, subscores, created_at')
         .eq('candidate_id', candidateId)
         .in('job_id', rows.map((r) => r.job_id))
         .order('created_at', { ascending: false });
@@ -268,7 +323,10 @@ export const getMyApplications = async (req, res) => {
         submitted_at: r.submitted_at,
         job_title: r.job?.title ?? null,
         scoring: { state: newest ? 'scored' : 'pending' },
-        score: newest ? { composite: Number(newest.composite_score), band: scoreBand(newest.composite_score) } : null,
+        // D§7.1 W3 (R-28): the verification state goes wherever the band does.
+        score: newest
+          ? { composite: Number(newest.composite_score), band: scoreBand(newest.composite_score), verification: scoreVerification(newest.subscores) }
+          : null,
       };
     }));
   } catch (err) {

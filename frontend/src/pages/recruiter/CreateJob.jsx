@@ -1,26 +1,48 @@
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Sparkles, Briefcase, MapPin, Clock, ChevronDown, Zap, ArrowRight, ArrowLeft, Lightbulb, FileText } from 'lucide-react';
-import { api } from '../../lib/api';
+import { Check, Sparkles, Briefcase, MapPin, Clock, ChevronDown, Zap, ArrowRight, ArrowLeft, Lightbulb, FileText, Search, Plus, X } from 'lucide-react';
+import { api, isAborted } from '../../lib/api';
 
 // R-15 (D§8.2): the random "AI Suggestion" (no model was ever called) and the
 // unsourced tip claiming more qualified applications are removed. Primary controls use
 // `text-primary-foreground` on `bg-primary`; they were black text on black.
-
-// Suggested Skills
-const SUGGESTED_SKILLS = [
-  'React', 'Node.js', 'Python', 'AWS', 'TypeScript',
-  'Django', 'Machine Learning', 'Docker', 'Kubernetes',
-  'MongoDB', 'SQL', 'Go', 'Rust', 'PostgreSQL', 'Redis',
-  'GraphQL', 'REST APIs', 'React Native', 'Next.js', 'Vue.js'
-];
+//
+// R-32 (MUST 6): the fixed list of about 20 skill chips is replaced by a search over the
+// parser's skill vocabulary (GET /api/skills?q=, read from nlp-engine), skills the parser
+// finds in the description offered as suggestions (POST /api/skills/extract), and skills
+// the recruiter types that are not in the vocabulary, added as custom. Nothing is added
+// without a click or Enter. The description is written first (step 2) so its skills can be
+// suggested on the skills step (step 3). Skills are saved in the parser's spelling.
 
 const FIELD_CLASS = 'w-full px-5 py-4 bg-background border border-input rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-all';
 
 const PRIMARY_BUTTON = 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer';
 const DISABLED_BUTTON = 'bg-muted text-muted-foreground cursor-not-allowed';
 const SECONDARY_BUTTON = 'px-6 py-3 rounded-xl font-medium bg-background border border-input text-foreground hover:bg-muted transition-all flex items-center gap-2';
+const CHIP_BUTTON = 'px-3 py-1.5 rounded-xl text-sm font-medium border transition-all flex items-center gap-1.5';
+
+export const SEARCH_DEBOUNCE_MS = 200;
+
+const EDGE_CHARS = ' \t.,:;/|()[]-';
+
+/**
+ * A typed skill in the form it is saved: lower case, inner spaces collapsed, edge
+ * punctuation removed. The same rules as nlp-engine's normalize_skill (app/ner.py) and
+ * core's basicSkillForm, without the alias table: an alias ("Postgres") is resolved by
+ * the search, which returns the canonical name as its exact match.
+ */
+export const normaliseTypedSkill = (raw) => {
+  const s = String(raw ?? '').split(/\s+/).filter(Boolean).join(' ').toLowerCase();
+  let start = 0;
+  let end = s.length;
+  while (start < end && EDGE_CHARS.includes(s[start])) start += 1;
+  while (end > start && EDGE_CHARS.includes(s[end - 1])) end -= 1;
+  return s.slice(start, end);
+};
+
+const searchPath = (q) => `/api/skills?q=${encodeURIComponent(q)}`;
+const skillsOf = (body) => (Array.isArray(body?.skills) ? body.skills : []);
 
 // Labelled input; the label is tied to the input, extra props (data-testid) go to the input.
 const LabelledInput = ({ label, icon: Icon, ...props }) => {
@@ -50,29 +72,244 @@ const LabelledTextarea = ({ label, icon: Icon, ...props }) => {
   );
 };
 
-// Skill Tag Component
-const SkillTag = ({ skill, selected, onClick, index }) => (
-  <motion.button
-    type="button"
-    onClick={onClick}
-    aria-pressed={selected}
-    className={`relative px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-      selected
-        ? 'bg-primary border border-primary text-primary-foreground'
-        : 'bg-background border border-input text-foreground hover:bg-muted'
-    }`}
-    initial={{ opacity: 0, scale: 0.8 }}
-    animate={{ opacity: 1, scale: 1 }}
-    transition={{ delay: index * 0.03 }}
-    whileHover={{ scale: 1.05 }}
-    whileTap={{ scale: 0.95 }}
-  >
-    <span className="flex items-center gap-1.5">
-      {selected && <Check className="w-3 h-3" />}
-      {skill}
-    </span>
-  </motion.button>
-);
+/**
+ * The skills step. `skills` is [{ name, custom }]; `onChange` is its state setter
+ * (called with an updater function).
+ * `custom` is true for a skill added as typed because the vocabulary had no exact match
+ * (or could not be searched); it is shown in the form only and not saved separately.
+ */
+export function SkillPicker({ description, skills, onChange }) {
+  const inputId = useId();
+  const [query, setQuery] = useState('');
+  // The last search answered: { q, skills }, where q is the normalised query it was for.
+  const [results, setResults] = useState({ q: '', skills: [] });
+  const [searchState, setSearchState] = useState('idle'); // idle | loading | ready | unavailable
+  const [found, setFound] = useState({ state: 'idle', skills: [] }); // idle | loading | ready | unavailable
+
+  // Skills the parser finds in the description, offered as suggestions only.
+  useEffect(() => {
+    const text = (description || '').trim();
+    if (!text) {
+      setFound({ state: 'ready', skills: [] });
+      return undefined;
+    }
+    const controller = new AbortController();
+    setFound({ state: 'loading', skills: [] });
+    api.post('/api/skills/extract', { text }, { signal: controller.signal })
+      .then((body) => setFound({ state: 'ready', skills: skillsOf(body).filter((s) => typeof s === 'string' && s) }))
+      .catch((err) => { if (!isAborted(err)) setFound({ state: 'unavailable', skills: [] }); });
+    return () => controller.abort();
+  }, [description]);
+
+  // Search as the recruiter types, after a short pause.
+  useEffect(() => {
+    const q = normaliseTypedSkill(query);
+    if (!q) {
+      setSearchState('idle');
+      return undefined;
+    }
+    const controller = new AbortController();
+    setSearchState('loading');
+    const timer = setTimeout(() => {
+      api.get(searchPath(q), { signal: controller.signal })
+        .then((body) => {
+          setResults({ q, skills: skillsOf(body) });
+          setSearchState('ready');
+        })
+        .catch((err) => { if (!isAborted(err)) setSearchState('unavailable'); });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+
+  // onChange is a state setter and gets an updater, so an add that finishes after a search
+  // never drops a skill added meanwhile.
+  const has = (name) => skills.some((s) => s.name === name);
+  const add = (name, custom) => {
+    if (!name) return;
+    onChange((prev) => (prev.some((s) => s.name === name) ? prev : [...prev, { name, custom }]));
+  };
+  const remove = (name) => onChange((prev) => prev.filter((s) => s.name !== name));
+
+  const q = normaliseTypedSkill(query);
+  const current = results.q === q && searchState === 'ready' ? results.skills : null;
+  const exact = current?.find((s) => s.exact) || null;
+
+  // Enter or "Add as custom": the vocabulary's exact match when there is one, else the
+  // typed text as a custom skill. Waits for the search of this exact text if it has not
+  // answered yet, so "Postgres" typed quickly still becomes "postgresql".
+  const addTyped = async () => {
+    if (!q) return;
+    let list = current;
+    if (list === null && searchState !== 'unavailable') {
+      try {
+        list = skillsOf(await api.get(searchPath(q)));
+      } catch {
+        list = [];
+        setSearchState('unavailable');
+      }
+    }
+    const match = (list || []).find((s) => s.exact);
+    if (match) add(match.name, false);
+    else add(q, true);
+    setQuery('');
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTyped();
+    }
+  };
+
+  return (
+    <fieldset>
+      <legend className="w-full text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+        <Sparkles className="w-4 h-4 text-muted-foreground" />
+        Required Skills
+        <span className="text-xs text-muted-foreground ml-auto">{skills.length} selected</span>
+      </legend>
+
+      <div className="mb-5 p-4 rounded-xl bg-muted border border-border" data-testid="description-suggestions" data-state={found.state}>
+        <div className="text-sm font-medium text-foreground mb-2">Found in your description:</div>
+        {found.state === 'loading' && <p className="text-sm text-muted-foreground">Reading your description…</p>}
+        {found.state === 'unavailable' && (
+          <p className="text-sm text-muted-foreground" role="status">
+            Suggestions are unavailable right now. You can still type skills below.
+          </p>
+        )}
+        {found.state === 'ready' && found.skills.length === 0 && (
+          <p className="text-sm text-muted-foreground">No skills from the parser's vocabulary were found in your description.</p>
+        )}
+        {found.state === 'ready' && found.skills.length > 0 && (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {found.skills.map((name) => {
+                const added = has(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => add(name, false)}
+                    disabled={added}
+                    aria-pressed={added}
+                    data-testid="description-suggestion"
+                    data-skill={name}
+                    className={`${CHIP_BUTTON} ${added
+                      ? 'bg-primary border-primary text-primary-foreground cursor-default'
+                      : 'bg-background border-input text-foreground hover:bg-muted'}`}
+                  >
+                    {added ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Click a skill to add it. Nothing is added until you do.</p>
+          </>
+        )}
+      </div>
+
+      <label htmlFor={inputId} className="block text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+        <Search className="w-4 h-4 text-muted-foreground" />
+        Search skills
+      </label>
+      <input
+        id={inputId}
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={onKeyDown}
+        placeholder="Type a skill, e.g. python, servicenow, r"
+        autoComplete="off"
+        maxLength={100}
+        data-testid="skill-search-input"
+        className={FIELD_CLASS}
+      />
+
+      <div className="mt-2 min-h-[1.5rem]" data-testid="skill-search-results" data-state={q ? searchState : 'idle'}>
+        {q && searchState === 'loading' && <p className="text-sm text-muted-foreground">Searching…</p>}
+        {q && searchState === 'unavailable' && (
+          <p className="text-sm text-muted-foreground" role="status">
+            Suggestions are unavailable right now. Press Enter to add “{q}” as written.
+          </p>
+        )}
+        {current && (
+          <div className="flex flex-wrap gap-2">
+            {current.map((s) => {
+              const added = has(s.name);
+              return (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => { add(s.name, false); setQuery(''); }}
+                  disabled={added}
+                  data-testid="skill-option"
+                  data-skill={s.name}
+                  title={s.aliases?.length ? `Also written: ${s.aliases.join(', ')}` : undefined}
+                  className={`${CHIP_BUTTON} ${added
+                    ? 'bg-primary border-primary text-primary-foreground cursor-default'
+                    : 'bg-background border-input text-foreground hover:bg-muted'}`}
+                >
+                  {added ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                  {s.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {q && (searchState === 'unavailable' || (current && !exact)) && !has(q) && (
+          <button
+            type="button"
+            onClick={addTyped}
+            data-testid="skill-add-custom"
+            className={`${CHIP_BUTTON} mt-2 bg-background border-dashed border-input text-foreground hover:bg-muted`}
+          >
+            <Plus className="w-3 h-3" />
+            Add “{q}” as a custom skill
+          </button>
+        )}
+      </div>
+
+      <p className="text-xs text-muted-foreground mt-2">
+        Skills are saved in the parser's spelling. A custom skill is not in the parser's vocabulary,
+        so the parser will not find it in résumés.
+      </p>
+
+      {skills.length > 0 ? (
+        <ul className="mt-4 flex flex-wrap gap-2" data-testid="selected-skills" aria-label="Selected skills">
+          {skills.map((s) => (
+            <li
+              key={s.name}
+              data-testid="selected-skill"
+              data-skill={s.name}
+              data-custom={s.custom ? 'true' : 'false'}
+              className="px-3 py-1 rounded-full bg-background border border-border text-foreground text-sm flex items-center gap-2"
+            >
+              <span>{s.name}</span>
+              {s.custom && <span className="text-xs text-muted-foreground border border-border rounded-full px-1.5">custom</span>}
+              <button
+                type="button"
+                onClick={() => remove(s.name)}
+                aria-label={`Remove ${s.name}`}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground mt-4 flex items-center gap-2">
+          <Lightbulb className="w-4 h-4" />
+          Add at least one skill
+        </p>
+      )}
+    </fieldset>
+  );
+}
 
 // Form Progress Indicator
 const FormProgress = ({ currentStep }) => (
@@ -110,7 +347,7 @@ function CreateJob() {
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [skills, setSkills] = useState([]);
+  const [skills, setSkills] = useState([]); // [{ name, custom }]
   const [experience, setExperience] = useState('');
   const [location, setLocation] = useState('Remote');
   const [currentStep, setCurrentStep] = useState(1);
@@ -119,19 +356,12 @@ function CreateJob() {
   const experienceId = useId();
 
   const stepOneReady = Boolean(title.trim() && experience && location.trim());
-
-  const toggleSkill = (skill) => {
-    if (skills.includes(skill)) {
-      setSkills(skills.filter((s) => s !== skill));
-    } else {
-      setSkills([...skills, skill]);
-    }
-  };
+  const stepTwoReady = Boolean(description.trim());
 
   const nextStep = () => {
     setFormError('');
     if (currentStep === 1 && !stepOneReady) return;
-    if (currentStep === 2 && skills.length === 0) return;
+    if (currentStep === 2 && !stepTwoReady) return;
     if (currentStep < 3) setCurrentStep(currentStep + 1);
   };
 
@@ -149,12 +379,16 @@ function CreateJob() {
       return;
     }
 
-    if (!stepOneReady || skills.length === 0) {
-      setFormError('Fill in the title, location and experience level, and select at least one skill.');
+    if (!stepOneReady) {
+      setFormError('Fill in the title, location and experience level.');
       return;
     }
-    if (!description.trim()) {
+    if (!stepTwoReady) {
       setFormError('Add a job description.');
+      return;
+    }
+    if (skills.length === 0) {
+      setFormError('Add at least one required skill.');
       return;
     }
 
@@ -163,7 +397,7 @@ function CreateJob() {
 
     const payload = {
       title: title.trim(),
-      skills,
+      skills: skills.map((s) => s.name),
       description: description.trim(),
       experienceLevel: experience,
       location: location.trim(),
@@ -178,7 +412,7 @@ function CreateJob() {
     }
   };
 
-  const canSubmit = Boolean(description.trim()) && !isSubmitting;
+  const canSubmit = stepTwoReady && skills.length > 0 && !isSubmitting;
 
   return (
     <div className="relative text-foreground">
@@ -298,31 +532,18 @@ function CreateJob() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <fieldset>
-                  <legend className="w-full text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-muted-foreground" />
-                    Required Skills
-                    <span className="text-xs text-muted-foreground ml-auto">{skills.length} selected</span>
-                  </legend>
-                  <p className="text-xs text-muted-foreground mb-4">Select the core skills required for this position.</p>
-                  <div className="flex flex-wrap gap-2">
-                    {SUGGESTED_SKILLS.map((skill, i) => (
-                      <SkillTag
-                        key={skill}
-                        skill={skill}
-                        selected={skills.includes(skill)}
-                        onClick={() => toggleSkill(skill)}
-                        index={i}
-                      />
-                    ))}
-                  </div>
-                  {skills.length === 0 && (
-                    <p className="text-sm text-muted-foreground mt-3 flex items-center gap-2">
-                      <Lightbulb className="w-4 h-4" />
-                      Select at least one skill
-                    </p>
-                  )}
-                </fieldset>
+                <LabelledTextarea
+                  label="Job Description"
+                  icon={FileText}
+                  rows="8"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Describe the role's responsibilities and requirements."
+                  data-testid="job-description-input"
+                />
+                <p className="text-xs text-muted-foreground">
+                  On the next step, skills found in this description are offered as suggestions.
+                </p>
 
                 <div className="flex justify-between">
                   <motion.button
@@ -339,10 +560,10 @@ function CreateJob() {
                   <motion.button
                     type="button"
                     onClick={nextStep}
-                    disabled={skills.length === 0}
-                    className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${skills.length > 0 ? PRIMARY_BUTTON : DISABLED_BUTTON}`}
-                    whileHover={skills.length > 0 ? { scale: 1.02 } : {}}
-                    whileTap={skills.length > 0 ? { scale: 0.98 } : {}}
+                    disabled={!stepTwoReady}
+                    className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${stepTwoReady ? PRIMARY_BUTTON : DISABLED_BUTTON}`}
+                    whileHover={stepTwoReady ? { scale: 1.02 } : {}}
+                    whileTap={stepTwoReady ? { scale: 0.98 } : {}}
                   >
                     Next Step
                     <ArrowRight className="w-4 h-4" />
@@ -359,31 +580,7 @@ function CreateJob() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                <LabelledTextarea
-                  label="Job Description"
-                  icon={FileText}
-                  rows="6"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe the role's responsibilities and requirements."
-                />
-
-                {/* Selected Skills Preview */}
-                {skills.length > 0 && (
-                  <div className="p-4 rounded-xl bg-muted border border-border">
-                    <div className="text-xs text-muted-foreground mb-2">Selected Skills</div>
-                    <div className="flex flex-wrap gap-2">
-                      {skills.map((skill) => (
-                        <span
-                          key={skill}
-                          className="px-3 py-1 rounded-full bg-background border border-border text-foreground text-sm"
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <SkillPicker description={description} skills={skills} onChange={setSkills} />
 
                 <div className="flex justify-between">
                   <motion.button

@@ -2,7 +2,15 @@
   "entities": {
     "candidate_name": "Arjun Mehta",
     "education": [
-      "B.E. in Information Technology - Example University of Pune (2015 - 2019)"
+      {
+        "dates": "2015 – 2019",
+        "degree": "B.E. in Information Technology",
+        "grade": null,
+        "graduation_year": 2019,
+        "honours": null,
+        "institution": "Example University of Pune",
+        "text": "B.E. in Information Technology - Example University of Pune (2015 - 2019)"
+      }
     ],
     "email": "arjun.mehta@example.com",
     "experience": [
@@ -39,28 +47,30 @@
     ],
     "github": "github.com/example-arjunm",
     "linkedin": null,
+    "links": [
+      "github.com/example-arjunm",
+      "github.com/example-arjunm/ratelimiter"
+    ],
     "phone": null,
     "projects": [],
-    "skill_count": 14,
+    "skill_count": 12,
     "skills": [
       "java",
-      "javascript",
       "nodejs",
       "express",
-      "spring",
+      "spring boot",
       "mongodb",
       "mysql",
       "docker",
       "kubernetes",
       "jenkins",
       "git",
-      "github",
       "microservices",
       "api"
     ]
   },
   "filename": "f2_dev_github.docx",
-  "parser_version": "nlp-engine@2.0.0",
+  "parser_version": "nlp-engine@2.2.0",
   "preprocessing": {
     "noun_chunks_preview": [
       "arjun mehta",
@@ -107,7 +117,7 @@
       "semantic_score": 0.4,
       "skill_coverage": 0.6
     },
-    "focused_score": 0.6664,
+    "focused_score": 0.6537,
     "full_text_score": 0.4616,
     "jd_embedding_size": 384,
     "jd_skills": [
@@ -142,22 +152,20 @@
     "resume_embedding_size": 384,
     "resume_skills": [
       "java",
-      "javascript",
       "nodejs",
       "express",
-      "spring",
+      "spring boot",
       "mongodb",
       "mysql",
       "docker",
       "kubernetes",
       "jenkins",
       "git",
-      "github",
       "microservices",
       "rest api"
     ],
-    "semantic_score": 0.5947,
-    "similarity_score": 0.4779,
+    "semantic_score": 0.5865,
+    "similarity_score": 0.4746,
     "skill_coverage": 0.4
   },
   "status": "success"

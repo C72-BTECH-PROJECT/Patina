@@ -4,15 +4,21 @@ import os
 
 nlp = spacy.load("en_core_web_sm")
 
+# R-21 (DECISIONS 4.2, I-0004). Removed: "github" (a hosting site, not a skill;
+# it came from profile URLs and from the label "GitHub" beside a link),
+# "exponentjs" (not a real library) and "r language" (R is detected below).
+# "c", "go" and "r", and the English words express, spring, oracle, apache and
+# rust, are listed in catalog order but matched by the context rules of
+# CONTEXT_SKILLS, never as a bare word anywhere.
 SKILL_KEYWORDS = [
     # programming languages
-    "python", "java", "javascript", "typescript", "golang",
+    "python", "java", "javascript", "typescript", "go", "c",
     "ruby", "rust", "swift", "kotlin", "php", "scala",
-    "matlab", "perl", "bash", "dart", "lua", "r language",
+    "matlab", "perl", "bash", "dart", "lua", "r", "powershell",
 
     # web frameworks and libraries
     "react", "angular", "vue", "nextjs", "nuxtjs", "nodejs", "express",
-    "django", "flask", "fastapi", "spring", "laravel", "rails",
+    "django", "flask", "fastapi", "spring boot", "spring", "laravel", "rails",
     "jquery", "bootstrap", "tailwind", "redux", "graphql", "webpack",
     "vite", "gatsby", "svelte", "remix",
 
@@ -23,10 +29,19 @@ SKILL_KEYWORDS = [
 
     # cloud and devops
     "aws", "azure", "gcp", "docker", "kubernetes", "jenkins", "git",
-    "github", "gitlab", "bitbucket", "linux", "terraform", "ansible",
+    "gitlab", "bitbucket", "linux", "terraform", "ansible",
     "nginx", "apache", "heroku", "vercel", "netlify", "cloudflare",
     "digitalocean", "circleci", "tomcat", "grunt", "maven",
     "devops", "ci/cd", "mern stack",
+
+    # IT support and operations (R-21, GF-3): service management and ticketing,
+    # monitoring, and Windows / Microsoft administration.
+    "servicenow", "jira", "itil", "bmc remedy", "zendesk", "freshservice",
+    "freshdesk", "pagerduty",
+    "nagios", "zabbix", "prometheus", "grafana", "splunk", "datadog",
+    "cloudwatch",
+    "active directory", "windows server", "group policy", "sccm", "intune",
+    "exchange server", "office 365", "vmware", "hyper-v",
 
     # data science and ml
     "tensorflow", "pytorch", "keras", "scikit-learn", "pandas", "numpy",
@@ -51,7 +66,6 @@ SKILL_KEYWORDS = [
     # concepts
     "system design", "data structures", "algorithms", "oop",
     "design patterns", "solid principles", "clean code",
-    "exponentjs",
 ]
 
 # Store one canonical value for variants that appear frequently in resumes and
@@ -72,12 +86,125 @@ SKILL_ALIASES = {
     "c#": ("c#", "c sharp", "csharp"),
     "c++": ("c++", "cpp", "c plus plus"),
     ".net": (".net", "dotnet", "dot net"),
+    "spring boot": ("spring boot", "springboot", "spring-boot"),
+    "powershell": ("powershell", "power shell"),
+    "servicenow": ("servicenow", "service now", "service-now"),
+    "itil": ("itil", "itil4", "itilv3", "itilv4"),
+    "windows server": ("windows server", "windows servers"),
+    "office 365": ("office 365", "office365", "microsoft 365", "o365", "m365"),
+    "cloudwatch": ("cloudwatch", "cloud watch"),
+    "exchange server": ("exchange server", "microsoft exchange", "exchange online"),
+    "sccm": ("sccm", "mecm", "system center configuration manager",
+             "microsoft endpoint configuration manager"),
+    "hyper-v": ("hyper-v", "hyperv"),
+    "bmc remedy": ("bmc remedy", "remedyforce"),
+    # Spellings of the context skills below. They are used to normalise skill
+    # names (job side) and by the similarity evidence search; extract_skills
+    # never matches them as bare words, only through CONTEXT_SKILLS.
+    "go": ("go", "golang", "go lang", "go language"),
+    "c": ("c", "c language", "c programming"),
+    "r": ("r", "r language", "r programming"),
+    "express": ("express", "express.js", "expressjs", "express js"),
+    "spring": ("spring", "spring framework"),
+    "oracle": ("oracle", "oracle database", "oracle db"),
+    "apache": ("apache", "apache http server", "apache httpd", "apache2"),
+    "rust": ("rust", "rustlang", "rust language"),
+}
+
+# --- Context skills (R-21) --------------------------------------------------------
+# A skill whose bare name is also an English word ("express", "spring", "oracle",
+# "apache", "rust") or a single letter or short word ("c", "go", "r") is found
+# only when:
+#   1. one of its `context` patterns matches (an unambiguous spelling or a
+#      technical neighbour: "Express.js", "Spring MVC", "Oracle 19c", "C/C++",
+#      "written in Go"), or
+#   2. its bare name (`bare`, full match) is a whole item of a list on one line
+#      ("Java, Spring, SQL", "Languages: C, Go, R") and that line is in the
+#      skills section or another short item of it names a skill.
+# Patterns run on the original-case text; a pattern that must ignore case says
+# so with (?i:...). "C", "Go" and "R" as list items are case-sensitive.
+_BUILT_IN = (r"\b(?i:written|writ(?:e|ing)|wrote|implemented|built|developed|coded|programmed|"
+             r"rewritten|rewrote)\s+(?:[\w-]+\s+){0,3}in\s+")
+CONTEXT_SKILLS = {
+    "go": {
+        "bare": r"(?:Go|GO|go)",
+        "context": [
+            r"(?i:\bgolang\b|\bgo[\s-]?lang\b|\bgo\s+(?:language|programming)\b)",
+            _BUILT_IN + r"Go\b(?![-'’])",
+            r"\bGo\s+(?:developer|engineer|programmer|backend|microservices?)\b",
+        ],
+    },
+    "c": {
+        "bare": r"C",
+        "context": [
+            r"(?<![\w.+#/-])C(?=\s*(?:/|,|&|and)\s*C\+\+)",
+            r"(?<![\w.+#/-])C\s+(?i:programming|language)\b",
+            r"(?i:\b(?:embedded|ansi))\s+C(?![\w+#.-])",
+            _BUILT_IN + r"C(?![\w+#.-])",
+        ],
+    },
+    "r": {
+        "bare": r"R",
+        "context": [
+            r"(?<![\w.&-])R\s+(?i:programming|language|studio|shiny)\b",
+            r"(?i:\brstudio\b)",
+            r"\b(?:in|using)\s+R(?=\s*(?:,|\(|and\b|or\b|to\b|for\b|with\b|$))",
+        ],
+    },
+    "express": {
+        "bare": r"(?i:express)",
+        "context": [
+            r"(?i:\bexpress(?:\.js|js)(?!\w)|\bexpress\s+js\b)",
+            r"(?i:\bexpress\s+(?:apis?|servers?|middleware|apps?|application|routes?|routing|"
+            r"backend|back-end|framework|rest)\b)",
+            r"(?i:\bnode(?:\.js|js)?\s*(?:/|\+|&|and)\s*express\b)",
+            # "with Express" capitalised, not a delivery service ("with Express Delivery").
+            r"\b(?:with|using|used|in|on)\s+Express\b(?![\w.-]|\s+(?:Delivery|Mail|Entry|Shipping))",
+        ],
+    },
+    "spring": {
+        "bare": r"(?i:spring)",
+        "context": [
+            r"(?i:\bspring\s+(?:framework|mvc|security|cloud|data|batch|webflux|jpa|integration|aop|core)\b)",
+        ],
+    },
+    "oracle": {
+        "bare": r"(?i:oracle)",
+        "context": [
+            r"(?i:\boracle\s+(?:databases?|db|dba|sql|pl/sql|rac|asm|rman|exadata|data\s*guard|"
+            r"\d{1,2}[gc])(?!\w))",
+        ],
+    },
+    "apache": {
+        "bare": r"(?i:apache)",
+        "context": [
+            r"(?i:\bapache\s*(?:http(?:d)?(?:\s+server)?|web\s+server|server)\b|\bapache2\b)",
+        ],
+    },
+    "rust": {
+        "bare": r"(?i:rust)",
+        "context": [
+            r"(?i:\brustlang\b|\brust\s*(?:lang|language|programming)\b)",
+            _BUILT_IN + r"Rust\b",
+        ],
+    },
 }
 
 # These words occur in ordinary prose, so only accept clear technical forms.
+# "api": a bare "API" ("worked with the API team") is not a skill; it needs a
+# technical qualifier, a known framework before it, a following technical noun,
+# or a build verb before it.
 GENERIC_SKILL_PATTERNS = {
     "rest": r"(?<![a-z])rest(?:ful)?\s*(?:api|apis|service|services)(?![a-z])",
-    "api": r"\bapis?\b",
+    "api": (
+        r"\b(?:rest(?:ful)?|web|graphql|soap|http|json|third[- ]party|public|internal|backend|"
+        r"back-end|external|partner|payment|private|express|django|flask|fastapi|spring(?: boot)?|"
+        r"node(?:\.js|js)?|laravel|rails)\s+apis?\b"
+        r"|\bapis?\s+(?:development|design|integrations?|gateway|testing|endpoints?|documentation|"
+        r"management|security|calls?|layer|clients?|services?)\b"
+        r"|\b(?:built|designed|developed|wrote|written|implemented|exposed|consumed|integrated|"
+        r"documented|maintained|created)\s+(?:\w+\s+){0,2}apis?\b"
+    ),
     "agile": r"\bagile\s*(?:methodology|development|team|environment|practices?)\b",
     "scrum": r"\b(?:scrum|scrum master|sprint planning)\b",
     "oop": r"\b(?:oop|object[ -]oriented programming)\b",
@@ -120,8 +247,18 @@ _EXTRA_NORMALISATION = {
     "k8s": "kubernetes",
     "js": "javascript",
     "ts": "typescript",
-    "golang": "golang",
-    "go lang": "golang",
+    "go programming": "go",
+    "apache http": "apache",
+    "apache web server": "apache",
+    "oracle sql": "oracle",
+    "jira software": "jira",
+    "jira service management": "jira",
+    "jira service desk": "jira",
+    "itil v3": "itil",
+    "itil v4": "itil",
+    "itil 4": "itil",
+    "aws cloudwatch": "cloudwatch",
+    "amazon cloudwatch": "cloudwatch",
 }
 
 
@@ -152,29 +289,97 @@ def normalize_skills(values) -> list:
     return out
 
 
+def _alias_regex(skill: str, alias: str) -> str:
+    # Not after a letter, digit or dot: the "js" of "Node.js" is not
+    # JavaScript and the "html" of "index.html" is not a skill (R-21).
+    pattern = r"(?<![\w.])" + re.escape(alias) + r"(?!\w)"
+    if alias == "js":
+        # Nor the "JS" of "Node JS", "React JS" ...: those name the framework.
+        pattern = "".join(rf"(?<!{w} )" for w in ("node", "react", "next", "nuxt", "vue", "express")) + pattern
+    if skill == "java":
+        pattern += r"(?!\s*-?\s*script)"  # "Java Script" is JavaScript only
+    return pattern
+
+
+# Skills matched anywhere by their spellings (every skill except the context ones).
+_ANYWHERE_RE = {}
+for _skill in list(SKILL_KEYWORDS) + [s for s in SKILL_ALIASES if s not in SKILL_KEYWORDS]:
+    if _skill in CONTEXT_SKILLS or _skill in _ANYWHERE_RE:
+        continue
+    _ANYWHERE_RE[_skill] = re.compile(
+        "|".join(_alias_regex(_skill, a) for a in SKILL_ALIASES.get(_skill, (_skill,)))
+    )
+
+_CONTEXT_RE = {
+    skill: (re.compile(rf"\s*{rule['bare']}\s*"), [re.compile(p, re.M) for p in rule["context"]])
+    for skill, rule in CONTEXT_SKILLS.items()
+}
+_GENERIC_RE = {skill: re.compile(p) for skill, p in GENERIC_SKILL_PATTERNS.items()}
+
+# One line's list items: split on commas, semicolons, pipes, bullets, slashes,
+# brackets, " - ", "and" / "&", and a "Label:" prefix.
+_LIST_ITEM_SPLIT_RE = re.compile(r"[,;|•·/()\[\]]|\s[-–—]\s|\s(?:and|&)\s|:\s")
+
+
+def _skill_text(text: str) -> str:
+    """The text skills are read from: links and email addresses are removed, so
+    a profile URL ("github.com/...", "gitlab.com/...") never yields a skill."""
+    return _URL_RE.sub(" ", _EMAIL_RE.sub(" ", text))
+
+
+def _list_context_skills(text: str) -> set:
+    """Context skills named as a whole list item (rule 2 of CONTEXT_SKILLS)."""
+    skills_lines = {line.strip() for line in split_sections(text).get("skills", [])}
+    found = set()
+    for line in text.split("\n"):
+        items = [i.strip() for i in _LIST_ITEM_SPLIT_RE.split(line) if i.strip()]
+        if len(items) < 2 and line.strip() not in skills_lines:
+            continue
+        for skill, (bare, _) in _CONTEXT_RE.items():
+            if skill in found:
+                continue
+            hits = [i for i, item in enumerate(items) if bare.fullmatch(item)]
+            if not hits:
+                continue
+            if line.strip() in skills_lines or any(
+                k not in hits and len(item.split()) <= 4
+                and any(rx.search(item.lower()) for rx in _ANYWHERE_RE.values())
+                for k, item in enumerate(items)
+            ):
+                found.add(skill)
+    return found
+
+
 def extract_skills(text: str) -> list:
-    """Return ordered, canonical skills found in text."""
-    text_lower = text.lower()
+    """Return ordered, canonical skills found in text.
+
+    Catalog order, then the generic patterns, then alias-only skills. Context
+    skills (CONTEXT_SKILLS) need a technical context; links and emails are
+    ignored (R-21).
+    """
+    skill_text = _skill_text(text)
+    text_lower = skill_text.lower()
+    listed = _list_context_skills(skill_text)
     found_skills = []
 
+    def _found(skill):
+        if skill in _CONTEXT_RE:
+            return skill in listed or any(rx.search(skill_text) for rx in _CONTEXT_RE[skill][1])
+        return bool(_ANYWHERE_RE[skill].search(text_lower))
+
     for skill in SKILL_KEYWORDS:
-        aliases = SKILL_ALIASES.get(skill, (skill,))
-        if any(re.search(r'(?<!\w)' + re.escape(alias) + r'(?!\w)', text_lower) for alias in aliases):
+        if _found(skill):
             found_skills.append(skill)
 
-    for skill, pattern in GENERIC_SKILL_PATTERNS.items():
-        if re.search(pattern, text_lower) and skill not in found_skills:
+    for skill, rx in _GENERIC_RE.items():
+        if skill not in found_skills and rx.search(text_lower):
             found_skills.append(skill)
 
-    # Skills supported by aliases but not yet present in the original catalog.
-    for skill, aliases in SKILL_ALIASES.items():
-        if skill not in found_skills and any(
-            re.search(r'(?<!\w)' + re.escape(alias) + r'(?!\w)', text_lower)
-            for alias in aliases
-        ):
+    # Skills supported by aliases but not in the catalog list (c#, c++, .net ...).
+    for skill in SKILL_ALIASES:
+        if skill not in found_skills and skill not in SKILL_KEYWORDS and _found(skill):
             found_skills.append(skill)
 
-    # Defensive: the catalog has historically carried duplicate entries.
     return list(dict.fromkeys(found_skills))
 
 
@@ -259,6 +464,185 @@ _STRONG_EDUCATION_RE = re.compile(
     r"school of engineering)\b",
     re.I,
 )
+
+# --- Education entry fields (R-30) ---------------------------------------------
+# One entry per qualification: the institution, degree, dates, graduation year,
+# grade (CGPA, GPA or percentage) and honours found on the lines of that
+# qualification, however many lines it is written over.
+
+_DEGREE_RE = re.compile(
+    r"\b(?:bachelor(?:'?s)?|master(?:'?s)?|doctor(?:ate)?\b|ph\.?\s?d|"
+    r"b\.?\s?tech|m\.?\s?tech|b\.?\s?sc|m\.?\s?sc|b\.?\s?com|m\.?\s?com|b\.?\s?eng|m\.?\s?eng|"
+    r"b\.\s?e\.?|m\.\s?e\.?|b\.\s?s\.?|m\.\s?s\.?|b\.\s?a\.?|m\.\s?a\.?|"
+    r"bca|mca|bba|mba|hnd|hsc|ssc|higher secondary|senior secondary|"
+    r"secondary school certificate|diploma|associate(?:'?s)? degree|degree|"
+    r"class\s+(?:x|xii|10|12)(?:th)?|(?:10|12)th\b|a[- ]levels?|gcse|cbse|icse)(?!\w)",
+    re.I,
+)
+# Bare two-letter degree acronyms only in capitals ("BE", "MS"), so the words
+# "be", "ms" or "ma" in a sentence are not read as degrees.
+_DEGREE_ACRONYM_RE = re.compile(r"\b(?:BE|ME|BS|MS|BA|MA|BSc|MSc|BTech|MTech|BCom|MCom|PhD)\b")
+_INSTITUTION_RE = re.compile(
+    r"\b(?:universit(?:y|ies)|universität|college|institute|institution|polytechnic|"
+    r"school|academy|vidyalaya|vidyapeeth|iit|nit|iiit|bits)\b",
+    re.I,
+)
+_GRADE_RE = re.compile(
+    r"\b(?:c\.?g\.?p\.?a|g\.?p\.?a|cgpi|cpi|sgpa)\b\.?\s*(?:of\s+)?[:=\-–]?\s*"
+    r"\d{1,2}(?:\.\d{1,3})?(?:\s*/\s*\d{1,2}(?:\.\d{1,2})?)?"
+    r"|\b\d{1,2}(?:\.\d{1,3})?(?:\s*/\s*\d{1,2}(?:\.\d{1,2})?)?\s*(?:c\.?g\.?p\.?a|g\.?p\.?a|cgpi|cpi)\b"
+    r"|\b(?:percentage|aggregate|marks|score)\b\s*[:\-–]?\s*\d{1,3}(?:\.\d{1,2})?\s*%?"
+    r"|\b\d{1,3}(?:\.\d{1,2})?\s*%",
+    re.I,
+)
+_HONOURS_RE = re.compile(
+    r"\b(?:honou?rs?|with distinction|distinction|first class|first division|"
+    r"(?:summa |magna )?cum laude|dean'?s list|gold medal(?:ist)?|rank holder|minor in)\b",
+    re.I,
+)
+_EDU_NOISE_RE = re.compile(r"\b(?:expected|graduat(?:ed|ing|ion)|class of|batch of|passed out|passing year)\b:?", re.I)
+_EDU_PART_SPLIT_RE = re.compile(r"\s+[|–—-]\s+|\s*\|\s*|,\s+|\s+at\s+|\s+@\s+|\t|\s{2,}")
+
+
+def _has_degree(text: str) -> bool:
+    return bool(_DEGREE_RE.search(text) or _DEGREE_ACRONYM_RE.search(text))
+
+
+def _parse_education_line(line: str) -> dict:
+    """The fields one education line carries. Missing fields are None."""
+    info = {"degree": None, "institution": None, "honours": None, "grade": None,
+            "dates": None, "years": [], "open_ended": False, "other": None}
+    body = line
+    grade = _GRADE_RE.search(body)
+    if grade:
+        info["grade"] = grade.group().strip()
+        body = body[:grade.start()] + " " + body[grade.end():]
+
+    span = _DATE_RANGE_RE.search(body)
+    if span:
+        info["dates"] = " – ".join(part.strip() for part in span.groups())
+        info["years"] = [int(y) for y in _SINGLE_YEAR_RE.findall(span.group())]
+        info["open_ended"] = bool(re.search(r"present|current|now|ongoing", span.group(2), re.I))
+        body = body[:span.start()] + " " + body[span.end():]
+    years = [int(y) for y in _SINGLE_YEAR_RE.findall(body)]
+    if years:
+        info["years"] += years
+        info["dates"] = info["dates"] or (str(years[0]) if len(years) == 1 else f"{years[0]} – {years[-1]}")
+        body = _SINGLE_YEAR_RE.sub(" ", body)
+    body = _EDU_NOISE_RE.sub(" ", body)
+    body = re.sub(r"\(\s*[-–—,|]*\s*\)", " ", body)          # "()" left by a removed date
+    body = " ".join(body.split()).strip(" \t|,;:-–—·•")
+
+    if not body:
+        return info
+
+    honours = _HONOURS_RE.search(body)
+    if honours and not _has_degree(body) and not _INSTITUTION_RE.search(body):
+        info["honours"] = body
+        return info
+    if honours:
+        info["honours"] = honours.group()
+
+    current = None
+    for part in (p.strip(" \t|,;:-–—·•") for p in _EDU_PART_SPLIT_RE.split(body)):
+        if not part:
+            continue
+        if _has_degree(part) and info["degree"] is None:
+            info["degree"], current = part, "degree"
+        elif _INSTITUTION_RE.search(part) and info["institution"] is None:
+            info["institution"], current = part, "institution"
+        elif current:
+            info[current] = f"{info[current]}, {part}"
+        else:
+            info["other"] = f"{info['other']}, {part}" if info["other"] else part
+    if info["other"] and current is None:
+        return info
+    if info["other"]:
+        # Text before the first recognised part ("Pune, B.Tech ...") stays in the entry text only.
+        info["other"] = None
+    return info
+
+
+def _new_education_entry() -> dict:
+    return {"institution": None, "degree": None, "dates": None, "graduation_year": None,
+            "grade": None, "honours": None, "_lines": [], "_years": [], "_open": False}
+
+
+def _merge_education_line(entry: dict, info: dict, line: str) -> None:
+    entry["_lines"].append(line)
+    for field in ("institution", "degree", "grade"):
+        if info[field] and not entry[field]:
+            entry[field] = info[field]
+    if info["honours"]:
+        entry["honours"] = f"{entry['honours']}; {info['honours']}" if entry["honours"] else info["honours"]
+    if info["dates"] and not entry["dates"]:
+        entry["dates"] = info["dates"]
+    entry["_years"] += info["years"]
+    entry["_open"] = entry["_open"] or info["open_ended"]
+
+
+def _finish_education_entry(entry: dict) -> dict:
+    graduation_year = None
+    if entry["_years"] and not entry["_open"]:
+        graduation_year = max(entry["_years"])
+    return {
+        "institution": entry["institution"],
+        "degree": entry["degree"],
+        "dates": entry["dates"],
+        "graduation_year": graduation_year,
+        "grade": entry["grade"],
+        "honours": entry["honours"],
+        "text": " · ".join(entry["_lines"]),
+    }
+
+
+def _group_education(lines) -> list:
+    """Group the lines of an education section into one entry per qualification.
+
+    A line starts a new entry when it names a degree and the current entry has
+    one already, names an institution and the current entry has one already, or
+    is a date line and the current entry has dates already. A line that only
+    carries honours, a grade or dates is attached to the current entry. Bullets
+    only add a grade or honours, never a new qualification.
+    """
+    entries = []
+    current = None
+    for raw in lines:
+        bullet = _is_bullet(raw)
+        line = _strip_bullet(raw) if bullet else raw.strip()
+        if len(line) < 2:
+            continue
+        info = _parse_education_line(line)
+        if bullet:
+            info.update(degree=None, institution=None, other=None)
+            if current is not None:
+                _merge_education_line(current, info, line)
+            continue
+
+        only_other = info["other"] and not (info["degree"] or info["institution"])
+        if only_other:
+            # An unrecognised short line: an institution the keywords do not
+            # know ("Example State", "St. Mary's") if the entry has none yet.
+            if current is None or current["institution"] is None:
+                if len(line.split()) <= 10 and not line.endswith("."):
+                    info["institution"] = info["other"]
+        starts_new = current is None or (
+            (info["degree"] and current["degree"])
+            or (info["institution"] and current["institution"])
+            or (info["dates"] and current["dates"] and not (info["degree"] or info["institution"]))
+        )
+        if info["honours"] and not info["institution"] and current is not None and current["degree"]:
+            # "B.Tech Honours in AI" under a degree already found is the honours
+            # of that degree, not a second qualification.
+            starts_new = False
+            if info["degree"]:
+                info["honours"] = line
+                info["degree"] = None
+        if starts_new:
+            current = _new_education_entry()
+            entries.append(current)
+        _merge_education_line(current, info, line)
+    return [_finish_education_entry(e) for e in entries]
 
 
 def _is_heading_line(line: str):
@@ -375,6 +759,19 @@ def _split_role_and_org(header: str):
     return b, a
 
 
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+
+
+def _is_contact_only(line: str) -> bool:
+    """A line made only of links, email addresses and phone numbers: once the
+    links and emails are removed, no letter is left."""
+    stripped = line.strip()
+    rest = _URL_RE.sub(" ", _EMAIL_RE.sub(" ", stripped))
+    if re.search(r"[^\W\d_]", rest):
+        return False
+    return rest.strip() != stripped or len(re.sub(r"\D", "", rest)) >= 7
+
+
 def _extract_experience(sections: dict) -> list:
     """Section-scoped work history. Empty list when there is no experience section."""
     lines = sections.get("experience")
@@ -386,6 +783,9 @@ def _extract_experience(sections: dict) -> list:
         if _is_bullet(line):
             if entries:
                 entries[-1]["highlights"].append(_strip_bullet(line))
+            continue
+        if _is_contact_only(line):
+            # A page footer read after the body ("linkedin.com/in/...") is not a job.
             continue
 
         date_span = _extract_date_span(line)
@@ -413,31 +813,28 @@ def _extract_experience(sections: dict) -> list:
 
 
 def _extract_education(sections: dict, full_text: str) -> list:
-    """Education lines, scoped to the education section when one exists.
+    """One entry per qualification, scoped to the education section.
 
-    With a real education section, a bare year or a short non-bullet line counts.
-    Without one, fall back to a whole-document scan but require a strong
-    degree/institution keyword — a lone year elsewhere in the résumé (a phone
+    Each entry is {institution, degree, dates, graduation_year, grade, honours,
+    text}; `text` is the entry's source lines joined with " · ". With a real
+    education section its lines are grouped into qualifications however many
+    lines each is written over (`_group_education`). Without one, fall back to
+    a whole-document scan where each line with a strong degree/institution
+    keyword is its own entry: a lone year elsewhere in the résumé (a phone
     number, a project date) is not education.
     """
     section_lines = sections.get("education")
-    scoped = bool(section_lines)
-    candidates = section_lines if scoped else [
-        ln.strip() for ln in full_text.split("\n") if len(ln.strip()) > 5
-    ]
+    if section_lines:
+        return _group_education(section_lines)
 
-    education = []
-    for line in candidates:
-        clean = _strip_bullet(line) if _is_bullet(line) else line.strip()
-        if len(clean) < 5 or clean in education:
+    entries, seen = [], set()
+    for raw in full_text.split("\n"):
+        line = _strip_bullet(raw) if _is_bullet(raw) else raw.strip()
+        if len(line) < 5 or line in seen or not _STRONG_EDUCATION_RE.search(line):
             continue
-        if _STRONG_EDUCATION_RE.search(clean):
-            education.append(clean)
-        elif scoped and not _is_bullet(line) and len(clean.split()) <= 14:
-            # Inside a real education section: keep entry lines (institution
-            # names, "2019 – 2023") even without a keyword; drop stray bullets.
-            education.append(clean)
-    return education
+        seen.add(line)
+        entries.extend(_group_education([line]))
+    return entries
 
 
 def _looks_like_project_title(line: str) -> bool:
@@ -518,24 +915,125 @@ def _extract_projects(sections: dict, full_text: str) -> list:
     ]
 
 
-def extract_entities(text: str) -> dict:
-    doc = nlp(text)
+# --- Candidate name (R-30) -----------------------------------------------------
+# The name is read from the top lines first: the words before the first contact
+# token (a phone digit, "+91", an email, a URL) or separator. spaCy's first
+# PERSON entity is the fallback, cut the same way. A name never contains a
+# digit, "+", "@", "/", ":" or a URL.
 
-    # ── 0. CANDIDATE NAME ────────────────────────────────
-    candidate_name = None
+_NAME_SEPARATOR_RE = re.compile(r"\s*(?:[|•·,;\t]|\s{2,}|\s[-–—]\s)\s*")
+_CONTACT_TOKEN_RE = re.compile(r"[\d@+/\\:()]|^(?:https?|www)\b|\.(?:com|in|org|net|io|dev|me|co)\b", re.I)
+_NAME_WORD_RE = re.compile(r"^[^\W\d_](?:[^\W\d_]|['’.\-])*$")
+_NAME_LABEL_RE = re.compile(r"^\s*(?:full\s+)?name\s*[:\-]\s*", re.I)
+_NOT_NAME_WORDS = {
+    "resume", "résumé", "curriculum", "vitae", "cv", "biodata", "bio", "contact", "email",
+    "e-mail", "phone", "mobile", "tel", "address", "linkedin", "github", "portfolio",
+    "profile", "summary", "objective", "engineer", "developer", "manager", "analyst",
+    "intern", "consultant", "designer", "architect", "scientist", "student", "specialist",
+    "administrator", "lead", "senior", "junior", "software", "support", "page",
+}
+
+
+def _name_words(fragment: str) -> list:
+    """Leading name-like words of a fragment, stopping at the first contact token."""
+    words = []
+    for token in fragment.split():
+        if _CONTACT_TOKEN_RE.search(token) or not _NAME_WORD_RE.match(token):
+            break
+        words.append(token)
+    return words
+
+
+def _plausible_name(words: list) -> str | None:
+    if not 2 <= len(words) <= 5:
+        return None
+    if any(w.lower().strip(".") in _NOT_NAME_WORDS for w in words):
+        return None
+    if not all(w[0].isupper() for w in words):
+        return None
+    name = " ".join(words)
+    if _is_heading_line(name) or extract_skills(name):
+        return None
+    return name
+
+
+def _candidate_name(header_lines, doc) -> str | None:
+    for line in header_lines[:3]:
+        fragment = _NAME_SEPARATOR_RE.split(_NAME_LABEL_RE.sub("", line.strip()), maxsplit=1)[0]
+        name = _plausible_name(_name_words(fragment))
+        if name:
+            return name
     for ent in doc.ents:
         if ent.label_ == "PERSON":
-            # Usually the first person mentioned is the candidate
-            # Specifically if it's near the top
-            if len(ent.text.split()) >= 2: # Ensure it's likely a full name
-                 candidate_name = ent.text.strip()
-                 break
+            words = _name_words(" ".join(ent.text.split()))
+            if len(words) >= 2:
+                return " ".join(words)
+    return None
+
+
+# --- Links (R-30) ---------------------------------------------------------------
+# Every web link written in the text, in order, plus the link targets attached
+# to words in the file (`links` argument), after them. Bare domains count only
+# with a common top-level domain and a second-level label of 2+ characters, so
+# "B.Tech", "B.Com", "Node.js", "socket.io" and "ASP.NET" are not links.
+
+_URL_STOP = r"[^\s<>()\[\]{}|,;\"'“”‘’]"
+_BARE_TLD = r"(?:com|org|dev|me|in|co|app|page|site|tech|xyz|blog|info|us|uk|eu|de|ca|au|edu|gov|link|pro|online|website)"
+_PATH_TLD = r"(?:net|io|ai|so|sh|gg|ly|to|tv|cc)"
+_URL_RE = re.compile(
+    rf"(?<![@\w./-])(?:"
+    rf"(?:https?://|www\.){_URL_STOP}+"
+    rf"|(?:[a-z0-9][a-z0-9-]*\.)*[a-z0-9][a-z0-9-]+\.{_BARE_TLD}(?:/{_URL_STOP}*)?(?![\w@])"
+    rf"|(?:[a-z0-9][a-z0-9-]*\.)*[a-z0-9][a-z0-9-]+\.{_PATH_TLD}/{_URL_STOP}*"
+    rf")",
+    re.I,
+)
+
+
+def _link_key(url: str) -> str:
+    key = re.sub(r"(?i)^https?://", "", url.strip())
+    key = re.sub(r"(?i)^www\.", "", key)
+    return key.rstrip("/").lower()
+
+
+def _collect_links(text: str, link_targets) -> list:
+    out, seen = [], set()
+
+    def _add(url):
+        url = url.rstrip(".,;:!?)]}'\"")
+        if not url or "." not in url:
+            return
+        key = _link_key(url)
+        if key and key not in seen:
+            seen.add(key)
+            out.append(url)
+
+    for match in _URL_RE.finditer(text):
+        _add(match.group())
+    for target in link_targets or ():
+        _add(target)
+    return out
+
+
+def extract_entities(text: str, links=()) -> dict:
+    """Entities of a résumé's text.
+
+    `links` are link targets attached to words in the file (PDF annotations,
+    DOCX hyperlinks). They are read only by the contact parser (GitHub,
+    LinkedIn, the `links` list), after the text's own matches, and never added
+    to the text, so skills, sections and similarity do not depend on them.
+    """
+    links = [l for l in (links or ()) if isinstance(l, str) and l.strip()]
+    doc = nlp(text)
+    sections = split_sections(text)
+
+    # ── 0. CANDIDATE NAME ────────────────────────────────
+    candidate_name = _candidate_name(sections.get("header", []), doc)
 
     # ── 1. SKILLS — word boundary matching ──────────────
     found_skills = extract_skills(text)
 
     # ── 2-4. SECTION-SCOPED ENTITIES ─────────────────────
-    sections = split_sections(text)
     experience = _extract_experience(sections)
     education = _extract_education(sections, text)
     projects = _extract_projects(sections, text)
@@ -544,10 +1042,19 @@ def extract_entities(text: str) -> dict:
     email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
     phone_pattern = r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}'
     # Group 1 = scheme/host prefix, 2 = owner, 3 = optional "/repo" segment (T-0013, I-0015).
-    github_pattern = r'((?:https?://)?(?:www\.)?github\.com/)([A-Za-z0-9_.-]+)(/[A-Za-z0-9_.-]*)?'
-    linkedin_pattern = r'(?:https?://)?(?:www\.)?linkedin\.com/in/[A-Za-z0-9_.-]+'
+    github_pattern = r'((?:https?://)?(?:www\.)?(?i:github)\.com/)([A-Za-z0-9_.-]+)(/[A-Za-z0-9_.-]*)?'
+    # Any case ("LinkedIn.com"), a country subdomain ("in.linkedin.com"), /in/ or
+    # /pub/, and any slug character a URL can carry (accents, %-escapes).
+    linkedin_pattern = (
+        r'(?i:(?:https?://)?(?:(?:www|[a-z]{2})\.)?linkedin\.com/(?:in|pub)/)'
+        r'[^\s/?#|,;()\[\]<>"\'“”]+'
+    )
 
-    # First match in document order; never via set(), whose order varies per process.
+    # The text's matches first, in document order, then those inside each link
+    # target in link order (T-0017). Never via set(), whose order varies per process.
+    sources = [text, *links]
+
+    # First match in document order.
     emails = re.findall(email_pattern, text)
 
     # Phone numbers might have duplicates due to formatting, keep distinct digits
@@ -556,7 +1063,7 @@ def extract_entities(text: str) -> dict:
 
     # A bare profile link beats a repository link; otherwise the owner of the first repo link.
     github_profile = github_repo_owner = None
-    for m in re.finditer(github_pattern, text):
+    for m in (m for source in sources for m in re.finditer(github_pattern, source)):
         owner = m.group(2).rstrip('.')
         if not owner:
             continue
@@ -568,7 +1075,10 @@ def extract_entities(text: str) -> dict:
             break
     github_link = github_profile or github_repo_owner
 
-    linkedin_links = re.findall(linkedin_pattern, text)
+    linkedin_links = [
+        m.group().rstrip('.,')
+        for source in sources for m in re.finditer(linkedin_pattern, source)
+    ]
 
     return {
         "candidate_name": candidate_name,
@@ -576,6 +1086,8 @@ def extract_entities(text: str) -> dict:
         "phone": phones[0] if phones else None,
         "github": github_link,
         "linkedin": linkedin_links[0] if linkedin_links else None,
+        # Every web link: the text's own, then link targets not already listed.
+        "links": _collect_links(text, links),
         "skills": found_skills,
         "experience": experience,
         "education": education,

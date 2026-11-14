@@ -47,6 +47,10 @@ These are the decisions that delete a feature or a file, or change auth. Everyth
 | A1 | 2026-11-13 | **No live generation on the demo path.** The question pool is generated and stored in the background right after apply. The candidate sees a "preparing" state if it is not ready, and every candidate request answers at once (no request waits on the LLM; the former worst case was about 210 s). Consequences, with no schema change: a prepared pool is an `assessments` row with status `generated` and `answers` null; the 15-minute clock starts when the candidate presses Start and is stored as `started_at` inside `answers` (this replaces "start time = `assessments.created_at`" wherever it is written, including §6.2's "started when the questions are issued": issued now means at Start); in-flight and failed preparation state lives in core memory only and is never presented as a stored fact. | `TASKS.md` R-11, R-12, R-13, R-17, R-19 |
 | A2 | 2026-11-13 | `GEMINI_MODELS` in `assessment-service/.env` stays (owner's choice). A verifier listed the key's models on both the native and the OpenAI-compatible endpoint: the code default (`gemini-3.5-flash`, `gemini-3.1-flash-lite`) and `gemini-3.5-flash-lite`, `gemini-3.8-flash` are all listed, as are all three configured ids. The code default was left unchanged. Listed is not the same as callable; no generation call was made in that check. | `LOG.md` |
 | A3 | 2026-11-13 | O-5 answered: email confirmation is on; the demo GitHub account is `anthonyjennis`. | `TASKS.md` O-5, R-19, TM-4 |
+| A4 | 2026-11-13 | **Scoring weights changed** after the manual test: resume 0.20 fixed, GitHub 0.35, assessment 0.45; a verification state on every score; GitHub capped so that the ceiling is 55 until the assessment is taken (option b); "Awaiting assessment" as the recruiter's primary state; a weights version on every stored score; a "sources disagree" flag inside R-28 if it fits. | §7.1 (W1 to W7); `TASKS.md` R-27, R-28 |
+| A5 | 2026-11-13 | **Re-plan approved.** Batch 7 (R-27 to R-33, plus R-37) runs before the docs batch. S-1 OCR is dropped before Nov 18; S-2, S-4, S-5 and the job-description upload go to the roadmap. Teammates do documentation only. TM-1: Anthony labels alone, from an AI first pass made from the resume text only, and the results record the labels as "AI-drafted and human-checked, one labeller". TM-2: one full rehearsal on Nov 17 and a short run on the morning of the demo. TM-4: a demo set of three candidates that shows the weighting: Anthony's real resume with `anthonyjennis` (verified), a synthetic keyword-stuffed resume with no GitHub (low, unverified), a synthetic support-role resume with no GitHub (partly verified after the assessment). The two synthetic ones contain no real person's data; the real one is never committed. | `TASKS.md` re-plan, R-30, teammate table; §4.3 (one labeller replaces "two teammates and a third") |
+| A6 | 2026-11-13 | **Issue triage.** Every open issue is NOW, BATCH or CLOSED; an issue closes only when its fix is verified, not when a card is assigned. The six low-severity security items stay BATCH and are fixed together under a "Security and privacy" heading in the roadmap; "account deletion leaves storage files behind" is a Track B privacy issue. | `CLAUDE.md` "Issue triage"; `ISSUES.md`; `TASKS.md` H-1, R-36, R-37 |
+| A7 | 2026-11-13 | **Owner actions reported done by Anthony:** the test accounts are recreated (O-8); the GitHub OAuth app exists and its two values are in `backend/.env` (O-6; this is also his yes to S-3, which changes how a GitHub account is linked); custom SMTP through Gmail is configured in Supabase (O-7). None of the three was checked by an agent except O-8, whose check is the e2e run recorded in `LOG.md`. | `TASKS.md` O-6, O-7, O-8 |
 
 ## 1. Architecture and gateway (GR-2)
 
@@ -207,13 +211,65 @@ Settings (all configurable, defaults shown): `ASSESSMENT_MAX_ATTEMPTS=1`, `ASSES
 
 | Choice | Verdict | Reason | Evidence | Risk |
 |---|---|---|---|---|
-| Composite = weighted mean of available sub-scores, base weights 0.40 parsing / 0.35 GitHub / 0.25 assessment, renormalised over what is available | KEEP | Unit-tested and seen live. The weights are a design choice with no calibration behind them; the UI and the docs say "provisional". | `[BE §7]`, `[BL-15]` | Evaluators may ask why these weights |
+| Composite = weighted mean of available sub-scores, base weights 0.40 parsing / 0.35 GitHub / 0.25 assessment, renormalised over what is available | **REPLACED by §7.1 on 2026-11-13** (was KEEP) | Unit-tested and seen live. The weights are a design choice with no calibration behind them; the UI and the docs say "provisional". | `[BE §7]`, `[BL-15]` | Evaluators may ask why these weights |
 | Stored explanation: factors, weights, evidence, per-skill table | KEEP | Real and stored today; never yet rendered with data. | `[SvR 4.5]` | Render check is in the UI card |
 | Explanation carries only assessment totals | FIX | Per-question outcomes (skill, result, rubric points) are available to the recruiter drill-down. | `[SvR 3.12]` | Low |
 | GitHub ownership | FIX | The explanation states the account came from the resume and is not verified. | §5 | — |
 | Score colour bands hardcoded in five frontend files | REPLACE | Core emits one band with the composite; the frontend only renders it. The thresholds (80 / 60) are presentation labels, documented as uncalibrated. | `[SvR F25]` | Low |
 | Inconsistency flags always "not available" (4.6) | KEEP honest panel | Building them is stretch S-2. | `[SvR 4.6]` | Promise not met unless S-2 lands |
 | Support-role weighting (4.8), LinkedIn and certificate validation (4.10) | Not built | No such data exists in any row yet, so no weights or logic are invented for it. List C. | `[SvR 4.8, 4.10]` | Stated |
+
+### 7.1 Weights and the verification rule (W1 to W7)
+
+Status: **W1 to W3 APPROVED by Anthony on 2026-11-13, with option (b) for the open point in W2 and the additions W4 to W6 below. W7's threshold is the lead's proposal and is built as a configurable default until Anthony confirms it.** Written after his manual test (`MANUAL_TEST_2026-11-13.md`, MUST 1 and MUST 2). This section replaces the first row of the §7 table. Cards: `TASKS.md` R-27 (W1 to W5), R-28 (skill table, W7).
+
+**As approved, in one place (this paragraph wins over the proposal text below where they differ):**
+- Base weights: resume 0.20, GitHub 0.35, assessment 0.45. The resume's 0.20 never grows.
+- Both independent sources available: 0.20 / 0.35 / 0.45.
+- Assessment available, GitHub not: assessment 0.80. (GitHub is optional, GF-4.)
+- **GitHub available, assessment not yet taken (option b): GitHub stays at 0.35 and the assessment's 0.45 is unearned. The ceiling is 55, which is the low band.** GitHub never absorbs the assessment's share.
+- Neither: 0.20 × resume sub-score, ceiling 20.
+
+| # | Addition (Anthony, 2026-11-13) | How it is built |
+|---|---|---|
+| W4 | Until a candidate's assessment is completed or has expired, recruiter views show **"Awaiting assessment"** as the primary state, with the partial score secondary. A bare low score is never shown for an applicant who has not been assessed. | Core emits `score_state: "awaiting_assessment"` while the assessment state is `not_prepared`, `preparing`, `unavailable`, `ready`, `in_progress` or `grading_pending`. The recruiter table and drill-down lead with the state; the composite appears smaller, labelled "partial score, résumé" or "partial score, résumé and GitHub". Ranking puts awaiting applicants in their own group below scored ones, so a partial number is never compared with a full one. A completed, expired-and-graded or used-up attempt ends the state. |
+| W5 | Every stored score records the **weights version** it was computed with. | `explanation.weights_version` (first value `w2-2026-11-13`), beside the base weights already stored. No schema change. A row with no version is shown as "v1 (0.40 / 0.35 / 0.25)". The version string changes whenever a default weight or a rule of this section changes. |
+| W6 | A **"sources disagree"** flag when GitHub evidence and the assessment differ sharply on the same skills, if it fits inside R-28 without delaying it; otherwise roadmap. | It fits: R-28 already builds the per-skill marks it needs. It is the last step of R-28 and is cut to the roadmap if R-28's own checks are not green first. Rule in W7. |
+| W7 | Threshold for W6 (**proposed by the lead**). | Take the skills that GitHub marks `evidenced` and that the assessment asked at least one question on. If those questions carry **at least 2 points in total** and the candidate earned **25 % or less** of them, raise "Sources disagree: GitHub shows work in X and Y; the assessment on those skills earned n of m points." One flag per score, listing the skills. It never changes the score. It is not raised when either source is unavailable, or on fewer than 2 points (one question is too little to call a disagreement). The opposite case (assessment strong, nothing on GitHub) is not a disagreement: public code is optional. Both numbers are settings (`FLAG_DISAGREE_MIN_POINTS=2`, `FLAG_DISAGREE_MAX_SHARE=0.25`). |
+
+**Lead ruling, 2026-11-13, for Anthony to overturn if he disagrees (found while building R-27):** when the résumé could not be measured and there is no assessment, GitHub gets only its own 0.35 (ceiling 35); it does not take the résumé's 0.20. This follows the rule that no source absorbs another's share before the assessment.
+
+**The proposal as written on 2026-11-13 (kept for the reasoning):**
+
+**What is wrong today (read in the code).** The resume sub-score is the parser's resume-to-job similarity (`explainability.js:225-340`). `aggregate` renormalises the base weights over whatever is available (`explainability.js:664-678`), so with no GitHub and no assessment the resume carries weight 1.0 and a resume that repeats the job's words scores in the high band. In the skill table a required skill that only the resume lists is counted as one confirming source and labelled "Evidenced" (`explainability.js:724`, `ScoreBreakdown.jsx:34-38`). Both are keyword matching presented as evidence.
+
+**Principle (Anthony).** The resume decides what to verify. GitHub and the assessment decide how credible the candidate is.
+
+| # | Proposal | Reason |
+|---|---|---|
+| W1 | Base weights: **resume 0.20, GitHub 0.35, assessment 0.45** (today 0.40 / 0.35 / 0.25). Still overridable through `CREDIBILITY_WEIGHTS`, still labelled provisional and uncalibrated. | Resume 0.20: it is self-reported, so it can only show relevance to the job, not truth; 0.20 is enough to order two equally verified candidates and too little to carry anyone. Assessment 0.45, the largest: it is the only source every candidate can produce (GitHub is optional, GF-4; support and maintenance candidates often have no public code, GF-3), it is taken under the §6.2 controls, and its questions come from the candidate's own claims. GitHub 0.35, below the assessment: it is real work over time, but ownership of the account is not verified until S-3, and public commits measure only public work. |
+| W2 | **The resume's weight is fixed at 0.20 and never grows.** The other 0.80 belongs to the independent sources and is redistributed only between them, by the existing proportional logic: both available → 0.35 / 0.45; GitHub missing → assessment 0.80; assessment not yet taken → GitHub 0.80. With **no** independent source the 0.80 is not earned by anyone: composite = 0.20 × resume sub-score, so at most 20 of 100. | This is the smallest change that makes the acceptance check true. Redistribution stays for the case it was designed for (GF-4: a missing GitHub costs nothing once the assessment exists), and the one path that let a resume score 100 on its own is closed. |
+| W3 | Every score carries a **verification state** beside the band: `unverified` (no independent source: "Résumé claims only. Nothing has been verified yet."), `partly_verified` (one), `verified` (both). The bands stay at 80 / 60. A stored score also records `unearned_weight` (0.80 or 0) so the explanation can say where the missing points are. | A number in the low band needs its reason next to it, or a recruiter reads "weak candidate" where the truth is "not assessed yet". This replaces the vaguer "evidence-limited" marker in the UI; the stored `evidence_limited` field stays for old rows. |
+
+**Worked cases under W1 to W3** (resume / GitHub / assessment sub-scores on 0 to 100):
+
+| Case | Sub-scores | Today | Proposed |
+|---|---|---|---|
+| Keyword-stuffed resume, no GitHub, no assessment | 95 / – / – | 95, high | **19, low, unverified** |
+| Same resume, average assessment, no GitHub | 95 / – / 50 | 77.7, medium | 59, low, partly verified |
+| Short resume, strong GitHub and assessment | 40 / 85 / 85 | 67, medium | **76, medium, verified** |
+| Long skill list, weak GitHub and assessment | 95 / 30 / 30 | 56, low | 43, low, verified |
+| Support candidate, no GitHub, strong assessment | 60 / – / 90 | 71.5, medium | 84, high, partly verified |
+
+The two checks Anthony asked for hold: the stuffed resume lands in the lowest band and is labelled unverified, and strong GitHub plus a strong assessment (76) beats the long skill list (19 alone, 43 with weak evidence).
+
+**Consequences to accept with the proposal.**
+- Every candidate reads low and "unverified" between applying and finishing the assessment, unless a GitHub account answered. The candidate's result page then says what would verify it ("Take the assessment"). The recruiter list still ranks by composite, so unassessed applicants sort to the bottom with the label.
+- The invariant "weights of the available sources sum to 1" becomes "sum to 1 when at least one independent source is available, otherwise 0.20 with 0.80 unearned". Unit tests and the end-to-end spec change in the same card.
+- Scores already stored were computed with the old weights. They are not rewritten; a new row is written the next time an application is scored. No schema change: the new fields live in the existing `explanation` JSON.
+- **Decided 2026-11-13: option (b).** The point as it was put to Anthony: while ownership is unverified, a candidate who names someone else's active GitHub account gets up to 0.80 of the score from it before the assessment. Options: (a) accept it and rely on the visible "ownership not verified" note until S-3 (what W2 says as written); (b) an unverified GitHub never absorbs the assessment's share, so before the assessment the ceiling is 0.20 + 0.35 = 55, low band. I recommend (b) if S-3 is not built by Nov 18 and (a) once it is; (b) is one extra condition in `aggregate`.
+
+**Skill table (goes with W3; card R-28).** Three statuses only: **Claimed only** (the resume lists it and no independent source confirms it), **Evidenced** (GitHub or the assessment confirms it), **Not found** (the job asks for it and no source has it). The resume never counts as a confirming source. Each row shows one mark per source (Resume, GitHub, Assessment), each `confirmed`, `absent` or `unavailable`, in place of "N of 3 sources".
 
 ## 8. Frontend structure and UI
 

@@ -24,6 +24,18 @@
     {"id": "f5_multicolumn", "file": "f5_multicolumn.pdf", "jd": "dev",
      "covers": "Two-column layout (sidebar contact/skills)"},
     {"id": "f6_image_only", "file": "f6_image_only.pdf", "jd": "dev",
-     "covers": "Feedback #2 OCR: image-only PDF, no text layer"}
+     "covers": "Feedback #2 OCR: image-only PDF, no text layer"},
+    {"id": "f7_realworld_links", "file": "f7_realworld_links.pdf", "jd": "dev",
+     "covers": "R-30 PDF: phone beside the name, full LinkedIn URL, GitHub and portfolio as link annotations only, education over several lines"},
+    {"id": "f8_realworld_links", "file": "f8_realworld_links.docx", "jd": "dev",
+     "covers": "R-30 DOCX: as f7; LinkedIn URL inside a HYPERLINK field, GitHub and portfolio as hyperlink relationships"},
+    {"id": "f9_table_layout", "file": "f9_table_layout.docx", "jd": "support",
+     "covers": "R-30 / R-05 DOCX: all text in a table, the page header and the footer; no body paragraph"},
+    {"id": "f10_textbox_only", "file": "f10_textbox_only.docx", "jd": "dev",
+     "covers": "R-30 / R-05 DOCX: all text in one text box (modern shape plus legacy fallback copy)"},
+    {"id": "demo_keyword_stuffed", "file": "demo/demo_keyword_stuffed.pdf", "jd": "dev",
+     "covers": "TM-4 demo: keyword-stuffed resume, no GitHub; synthetic"},
+    {"id": "demo_support_ops", "file": "demo/demo_support_ops.pdf", "jd": "dev",
+     "covers": "TM-4 demo: support and operations resume, no GitHub; synthetic"}
   ]
 }

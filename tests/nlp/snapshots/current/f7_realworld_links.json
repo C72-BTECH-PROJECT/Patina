@@ -1,0 +1,148 @@
+{
+  "entities": {
+    "candidate_name": "PRIYA LINKWELL",
+    "education": [
+      {
+        "dates": "2021 – 2025",
+        "degree": "Bachelor of Technology in Computer Engineering",
+        "grade": "CGPA: 8.72/10",
+        "graduation_year": 2025,
+        "honours": "Honours in Artificial Intelligence",
+        "institution": "Example Institute of Technology, Pune",
+        "text": "Example Institute of Technology, Pune · Bachelor of Technology in Computer Engineering · 2021 - 2025 | CGPA: 8.72/10 · Honours in Artificial Intelligence"
+      },
+      {
+        "dates": "2021",
+        "degree": "Higher Secondary Certificate (HSC)",
+        "grade": "Percentage: 88.5%",
+        "graduation_year": 2021,
+        "honours": null,
+        "institution": "Example Junior College, Mumbai",
+        "text": "Higher Secondary Certificate (HSC) · Example Junior College, Mumbai · 2021 | Percentage: 88.5%"
+      }
+    ],
+    "email": "priya.linkwell@example.com",
+    "experience": [
+      {
+        "dates": "Jan 2025 – Jun 2025",
+        "highlights": [
+          "Built Python and SQL jobs that load sensor data into PostgreSQL."
+        ],
+        "organisation": "Example Analytics Pvt Ltd ()",
+        "title": "Data Engineering Intern"
+      }
+    ],
+    "github": "https://github.com/example-plinkwell",
+    "linkedin": "https://www.linkedin.com/in/example-priya-linkwell",
+    "links": [
+      "https://www.linkedin.com/in/example-priya-linkwell/",
+      "https://github.com/example-plinkwell",
+      "https://plinkwell.example.com/portfolio"
+    ],
+    "phone": null,
+    "projects": [],
+    "skill_count": 6,
+    "skills": [
+      "python",
+      "postgresql",
+      "docker",
+      "git",
+      "pandas",
+      "sql"
+    ]
+  },
+  "filename": "f7_realworld_links.pdf",
+  "parser_version": "nlp-engine@2.2.0",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "| https://www.linkedin.com/in/example-priya-linkwell/",
+      "| github | portfolio\nsummary\ncomputer engineering graduate building data tools",
+      "python",
+      "sql",
+      "postgresql",
+      "jun",
+      "that",
+      "sensor data",
+      "postgresql",
+      "education\nexample institute"
+    ],
+    "sentence_count": 2,
+    "token_count": 61,
+    "tokens_preview": [
+      "priya",
+      "linkwell",
+      "github",
+      "portfolio",
+      "summary",
+      "computer",
+      "engineering",
+      "graduate",
+      "building",
+      "datum",
+      "tool",
+      "python",
+      "sql",
+      "postgresql",
+      "skills",
+      "python",
+      "sql",
+      "postgresql",
+      "pandas",
+      "docker"
+    ]
+  },
+  "raw_text": "PRIYA LINKWELL +91 55555 01234\npriya.linkwell@example.com | https://www.linkedin.com/in/example-priya-linkwell/ | GitHub | Portfolio\nSUMMARY\nComputer engineering graduate building data tools in Python, SQL and PostgreSQL.\nSKILLS\nPython, SQL, PostgreSQL, Pandas, Docker, Git\nEXPERIENCE\nData Engineering Intern - Example Analytics Pvt Ltd (Jan 2025 - Jun 2025)\n- Built Python and SQL jobs that load sensor data into PostgreSQL.\nEDUCATION\nExample Institute of Technology, Pune\nBachelor of Technology in Computer Engineering\n2021 - 2025 | CGPA: 8.72/10\nHonours in Artificial Intelligence\nHigher Secondary Certificate (HSC)\nExample Junior College, Mumbai\n2021 | Percentage: 88.5%",
+  "raw_text_preview": "PRIYA LINKWELL +91 55555 01234\npriya.linkwell@example.com | https://www.linkedin.com/in/example-priya-linkwell/ | GitHub | Portfolio\nSUMMARY\nComputer engineering graduate building data tools in Python, SQL and PostgreSQL.\nSKILLS\nPython, SQL, PostgreSQL, Pandas, Docker, Git\nEXPERIENCE\nData Engineerin",
+  "raw_text_truncated": false,
+  "semantic_analysis": {
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
+    "focused_score": 0.5828,
+    "full_text_score": 0.3776,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react",
+      "redis",
+      "aws",
+      "kubernetes"
+    ],
+    "jd_source": "structured_skills",
+    "match_level": "Moderate Match",
+    "match_reason": "Matched 5 of 10 job skills (from the role's listed required/preferred skills); missing: rest api, react, redis, aws, kubernetes.",
+    "matched_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git"
+    ],
+    "missing_skills": [
+      "rest api",
+      "react",
+      "redis",
+      "aws",
+      "kubernetes"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "python",
+      "postgresql",
+      "docker",
+      "git",
+      "pandas",
+      "sql"
+    ],
+    "semantic_score": 0.511,
+    "similarity_score": 0.5044,
+    "skill_coverage": 0.5
+  },
+  "status": "success"
+}

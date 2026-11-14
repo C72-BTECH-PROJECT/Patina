@@ -43,7 +43,16 @@ MAX_GENERATION_BUDGET_SECONDS = 230.0
 GENERATION_BUDGET_SECONDS = _float_env("ASSESSMENT_GENERATION_BUDGET_SECONDS", 210.0)
 REQUEST_TIMEOUT_SECONDS = _float_env("ASSESSMENT_REQUEST_TIMEOUT_SECONDS", 120.0)
 MIN_CALL_SECONDS = 10.0
-MAX_VALIDATION_ROUNDS = _int_env("ASSESSMENT_MAX_VALIDATION_ROUNDS", 2)
+# R-29: 3 by default (was 2) so a pool whose options give the answer away can be
+# regenerated; every round still has to fit inside the time budget above.
+MAX_VALIDATION_ROUNDS = _int_env("ASSESSMENT_MAX_VALIDATION_ROUNDS", 3)
+
+# R-29 (MUST 3): a multiple-choice question is rejected when its correct option is
+# BOTH longer than MCQ_MAX_LENGTH_RATIO times the mean length of its three
+# distractors AND at least MCQ_MIN_LENGTH_GAP characters longer than that mean
+# (the gap keeps short options such as "PATCH" vs POST/PUT/GET from being rejected).
+MCQ_MAX_LENGTH_RATIO = _float_env("ASSESSMENT_MCQ_MAX_LENGTH_RATIO", 1.25)
+MCQ_MIN_LENGTH_GAP = _int_env("ASSESSMENT_MCQ_MIN_LENGTH_GAP", 10)
 
 if not 0 < GENERATION_BUDGET_SECONDS <= MAX_GENERATION_BUDGET_SECONDS:
     raise ValueError(
@@ -54,6 +63,10 @@ if REQUEST_TIMEOUT_SECONDS <= 0:
     raise ValueError("ASSESSMENT_REQUEST_TIMEOUT_SECONDS must be positive.")
 if MAX_VALIDATION_ROUNDS < 1:
     raise ValueError("ASSESSMENT_MAX_VALIDATION_ROUNDS must be at least 1.")
+if MCQ_MAX_LENGTH_RATIO < 1.0:
+    raise ValueError("ASSESSMENT_MCQ_MAX_LENGTH_RATIO must be at least 1.0.")
+if MCQ_MIN_LENGTH_GAP < 0:
+    raise ValueError("ASSESSMENT_MCQ_MIN_LENGTH_GAP must be 0 or more.")
 
 # Served draw (D§6.2): 20 questions are generated (10 MCQ, 10 short answer); a
 # random 6 MCQ + 4 short answer are served. The rest are never sent.

@@ -6,6 +6,7 @@ import analysisRoutes from './Routes/analysis.routes.js';
 import adminRoutes from './Routes/admin.routes.js';
 import notificationRoutes from './Routes/notification.routes.js';
 import assessmentRoutes from './Routes/assessment.routes.js';
+import skillsRoutes from './Routes/skills.routes.js';
 
 import session from 'express-session';
 import { requestIdMiddleware } from './Middlewares/requestId.js';
@@ -60,6 +61,8 @@ app.use(session({
 
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobsRoutes);
+// R-32: GET /api/skills?q= and POST /api/skills/extract (recruiter-only).
+app.use('/api/skills', skillsRoutes);
 
 // analysisRoutes defines:
 // POST /analyze

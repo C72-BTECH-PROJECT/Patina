@@ -188,7 +188,7 @@ try {
     # Offline unit tests (T-0014): explainability layer and the github-evidence client against a
     # local stub. They import this repo's backend modules, so they mean nothing for baseline.
     if ($Target -eq 'current') {
-      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim', 'upload-limits', 'applicant-identity', 'assessment-service-client', 'backend-cruft', 'error-contract', 'auth-session', 'resume-pipeline', 'score-on-apply', 'assessment-orchestration', 'assessment-time-reset', 'apply-scoring-throws', 'recruiter-applications', 'candidate-results') {
+      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim', 'upload-limits', 'applicant-identity', 'assessment-service-client', 'backend-cruft', 'error-contract', 'auth-session', 'resume-pipeline', 'resume-links', 'score-on-apply', 'resume-current-on-apply', 'assessment-orchestration', 'assessment-time-reset', 'apply-scoring-throws', 'recruiter-applications', 'candidate-results', 'skills-api') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
       # T-0024/T-0025 route guards (T-0023): no session, no assessment service, no LLM. Baseline has no route.

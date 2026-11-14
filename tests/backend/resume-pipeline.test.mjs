@@ -25,10 +25,12 @@ const SNAPSHOTS = join(TESTS_DIR, 'nlp', 'snapshots', 'current');
 const F1 = readFileSync(join(FIXTURES, 'f1_dev_github.pdf'));
 const F2 = readFileSync(join(FIXTURES, 'f2_dev_github.docx'));
 const F6 = readFileSync(join(FIXTURES, 'f6_image_only.pdf'));
+const F7 = readFileSync(join(FIXTURES, 'f7_realworld_links.pdf'));
 const SNAP = {
   f1: JSON.parse(readFileSync(join(SNAPSHOTS, 'f1_dev_github.json'), 'utf8')),
   f2: JSON.parse(readFileSync(join(SNAPSHOTS, 'f2_dev_github.json'), 'utf8')),
   f6: JSON.parse(readFileSync(join(SNAPSHOTS, 'f6_image_only.json'), 'utf8')),
+  f7: JSON.parse(readFileSync(join(SNAPSHOTS, 'f7_realworld_links.json'), 'utf8')),
 };
 const NLP_LEAK = 'LEAKY-NLP-TRACEBACK File "/srv/app/main.py", line 99';
 const PARSER_DOWN_MESSAGE = 'Your resume was saved, but it could not be read right now because the resume parser is unavailable. Please try again later.';
@@ -96,7 +98,16 @@ const supabaseHandler = (req, res, rec) => {
 };
 
 // ---- nlp-engine stub: replays the R-05 snapshot of whichever fixture it receives ----
-let nlpMode = 'replay'; // 'replay' | 'hang' | 'crash' | 'unavailable'
+let nlpMode = 'replay'; // 'replay' | 'replay-2.0' | 'hang' | 'crash' | 'unavailable'
+// R-30 follow-up: the shape a parser before 2.1.0 sent for f1: no `links`, education as strings.
+const preLinksBody = (snap) => {
+  const { links: _links, ...entities } = snap.entities;
+  return {
+    ...snap,
+    parser_version: 'nlp-engine@2.0.0',
+    entities: { ...entities, education: entities.education.map((e) => e.text) },
+  };
+};
 const nlpHandler = (req, res, rec) => {
   if (nlpMode === 'hang') return hang();
   if (nlpMode === 'crash') return raw(res, 500, `Internal Server Error\n${NLP_LEAK}`, 'text/plain');
@@ -104,8 +115,10 @@ const nlpHandler = (req, res, rec) => {
   const body = rec.rawBody;
   const hasJd = body.includes(Buffer.from('name="jd"'));
   const withJd = (snap) => ({ ...snap, semantic_analysis: hasJd ? snap.semantic_analysis : null });
+  if (nlpMode === 'replay-2.0' && body.includes(F1)) return json(res, 200, withJd(preLinksBody(SNAP.f1)));
   if (body.includes(F1)) return json(res, 200, withJd(SNAP.f1));
   if (body.includes(F2)) return json(res, 200, withJd(SNAP.f2));
+  if (body.includes(F7)) return json(res, 200, withJd(SNAP.f7));
   if (body.includes(F6)) return json(res, SNAP.f6._http_status, SNAP.f6._body);
   return json(res, 422, { error: 'unreadable_document', reason: 'corrupt', message: 'stub: unknown file' });
 };
@@ -204,6 +217,16 @@ const upload = async (candidateId, { bytes, name, type = 'application/pdf', requ
 
 const objectsOf = (candidateId) =>
   [...store.keys()].filter((k) => k.startsWith(`candidates/${candidateId}/`) || k.startsWith(`${candidateId}/`));
+// R-38: every upload is stored under its own key, `candidates/<id>/resume-<UTC stamp>-<8 hex>.<ext>`.
+const uploadKeyRe = (candidateId, ext) =>
+  new RegExp(`^candidates/${candidateId}/resume-\\d{8}T\\d{9}Z-[0-9a-f]{8}\\.${ext}$`);
+/** The candidate's objects; asserts there are `n` and that each is an upload key of `ext`. */
+const uploadKeys = (candidateId, ext, n = 1) => {
+  const keys = objectsOf(candidateId);
+  assert.equal(keys.length, n, `objects: ${JSON.stringify(keys)}`);
+  for (const k of keys) assert.match(k, uploadKeyRe(candidateId, ext));
+  return keys;
+};
 
 const assertContract = (res, body, status, error) => {
   assert.equal(res.status, status, JSON.stringify(body));
@@ -221,7 +244,7 @@ const assertNoLeak = (text) => {
 
 const nlpCalls = () => nlp.requests.length;
 
-test('f1 upload -> 201 with skills; stored at candidates/<id>/resume.pdf; row persisted without full text', async () => {
+test('f1 upload -> 201 with skills; stored at a new key candidates/<id>/resume-<stamp>-<rand>.pdf; row persisted without full text', async () => {
   const id = newCandidate();
   const insertsBefore = inserts.length;
   const nlpBefore = nlpCalls();
@@ -235,9 +258,11 @@ test('f1 upload -> 201 with skills; stored at candidates/<id>/resume.pdf; row pe
   assert.equal(body.size, F1.length);
   assert.ok(!('raw_text' in body) && !('rawText' in body.parsed), 'full text must not be sent back by upload');
 
-  // One object, the canonical path, the exact bytes.
-  assert.deepEqual(objectsOf(id), [`candidates/${id}/resume.pdf`]);
-  const obj = store.get(`candidates/${id}/resume.pdf`);
+  // One object, under its own upload key (R-38), the exact bytes, written without upsert.
+  const [key] = uploadKeys(id, 'pdf');
+  const obj = store.get(key);
+  const write = supa.requests.filter((q) => q.method === 'POST' && q.path.includes(`/storage/v1/object/resumes/candidates/${id}/`)).at(-1);
+  assert.notEqual(write.headers['x-upsert'], 'true', 'an upload must never overwrite an object');
   assert.ok(obj.bytes.equals(F1));
   assert.equal(obj.contentType, 'application/pdf');
 
@@ -247,13 +272,13 @@ test('f1 upload -> 201 with skills; stored at candidates/<id>/resume.pdf; row pe
   assert.equal(call.headers['x-request-id'], 'r09-req-0001');
   assert.ok(!call.rawBody.includes(Buffer.from('name="jd"')), 'upload must parse without a jd');
 
-  // One resumes row: canonical file_ref, the service's parser version, no job, no full text.
+  // One resumes row: file_ref is the upload key, the service's parser version, no job, no full text.
   assert.equal(inserts.length - insertsBefore, 1);
   const row = inserts.at(-1);
   assert.equal(row.candidate_id, id);
   assert.equal(row.job_id, null);
-  assert.equal(row.file_ref, `candidates/${id}/resume.pdf`);
-  assert.equal(row.parser_version, 'nlp-engine@2.0.0');
+  assert.equal(row.file_ref, key);
+  assert.equal(row.parser_version, 'nlp-engine@2.2.0');
   assert.deepEqual(row.skills, SNAP.f1.entities.skills);
   assert.ok(!('raw_text' in row), 'the full text must never be persisted');
   assert.ok(row.raw_text_preview.length <= 300);
@@ -261,7 +286,69 @@ test('f1 upload -> 201 with skills; stored at candidates/<id>/resume.pdf; row pe
 
   const status = await fetch(`${base}/t/resume/status`, { headers: { 'X-Test-User': id } }).then((r) => r.json());
   assert.equal(status.hasResume, true);
-  assert.equal(status.fileName, 'resume.pdf');
+  assert.equal(status.fileName, key.split('/').pop());
+});
+
+// ---- R-30 follow-up: links and education objects from nlp-engine 2.1.0 ----
+
+test('R-30 follow-up: every web link is stored in project_links and sent back by upload; GitHub and LinkedIn first, no duplicates', async () => {
+  const id = newCandidate();
+  const { res, body, text } = await upload(id, { bytes: F7, name: 'cv.pdf' });
+  assert.equal(res.status, 201, text);
+  const expected = [
+    'https://github.com/example-plinkwell',
+    'https://www.linkedin.com/in/example-priya-linkwell',
+    'https://plinkwell.example.com/portfolio',
+  ];
+  // The fixture's parse lists the LinkedIn link with a trailing slash; it is the same link.
+  assert.deepEqual(SNAP.f7.entities.links, [
+    'https://www.linkedin.com/in/example-priya-linkwell/',
+    'https://github.com/example-plinkwell',
+    'https://plinkwell.example.com/portfolio',
+  ]);
+  const row = inserts.at(-1);
+  assert.deepEqual(row.project_links, expected);
+  assert.deepEqual(body.parsed.links, expected);
+  // The GitHub account used for evidence is still the parser's github field alone.
+  assert.equal(row.contact.github, SNAP.f7.entities.github);
+  assert.equal(body.parsed.contact.github, SNAP.f7.entities.github);
+  assert.ok(!('links' in row.contact), 'links are not added to the contact object');
+});
+
+test('R-30 follow-up: education objects are stored and sent back as the parser gave them', async () => {
+  const id = newCandidate();
+  const { res, body, text } = await upload(id, { bytes: F7, name: 'cv.pdf' });
+  assert.equal(res.status, 201, text);
+  assert.equal(SNAP.f7.entities.education.length, 2);
+  assert.equal(SNAP.f7.entities.education[0].institution, 'Example Institute of Technology, Pune');
+  assert.deepEqual(inserts.at(-1).education, SNAP.f7.entities.education);
+  assert.deepEqual(body.parsed.education, SNAP.f7.entities.education);
+});
+
+test('R-30 follow-up: a parser before 2.1.0 (no links, education as strings) keeps GitHub and LinkedIn only and the strings as they are', async () => {
+  nlpMode = 'replay-2.0';
+  const id = newCandidate();
+  const { res, body, text } = await upload(id, { bytes: F1, name: 'cv.pdf' });
+  assert.equal(res.status, 201, text);
+  const row = inserts.at(-1);
+  assert.equal(row.parser_version, 'nlp-engine@2.0.0');
+  assert.deepEqual(row.project_links, [SNAP.f1.entities.github, SNAP.f1.entities.linkedin]);
+  assert.deepEqual(body.parsed.links, [SNAP.f1.entities.github, SNAP.f1.entities.linkedin]);
+  assert.deepEqual(row.education, [SNAP.f1.entities.education[0].text]);
+  assert.equal(typeof body.parsed.education[0], 'string');
+});
+
+test('R-30 follow-up: collectProjectLinks drops blanks and non-strings and treats scheme, www, case and a trailing slash as one link', () => {
+  const { collectProjectLinks } = mods.pipeline;
+  assert.deepEqual(collectProjectLinks({ github: null, linkedin: null }, undefined), []);
+  assert.deepEqual(collectProjectLinks({}, null), []);
+  assert.deepEqual(
+    collectProjectLinks(
+      { github: 'github.com/example-a', linkedin: null },
+      ['https://www.GitHub.com/example-a/', '  ', 42, null, { url: 'x.com' }, 'example.dev/me', 'https://example.dev/me/', 'github.com/example-a/repo'],
+    ),
+    ['github.com/example-a', 'example.dev/me', 'github.com/example-a/repo'],
+  );
 });
 
 const storageWrites = () => supa.requests.filter((r) => r.method === 'POST' && r.path.startsWith('/storage/v1/object/resumes/')).length;
@@ -282,25 +369,27 @@ test('f6 (image-only) -> 422 unreadable_document, plain message, nothing stored,
 });
 
 test('unreadable re-upload over an existing readable resume -> 422; the earlier object and its bytes are untouched', async () => {
-  // Same extension: the earlier resume.pdf (f1) must survive an unreadable resume.pdf (f6).
+  // Same extension: the earlier PDF (f1) must survive an unreadable PDF (f6).
   const id = newCandidate();
   assert.equal((await upload(id, { bytes: F1, name: 'cv.pdf' })).res.status, 201);
-  const before = store.get(`candidates/${id}/resume.pdf`);
+  const [pdfKey] = uploadKeys(id, 'pdf');
+  const before = store.get(pdfKey);
   const r = await upload(id, { bytes: F6, name: 'scan.pdf' });
   assertContract(r.res, r.body, 422, 'unreadable_document');
   assert.equal(r.body.stored, false);
-  assert.deepEqual(objectsOf(id), [`candidates/${id}/resume.pdf`]);
-  const after = store.get(`candidates/${id}/resume.pdf`);
+  assert.deepEqual(objectsOf(id), [pdfKey]);
+  const after = store.get(pdfKey);
   assert.ok(after.bytes.equals(F1), 'the earlier resume bytes changed');
   assert.equal(after.updated_at, before.updated_at, 'the earlier resume was rewritten');
 
   // Other extension: the earlier resume.docx survives an unreadable PDF.
   const id2 = newCandidate();
   assert.equal((await upload(id2, { bytes: F2, name: 'cv.docx', type: 'application/octet-stream' })).res.status, 201);
+  const [docxKey] = uploadKeys(id2, 'docx');
   const r2 = await upload(id2, { bytes: F6, name: 'scan.pdf' });
   assert.equal(r2.res.status, 422);
-  assert.deepEqual(objectsOf(id2), [`candidates/${id2}/resume.docx`]);
-  assert.ok(store.get(`candidates/${id2}/resume.docx`).bytes.equals(F2));
+  assert.deepEqual(objectsOf(id2), [docxKey]);
+  assert.ok(store.get(docxKey).bytes.equals(F2));
 });
 
 test('a .pdf whose bytes are not PDF -> 400; a .docx that is not a ZIP -> 400; nothing stored or parsed', async () => {
@@ -339,8 +428,8 @@ test('NLP down (connection refused) -> 503 fixed message, file kept for a later 
   assertContract(res, body, 503, 'parser_unavailable');
   assert.equal(body.message, PARSER_DOWN_MESSAGE);
   assert.equal(body.fileKept, true);
-  assert.deepEqual(objectsOf(id), [`candidates/${id}/resume.pdf`]);
-  assert.ok(store.get(`candidates/${id}/resume.pdf`).bytes.equals(F1));
+  const [key] = uploadKeys(id, 'pdf');
+  assert.ok(store.get(key).bytes.equals(F1));
   assert.equal(inserts.length, insertsBefore);
   assertNoLeak(text);
   assert.ok(!/ECONNREFUSED|fetch failed|127\.0\.0\.1/.test(text), text);
@@ -349,7 +438,7 @@ test('NLP down (connection refused) -> 503 fixed message, file kept for a later 
   process.env.NLP_PARSE_URL = nlpUrl;
   const later = await mods.pipeline.runResumePipeline({ candidateId: id });
   assert.deepEqual(later.resume.skills, SNAP.f1.entities.skills);
-  assert.equal(later.storagePath, `candidates/${id}/resume.pdf`);
+  assert.equal(later.storagePath, key);
 });
 
 test('NLP timeout and NLP 503 -> the same 503 and fixed message; file kept', async () => {
@@ -362,19 +451,23 @@ test('NLP timeout and NLP 503 -> the same 503 and fixed message; file kept', asy
     const elapsed = Date.now() - t0;
     assertContract(res, body, 503, 'parser_unavailable');
     assert.equal(body.message, PARSER_DOWN_MESSAGE);
-    assert.deepEqual(objectsOf(id), [`candidates/${id}/resume.pdf`]);
+    uploadKeys(id, 'pdf');
     assertNoLeak(text);
     if (mode === 'hang') assert.ok(elapsed < 3000, `timeout took ${elapsed} ms`);
   }
 });
 
-test('NLP down replaces an earlier same-type resume (the one documented case); storing fails -> 500', async () => {
+test('NLP down: the upload is stored under a new key and becomes the current resume (the one documented case); the earlier object is not overwritten; storing fails -> 500', async () => {
   const id = newCandidate();
-  store.set(`candidates/${id}/resume.pdf`, { bytes: F6, contentType: 'application/pdf', updated_at: new Date(++clock).toISOString() });
+  const legacy = `candidates/${id}/resume.pdf`;
+  store.set(legacy, { bytes: F6, contentType: 'application/pdf', updated_at: new Date(++clock).toISOString() });
   process.env.NLP_PARSE_URL = await closedPortUrl();
   let r = await upload(id, { bytes: F1, name: 'cv.pdf' });
   assertContract(r.res, r.body, 503, 'parser_unavailable');
-  assert.ok(store.get(`candidates/${id}/resume.pdf`).bytes.equals(F1));
+  assert.ok(store.get(legacy).bytes.equals(F6), 'R-38: the earlier object is never overwritten');
+  const current = await mods.pipeline.findStoredResume(id);
+  assert.match(current.path, uploadKeyRe(id, 'pdf'));
+  assert.ok(store.get(current.path).bytes.equals(F1), 'the new upload is the current resume');
 
   const id2 = newCandidate();
   supaMode = { uploadError: true };
@@ -392,8 +485,8 @@ test('NLP crash (500 with a traceback) -> 502 parser_failed, nothing echoed, not
   assertContract(res, body, 502, 'parser_failed');
   assert.equal(body.stored, false);
   assertNoLeak(text);
-  assert.deepEqual(objectsOf(id), [`candidates/${id}/resume.docx`]);
-  assert.ok(store.get(`candidates/${id}/resume.docx`).bytes.equals(F2));
+  const [docxKey] = uploadKeys(id, 'docx');
+  assert.ok(store.get(docxKey).bytes.equals(F2));
 });
 
 test('storage failure after a successful parse -> 500 storage_error and no resumes insert', async () => {
@@ -415,19 +508,31 @@ test('row insert failure after storing -> 500 database_error, file kept', async 
   const { res, body, text } = await upload(id, { bytes: F1, name: 'cv.pdf' });
   assertContract(res, body, 500, 'database_error');
   assert.equal(body.fileKept, true);
-  assert.deepEqual(objectsOf(id), [`candidates/${id}/resume.pdf`]);
+  uploadKeys(id, 'pdf');
   assertNoLeak(text);
 });
 
-test('re-upload with another extension keeps exactly one resume (the new one)', async () => {
+test('re-upload (another extension, then the same one): each upload gets its own key, the newest is the current resume, earlier files are kept (R-38)', async () => {
   const id = newCandidate();
   assert.equal((await upload(id, { bytes: F1, name: 'a.pdf' })).res.status, 201);
+  const [pdfKey] = uploadKeys(id, 'pdf');
   const r = await upload(id, { bytes: F2, name: 'b.DOCX', type: 'application/octet-stream' });
   assert.equal(r.res.status, 201, r.text);
   assert.deepEqual(r.body.parsed.skills, SNAP.f2.entities.skills);
-  assert.deepEqual(objectsOf(id), [`candidates/${id}/resume.docx`]);
-  assert.equal(store.get(`candidates/${id}/resume.docx`).contentType,
+  const docxKey = objectsOf(id).find((k) => k !== pdfKey);
+  assert.match(docxKey, uploadKeyRe(id, 'docx'));
+  assert.equal(store.get(docxKey).contentType,
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  assert.ok(store.get(pdfKey).bytes.equals(F1), 'the earlier file is kept, unchanged');
+  assert.equal((await mods.pipeline.findStoredResume(id)).path, docxKey, 'the newest upload is the current resume');
+
+  // Same extension again: a third key, never the earlier PDF's.
+  assert.equal((await upload(id, { bytes: F1, name: 'c.pdf' })).res.status, 201);
+  const keys = objectsOf(id);
+  assert.equal(keys.length, 3);
+  const third = keys.find((k) => k !== pdfKey && k !== docxKey);
+  assert.match(third, uploadKeyRe(id, 'pdf'));
+  assert.equal((await mods.pipeline.findStoredResume(id)).path, third);
 });
 
 test('storage errors are errors, not "no resume" (B9): status, recruiter link, upload, pipeline', async () => {
@@ -466,7 +571,10 @@ test('recruiter resume link (B9): a storage-list error is 500, not 404; no file 
   r = await fetch(`${base}/t/resume/candidate/${id}`, { headers: asRecruiter });
   body = await r.json();
   assert.equal(r.status, 200, JSON.stringify(body));
-  assert.equal(body.fileName, 'resume.pdf');
+  // R-38: a pre-R-38 object with no upload row to name it: the neutral label, never the key.
+  assert.equal(body.fileName, 'résumé.pdf');
+  assert.equal(body.source, 'latest');
+  assert.ok(body.note, 'falling back to the newest file is said, not silent');
   assert.equal(signedFor.at(-1), `candidates/${id}/resume.pdf`);
 });
 
@@ -480,6 +588,7 @@ test('runResumePipeline with a job: downloads the stored file, sends jd and skil
     preferred_skills: ['docker'],
   };
   const insertsBefore = inserts.length;
+  const [key] = uploadKeys(id, 'pdf');
   const out = await mods.pipeline.runResumePipeline({ candidateId: id, job, requestId: 'r09-req-0002' });
 
   const call = nlp.requests.at(-1);
@@ -493,13 +602,13 @@ test('runResumePipeline with a job: downloads the stored file, sends jd and skil
     ['contact', 'entities', 'parserVersion', 'rawText', 'rawTextTruncated', 'resume', 'semanticAnalysis', 'storagePath']);
   assert.equal(out.rawText, SNAP.f1.raw_text);
   assert.equal(out.rawTextTruncated, false);
-  assert.equal(out.parserVersion, 'nlp-engine@2.0.0');
+  assert.equal(out.parserVersion, 'nlp-engine@2.2.0');
   assert.deepEqual(out.semanticAnalysis, SNAP.f1.semantic_analysis);
   assert.equal(out.contact.email, SNAP.f1.entities.email);
   assert.equal(out.contact.github, SNAP.f1.entities.github);
   assert.deepEqual(out.entities, SNAP.f1.entities);
   assert.equal(out.resume.job_id, job.id);
-  assert.equal(out.resume.file_ref, `candidates/${id}/resume.pdf`);
+  assert.equal(out.resume.file_ref, key);
   assert.equal(inserts.length - insertsBefore, 1);
   assert.ok(!('raw_text' in inserts.at(-1)));
 });
@@ -533,6 +642,25 @@ test('reads the newest resume object, including an older upper-case extension; i
   assert.equal((await findStoredResume(id)).path, `candidates/${id}/resume.docx`);
   store.set(`candidates/${id}/notes.pdf`, { bytes: F1, contentType: 'x', updated_at: new Date(++clock).toISOString() });
   assert.equal((await findStoredResume(id)).path, `candidates/${id}/resume.docx`);
+  // R-38: an upload key newer than the pre-R-38 file is the current one; a look-alike name is not a resume.
+  const key = `candidates/${id}/resume-20261114T101500123Z-0a1b2c3d.pdf`;
+  store.set(key, { bytes: F1, contentType: 'application/pdf', updated_at: new Date(++clock).toISOString() });
+  assert.equal((await findStoredResume(id)).path, key);
+  store.set(`candidates/${id}/resume-copy.pdf`, { bytes: F1, contentType: 'x', updated_at: new Date(++clock).toISOString() });
+  assert.equal((await findStoredResume(id)).path, key);
+});
+
+test('R-38: newResumePath gives a fresh key in the candidate folder each time; only pdf and docx', () => {
+  const { newResumePath } = mods.pipeline;
+  const id = newCandidate();
+  const at = new Date('2026-11-14T02:30:07.417Z');
+  const a = newResumePath(id, '.pdf', at);
+  const b = newResumePath(id, '.PDF', at);
+  assert.match(a, /^candidates\/[0-9a-f-]+\/resume-20261114T023007417Z-[0-9a-f]{8}\.pdf$/);
+  assert.ok(a.startsWith(`candidates/${id}/`));
+  assert.notEqual(a, b, 'two uploads in the same millisecond still get different keys');
+  assert.match(newResumePath(id, '.docx'), uploadKeyRe(id, 'docx'));
+  assert.throws(() => newResumePath(id, '.txt'));
 });
 
 test('the NLP call goes through the shared internal HTTP module with a 30 s default timeout', () => {

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Badge from '../../components/Badge';
 import { api } from '../../lib/api';
+import { EDUCATION_EMPTY_ENTRY, educationLine } from '../../lib/education';
 
 // R-16 (D§4.1, F20, F21): upload parses the file and the page shows what was read.
 // POST /api/resume/upload (backend/Controllers/analysis.controller.js uploadResume):
@@ -100,16 +101,19 @@ function ParsedSection({ title, count, empty, children, testId }) {
   );
 }
 
-function ParsedSummary({ fileName, parsed }) {
+export function ParsedSummary({ fileName, parsed }) {
   const skills = Array.isArray(parsed?.skills) ? parsed.skills : [];
   const experience = Array.isArray(parsed?.experience) ? parsed.experience : [];
   const education = Array.isArray(parsed?.education) ? parsed.education : [];
-  const links = Array.isArray(parsed?.links) ? parsed.links : [];
+  const links = Array.isArray(parsed?.links) ? parsed.links.filter((l) => typeof l === 'string' && l.trim()) : [];
   const contact = parsed?.contact || {};
   const contactLines = [
     ['Name', contact.candidate_name],
     ['Email', contact.email],
     ['Phone', contact.phone],
+    // R-38: the profile links the parser returned (also listed under Links), as text.
+    ['LinkedIn', contact.linkedin],
+    ['GitHub', contact.github],
   ].filter(([, v]) => typeof v === 'string' && v.trim());
 
   return (
@@ -156,22 +160,28 @@ function ParsedSummary({ fileName, parsed }) {
 
       <ParsedSection title="Education" count={education.length} empty="No education entries were found." testId="parsed-education">
         <ul className="list-disc space-y-1 pl-5">
-          {education.map((line, i) => (
-            <li key={i} className="text-sm text-foreground">{typeof line === 'string' ? line : JSON.stringify(line)}</li>
-          ))}
+          {education.map((entry, i) => {
+            const line = educationLine(entry);
+            return (
+              <li key={i} className="text-sm text-foreground">
+                {line || <span className="text-muted-foreground">{EDUCATION_EMPTY_ENTRY}</span>}
+              </li>
+            );
+          })}
         </ul>
       </ParsedSection>
 
-      <ParsedSection title="Links" count={links.length} empty="No GitHub or LinkedIn link was found." testId="parsed-links">
+      {/* Every web link the parser found (GitHub, LinkedIn, portfolio, others), as text. */}
+      <ParsedSection title="Links" count={links.length} empty="No web links were found." testId="parsed-links">
         <ul className="space-y-1">
-          {links.map((link) => (
-            <li key={link} className="text-sm text-foreground break-all">{link}</li>
+          {links.map((link, i) => (
+            <li key={`${i}-${link}`} className="text-sm text-foreground break-all">{link}</li>
           ))}
         </ul>
       </ParsedSection>
 
       {contactLines.length > 0 && (
-        <div>
+        <div data-testid="parsed-contact">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contact</p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
             {contactLines.map(([label, value]) => (

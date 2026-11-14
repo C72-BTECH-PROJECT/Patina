@@ -3,10 +3,12 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, Calendar, Mail, ShieldAlert, X } from 'lucide-react';
 import Badge from '../Badge';
 import Button from '../Button';
-import ScoreBadge from '../ScoreBadge';
+import ScoreBadge, {
+  AWAITING_ASSESSMENT, VerificationBadge, partialScoreLabel, showEvidenceLimited, weightsVersionLabel,
+} from '../ScoreBadge';
 import Spinner from '../Spinner';
 import ScoreBreakdown, { EvidenceUnavailable, FlagsPanel } from './ScoreBreakdown';
-import { api, isAborted } from '../../lib/api';
+import { api, isAborted, isStillWorking, pollServerState, stillWorkingSeconds } from '../../lib/api';
 import {
   SUBSCORES, assessmentStateText, attemptStateText, describeVoid, formatWhen, resettableAttempt,
   scoringFailureText, statusText, subscoreLabel,
@@ -141,23 +143,50 @@ function AttemptCard({ item, index, currentUserId }) {
   );
 }
 
-function ResetForm({ attempt, onDone }) {
+function ResetForm({ attempt, onDone, applicationId, scoreIdBefore }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [still, setStill] = useState(false); // R-33
+  const [note, setNote] = useState('');
   const trimmed = reason.trim();
+
+  // R-33: the reset's answer was lost (504 or a dropped connection) but core may still be
+  // voiding and re-scoring. Read this application back (bounded) until the attempt shows its
+  // void record and a new score row exists, then report what the server holds.
+  const readBack = async () => {
+    setStill(true);
+    const voidedIn = (d) => (Array.isArray(d?.assessment?.items) ? d.assessment.items : [])
+      .some((it) => it.assessmentId === attempt.assessmentId && it.voided);
+    const newScore = (d) => Boolean(d?.score?.id) && d.score.id !== scoreIdBefore;
+    const out = await pollServerState(
+      (signal) => api.get(`/api/recruiter/applications/${encodeURIComponent(applicationId)}`, { signal, cache: 'no-store' }),
+      (d) => voidedIn(d) && newScore(d),
+    ).catch(() => null);
+    setStill(false);
+    if (out?.hasValue && voidedIn(out.value)) {
+      setReason('');
+      onDone({ readBack: true, newScore: newScore(out.value) });
+    } else if (out?.hasValue) {
+      setNote(`The server did not answer in time and, after ${stillWorkingSeconds()} s of checking, does not show this attempt as reset. It may still be working: reload before trying again.`);
+    } else {
+      setNote(`The server did not answer in time and the current state could not be read: ${out?.error?.message || 'no answer'}`);
+    }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
     if (!trimmed || busy) return;
     setBusy(true);
     setError(null);
+    setNote('');
     try {
       const data = await api.post(`/api/assessment/${attempt.assessmentId}/reset`, { reason: trimmed });
       setReason('');
       onDone(data);
     } catch (err) {
-      setError(err.message);
+      if (isStillWorking(err) && applicationId) await readBack();
+      else setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -184,6 +213,12 @@ function ResetForm({ attempt, onDone }) {
         className="w-full bg-background border border-input rounded-md px-3 py-2 text-body-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
       />
       {error && <p className="text-caption text-destructive" role="alert">Not reset: {error}</p>}
+      {still && (
+        <p className="text-caption text-muted-foreground" role="status" data-testid="still-working">
+          Still working: the server has not answered yet but may still be resetting and re-scoring. Checking every few seconds.
+        </p>
+      )}
+      {!still && note && <p className="text-caption text-muted-foreground" role="status" data-testid="still-working-note">{note}</p>}
       <Button
         type="submit"
         size="sm"
@@ -232,6 +267,9 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
   const target = resettableAttempt(items);
   const baseWeights = explanation?.weighting_scheme?.base_weights || null;
   const history = Array.isArray(detail.score_history) ? detail.score_history : [];
+  // D§7.1 W4: until the assessment is completed (or the attempts are used) the state leads.
+  const awaiting = detail.score_state === AWAITING_ASSESSMENT;
+  const unearned = Number(explanation?.unearned_weight);
 
   return (
     <div className="space-y-8">
@@ -260,12 +298,31 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
 
       {/* Composite */}
       <Section title="Credibility score" testId="drilldown-composite-section">
-        {score ? (
+        {awaiting && (
+          <div className="p-3 rounded-lg border border-border bg-muted" data-testid="drilldown-awaiting" data-score-state={AWAITING_ASSESSMENT}>
+            <div className="text-h3 font-semibold text-foreground">Awaiting assessment</div>
+            <p className="text-caption text-muted-foreground mt-0.5">
+              Assessment: {stateText.label}. Until the candidate completes it, the score below is partial and is
+              ranked only against other applicants who are also awaiting the assessment.
+            </p>
+          </div>
+        )}
+        {score && awaiting ? (
+          // The composite stays the first <span> of drilldown-composite (tests/e2e reads it there).
+          <div className="flex flex-wrap items-center gap-2" data-testid="drilldown-composite" data-state="scored" data-value={String(score.composite)}>
+            <span className="text-body font-semibold text-muted-foreground tabular-nums">{String(score.composite)}</span>
+            <span className="text-caption text-muted-foreground">/100</span>
+            <Badge variant="outline" data-testid="partial-score-label">{partialScoreLabel(score.subscores)}</Badge>
+            <VerificationBadge verification={score.verification} />
+            {score.created_at && <span className="text-caption text-muted-foreground">Computed {formatWhen(score.created_at)}</span>}
+          </div>
+        ) : score ? (
           <div className="flex flex-wrap items-center gap-3" data-testid="drilldown-composite" data-state="scored" data-value={String(score.composite)}>
             <span className="text-h1 font-extrabold text-foreground tabular-nums">{String(score.composite)}</span>
             <span className="text-body-sm text-muted-foreground">/100</span>
             <ScoreBadge band={score.band} />
-            {score.evidence_limited && (
+            <VerificationBadge verification={score.verification} />
+            {showEvidenceLimited(score.evidence_limited, score.verification) && (
               <Badge variant="warning" data-testid="drilldown-evidence-limited">
                 <ShieldAlert className="w-3 h-3 mr-1" aria-hidden="true" />
                 Evidence-limited
@@ -317,8 +374,18 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
                       )}
                     </tr>
                   ))}
+                  {Number.isFinite(unearned) && unearned > 0 && (
+                    <tr className="border-b border-border last:border-0" data-testid="weight-unearned">
+                      <td className="py-1.5 pr-3 text-body-sm text-foreground">Not earned by any source</td>
+                      <td className="py-1.5 pr-3 text-body-sm text-foreground tabular-nums">{String(unearned)}</td>
+                      {baseWeights && <td className="py-1.5 text-body-sm text-muted-foreground">—</td>}
+                    </tr>
+                  )}
                 </tbody>
               </table>
+              <p className="text-caption text-muted-foreground" data-testid="weights-version">
+                Weights version: {weightsVersionLabel(explanation)}
+              </p>
               <p className="text-caption text-muted-foreground">
                 Provisional: these weights are a design choice with no calibration behind them.
                 {explanation?.weighting_scheme?.redistribution ? ` ${explanation.weighting_scheme.redistribution}` : ''}
@@ -385,7 +452,16 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
         ) : (
           <p className="text-caption text-muted-foreground">No assessment attempt exists for this application yet.</p>
         )}
-        {resetResult && (
+        {resetResult?.readBack && (
+          // R-33: read back after a lost answer; whether the candidate was notified is not known here.
+          <div className="p-3 rounded-lg border text-caption border-warning/30 bg-warning/10 text-foreground" role="status" data-testid="reset-result">
+            The attempt was reset (read back from the server after its answer did not arrive in time).{' '}
+            {resetResult.newScore
+              ? 'A new score without that attempt was saved.'
+              : 'No new score had appeared yet; the server may still be scoring. Reload later, or use "Score again" in the table.'}
+          </div>
+        )}
+        {resetResult && !resetResult.readBack && (
           <div
             className={`p-3 rounded-lg border text-caption ${resetResult.scoring?.status === 'scored' ? 'border-success/30 bg-success/10 text-foreground' : 'border-warning/30 bg-warning/10 text-foreground'}`}
             role="status"
@@ -399,7 +475,7 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
           </div>
         )}
         {target ? (
-          <ResetForm attempt={target} onDone={onReset} />
+          <ResetForm attempt={target} onDone={onReset} applicationId={detail.id} scoreIdBefore={score?.id ?? null} />
         ) : (
           <p className="text-caption text-muted-foreground">
             No attempt can be reset: the candidate has not started one, or every attempt is already reset.
@@ -408,7 +484,11 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
       </Section>
 
       {/* Flags */}
-      <FlagsPanel storedReason={explanation?.flags_unavailable_reason ?? null} />
+      <FlagsPanel
+        storedReason={explanation?.flags_unavailable_reason ?? null}
+        flags={explanation?.flags ?? []}
+        checks={explanation?.flag_checks ?? null}
+      />
 
       {/* History */}
       {history.length > 1 && (
@@ -419,7 +499,8 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
               <li key={h.id} className="flex flex-wrap items-center gap-2 text-body-sm">
                 <span className="tabular-nums font-medium text-foreground">{String(h.composite)}</span>
                 <ScoreBadge band={h.band} />
-                {h.evidence_limited && <Badge variant="warning">Evidence-limited</Badge>}
+                <VerificationBadge verification={h.verification} />
+                {showEvidenceLimited(h.evidence_limited, h.verification) && <Badge variant="warning">Evidence-limited</Badge>}
                 <span className="text-caption text-muted-foreground">{formatWhen(h.created_at)}</span>
               </li>
             ))}

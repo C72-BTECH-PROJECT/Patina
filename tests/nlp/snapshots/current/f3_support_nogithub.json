@@ -2,7 +2,15 @@
   "entities": {
     "candidate_name": "Lena Fischer",
     "education": [
-      "B.Sc. in Information Systems - Example University Hamburg (2015 - 2018)"
+      {
+        "dates": "2015 – 2018",
+        "degree": "B.Sc. in Information Systems",
+        "grade": null,
+        "graduation_year": 2018,
+        "honours": null,
+        "institution": "Example University Hamburg",
+        "text": "B.Sc. in Information Systems - Example University Hamburg (2015 - 2018)"
+      }
     ],
     "email": "lena.fischer@example.com",
     "experience": [
@@ -27,17 +35,24 @@
     ],
     "github": null,
     "linkedin": null,
+    "links": [],
     "phone": null,
     "projects": [],
-    "skill_count": 3,
+    "skill_count": 9,
     "skills": [
       "bash",
       "linux",
+      "servicenow",
+      "jira",
+      "itil",
+      "nagios",
+      "active directory",
+      "windows server",
       "sql"
     ]
   },
   "filename": "f3_support_nogithub.pdf",
-  "parser_version": "nlp-engine@2.0.0",
+  "parser_version": "nlp-engine@2.2.0",
   "preprocessing": {
     "noun_chunks_preview": [
       "lena fischer",
@@ -84,7 +99,7 @@
       "semantic_score": 0.4,
       "skill_coverage": 0.6
     },
-    "focused_score": 0.5914,
+    "focused_score": 0.6299,
     "full_text_score": 0.572,
     "jd_embedding_size": 384,
     "jd_skills": [
@@ -100,19 +115,19 @@
       "python"
     ],
     "jd_source": "structured_skills",
-    "match_level": "Weak Match",
-    "match_reason": "Matched 3 of 10 job skills (from the role's listed required/preferred skills); missing: servicenow, jira, itil, splunk, nagios, oracle, python.",
+    "match_level": "Moderate Match",
+    "match_reason": "Matched 7 of 10 job skills (from the role's listed required/preferred skills); missing: splunk, oracle, python.",
     "matched_skills": [
       "sql",
       "linux",
-      "bash"
-    ],
-    "missing_skills": [
+      "bash",
       "servicenow",
       "jira",
       "itil",
+      "nagios"
+    ],
+    "missing_skills": [
       "splunk",
-      "nagios",
       "oracle",
       "python"
     ],
@@ -120,11 +135,17 @@
     "resume_skills": [
       "bash",
       "linux",
+      "servicenow",
+      "jira",
+      "itil",
+      "nagios",
+      "active directory",
+      "windows server",
       "sql"
     ],
-    "semantic_score": 0.5846,
-    "similarity_score": 0.4138,
-    "skill_coverage": 0.3
+    "semantic_score": 0.6096,
+    "similarity_score": 0.6638,
+    "skill_coverage": 0.7
   },
   "status": "success"
 }

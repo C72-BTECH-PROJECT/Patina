@@ -15,7 +15,7 @@
 import { test, expect } from '@playwright/test';
 import { newRoleContext } from './lib/auth.mjs';
 import { recordLeftover } from './lib/leftovers.mjs';
-import { ANSWER_KEY_FIELDS, actAndWait, findFieldNames, recordApiResponses } from './lib/network.mjs';
+import { ANSWER_KEY_FIELDS, actAndWait, findAnswerKeyLeaks, recordApiResponses } from './lib/network.mjs';
 import { providerFailure } from './lib/provider.mjs';
 import { BAND_LABELS, checkDrilldown, chooseResumeFile, expectScore, numberIn } from './lib/pages.mjs';
 import { demoResumePath } from './fixtures/index.mjs';
@@ -27,10 +27,24 @@ const secondsFromEnv = (name, fallback) => {
 const POOL_WAIT_MS = secondsFromEnv('E2E_POOL_WAIT_S', 240);
 const GRADING_WAIT_MS = secondsFromEnv('E2E_GRADING_WAIT_S', 240);
 const APPLY_WAIT_MS = 120_000; // apply scores in the same request (NLP + GitHub)
+// R-33: after a gateway 504 the page reads the real state for up to 180 s (frontend/src/lib/api.js
+// STILL_WORKING_LIMIT_MS); the spec waits that long plus a margin for the page to settle.
+const STILL_WAIT_MS = 200_000;
+// R-33 short-timeout run: start the gateway with PROXY_TIMEOUT_MS=1500 and
+// PROXY_TIMEOUT_EVALUATE_MS=1500 and set E2E_EXPECT_GATEWAY_TIMEOUT=1 here; the spine then
+// also requires that apply or evaluate really answered 504 (so the "Still working" path ran).
+const EXPECT_GATEWAY_TIMEOUT = process.env.E2E_EXPECT_GATEWAY_TIMEOUT === '1';
+const isGatewayTimeout = (status, body) => status === 504 && body?.error === 'upstream_timeout';
 const UPLOAD_WAIT_MS = 120_000; // upload parses in the same request
 
-// Skills from CreateJob.jsx's list that fixture f1 (a Python/SQL developer) also claims.
-const JOB_SKILLS = ['Python', 'SQL', 'PostgreSQL', 'Docker'];
+// Skills that fixture f1 (a Python/SQL developer) also claims, in the parser's spelling (R-32:
+// CreateJob saves the vocabulary's canonical names; these were 'Python', 'SQL', 'PostgreSQL',
+// 'Docker' from the old chip list, the same four skills). The first two are taken from the
+// "Found in your description" suggestions, the last two through the search input.
+const SKILLS_FROM_DESCRIPTION = ['python', 'postgresql'];
+const SKILLS_FROM_SEARCH = ['sql', 'docker'];
+const JOB_SKILLS = [...SKILLS_FROM_DESCRIPTION, ...SKILLS_FROM_SEARCH];
+const SUGGESTION_WAIT_MS = 30_000; // nlp-engine reads the description (it may be busy parsing)
 const JOB_DESCRIPTION = [
   '# About the role',
   'Scripted end-to-end check (R-19). Build and run Python services backed by PostgreSQL, packaged with Docker.',
@@ -64,6 +78,35 @@ async function waitAssessmentState(page, whileIn, timeout) {
 }
 
 const remainingMs = async (timer) => Number(await timer.getAttribute('data-remaining-ms'));
+
+/**
+ * R-27 (REBUILD/DECISIONS.md §7.1): the weights invariant, on the drill-down response the
+ * recruiter page received. The résumé never weighs more than 0.20; the weights plus the
+ * unearned share sum to 1; before the assessment the assessment weighs 0, GitHub never
+ * takes its share, so the composite is at most 55 (low band) and the score is awaiting
+ * the assessment; after it the weights alone sum to 1 and nothing is unearned.
+ */
+function expectWeightsRule(detail, label, { assessed }) {
+  const w = detail.weights || {};
+  const sum = Object.values(w).reduce((a, b) => a + Number(b), 0);
+  const unearned = Number(detail.explanation?.unearned_weight ?? NaN);
+  expect(detail.explanation?.weights_version, `${label}: the score records its weights version`).toBe('w2-2026-11-13');
+  expect(Number(w.parsing_semantic_alignment), `${label}: the résumé weighs at most 0.20`).toBeLessThanOrEqual(0.2 + 1e-9);
+  expect(Number.isFinite(unearned), `${label}: the unearned share is stored`).toBe(true);
+  expect(Math.abs(sum + unearned - 1), `${label}: weights ${JSON.stringify(w)} plus unearned ${unearned} sum to 1`).toBeLessThanOrEqual(0.001);
+  expect(['unverified', 'partly_verified', 'verified'], `${label}: verification`).toContain(detail.score?.verification);
+  if (!assessed) {
+    expect(Number(w.assessment_results), `${label}: no assessment weight before the assessment`).toBe(0);
+    expect(Number(detail.score.composite), `${label}: before the assessment the composite is at most 55`).toBeLessThanOrEqual(55);
+    expect(detail.score.band, `${label}: before the assessment the band is low`).toBe('low');
+    expect(detail.score_state, `${label}: awaiting the assessment`).toBe('awaiting_assessment');
+  } else {
+    expect(Math.abs(sum - 1), `${label}: with the assessment the weights sum to 1`).toBeLessThanOrEqual(0.001);
+    expect(unearned, `${label}: nothing unearned with the assessment`).toBe(0);
+    expect(detail.score_state, `${label}: the assessment is over`).toBe('final');
+    expect(detail.score.verification, `${label}: verified by at least the assessment`).not.toBe('unverified');
+  }
+}
 
 /** Answer one question as the script's rule says; returns { qid, type, value } once the page saved it. */
 async function answerQuestion(page, question) {
@@ -119,6 +162,7 @@ test('demo spine: recruiter and candidate, through the browser', async ({ browse
   // Every API response the candidate's browser receives, for step 6's answer-key scan.
   const candResponses = recordApiResponses(cand.context);
   const ids = {};
+  const timeouts = []; // R-33: which of apply / evaluate answered a gateway 504
   let assessmentResultHtml = '';
 
   try {
@@ -133,17 +177,32 @@ test('demo spine: recruiter and candidate, through the browser', async ({ browse
       await p.getByLabel('Experience Level', { exact: true }).selectOption('2-5 years');
       await p.getByRole('button', { name: 'Next Step' }).click();
 
-      for (const skill of JOB_SKILLS) await p.getByRole('button', { name: skill, exact: true }).click();
-      await expect(p.getByText(`${JOB_SKILLS.length} selected`, { exact: true })).toBeVisible();
+      // R-32: the description comes before the skills, so its skills can be suggested.
+      await p.getByLabel('Job Description', { exact: true }).fill(JOB_DESCRIPTION);
       await p.getByRole('button', { name: 'Next Step' }).click();
 
-      await p.getByLabel('Job Description', { exact: true }).fill(JOB_DESCRIPTION);
+      // The suggestions are listed and nothing is added until a click.
+      const found = p.getByTestId('description-suggestions');
+      await expect(found, 'skills found in the description (nlp-engine answered)').toHaveAttribute('data-state', 'ready', { timeout: SUGGESTION_WAIT_MS });
+      await expect(p.getByTestId('selected-skill')).toHaveCount(0);
+      for (const skill of SKILLS_FROM_DESCRIPTION) {
+        await found.locator(`[data-testid="description-suggestion"][data-skill="${skill}"]`).click();
+      }
+      const search = p.getByTestId('skill-search-input');
+      for (const skill of SKILLS_FROM_SEARCH) {
+        await search.fill(skill);
+        await p.locator(`[data-testid="skill-option"][data-skill="${skill}"]`).click();
+      }
+      await expect(p.getByText(`${JOB_SKILLS.length} selected`, { exact: true })).toBeVisible();
+      await expect(p.locator('[data-testid="selected-skill"][data-custom="false"]')).toHaveCount(JOB_SKILLS.length);
+
       const { status, body } = await actAndWait(p, 'POST', /^\/api\/jobs$/, () => p.getByTestId('job-submit').click());
       expect(status, `POST /api/jobs answered ${status}: ${body?.message || ''}`).toBe(201);
       expect(body?.id, 'the created job has an id').toBeTruthy();
       ids.jobId = body.id;
       recordLeftover('jobs', ids.jobId, title);
       expect(body.title).toBe(title);
+      expect(body.requiredSkills, 'the job saved the four chosen skills').toEqual(JOB_SKILLS);
 
       await expect(p).toHaveURL(/\/recruiter\/jobs$/);
       await expect(p.getByText(title, { exact: true })).toBeVisible();
@@ -185,23 +244,46 @@ test('demo spine: recruiter and candidate, through the browser', async ({ browse
       await expect(apply).toBeEnabled();
       const mark = candResponses.entries.length;
       const { status, body } = await actAndWait(p, 'POST', new RegExp(`^/api/jobs/${ids.jobId}/apply$`), () => apply.click(), { timeout: APPLY_WAIT_MS });
-      expect(status, `apply answered ${status}: ${body?.message || ''}`).toBe(201);
-      expect(body?.id, 'the application has an id').toBeTruthy();
-      ids.applicationId = body.id;
-      recordLeftover('applications', ids.applicationId, `candidate application to ${title}`);
-      expect(body.scoring?.status, `apply scored the application (reason: ${body.scoring?.reason ?? 'none given'})`).toBe('scored');
-
-      // The page reads the application back after a scored apply; compare with that response.
       const scoredBox = p.getByTestId('application-score');
-      await expect(scoredBox).toHaveAttribute('data-state', 'scored');
+      const myRows = () => candResponses.entries.slice(mark)
+        .filter((e) => e.method === 'GET' && e.path === '/api/jobs/my-applications' && Array.isArray(e.body));
+      let readBack;
+      if (isGatewayTimeout(status, body)) {
+        // R-33: the gateway stopped waiting; core keeps saving and scoring. The page shows
+        // "Still working", reads My applications back, and must end on the scored row.
+        timeouts.push('apply');
+        note('apply answered 504 upstream_timeout; the page reads the application back (R-33)');
+        await expect(scoredBox).toHaveAttribute('data-state', 'scored', { timeout: STILL_WAIT_MS });
+        await candResponses.settle();
+        readBack = myRows().map((e) => e.body.find((r) => r.job_id === ids.jobId)).filter(Boolean).pop();
+        expect(readBack?.id, 'the page read the saved application back after the 504').toBeTruthy();
+        ids.applicationId = readBack.id;
+        recordLeftover('applications', ids.applicationId, `candidate application to ${title}`);
+        expect(readBack.scoring?.state, 'the application read back is scored').toBe('scored');
+      } else {
+        expect(status, `apply answered ${status}: ${body?.message || ''}`).toBe(201);
+        expect(body?.id, 'the application has an id').toBeTruthy();
+        ids.applicationId = body.id;
+        recordLeftover('applications', ids.applicationId, `candidate application to ${title}`);
+        expect(body.scoring?.status, `apply scored the application (reason: ${body.scoring?.reason ?? 'none given'})`).toBe('scored');
+        // The page reads the application back after a scored apply; compare with that response.
+        // R-38: the page marks "scored" from the apply response at once (JobDetail.jsx
+        // ScoringState) and THEN sends GET /api/jobs/my-applications; wait for that read-back
+        // to be recorded with this application in it, instead of reading the recording before
+        // it arrives. If the page never reads it back, this poll fails.
+        await expect(scoredBox).toHaveAttribute('data-state', 'scored');
+        const rowsWithThisApplication = () => myRows().map((e) => e.body.find((r) => r.id === ids.applicationId)).filter(Boolean);
+        await expect.poll(async () => {
+          await candResponses.settle();
+          return rowsWithThisApplication().length;
+        }, { message: 'the page read the application back (GET /api/jobs/my-applications) after the scored apply' }).toBeGreaterThan(0);
+        readBack = rowsWithThisApplication().pop();
+      }
       const composite = p.getByTestId('application-composite');
       await expect(composite).toBeVisible();
-      await candResponses.settle();
-      const readBack = candResponses.entries.slice(mark)
-        .filter((e) => e.method === 'GET' && e.path === '/api/jobs/my-applications' && Array.isArray(e.body))
-        .map((e) => e.body.find((r) => r.id === ids.applicationId))
-        .filter(Boolean)
-        .pop();
+      // R-33: no "Still working" text and no "could not read" note is left on the page.
+      await expect(p.getByTestId('still-working')).toHaveCount(0);
+      await expect(p.getByTestId('still-working-note')).toHaveCount(0);
       expect(readBack?.score, 'the page read the scored application back').toBeTruthy();
       const shownAfterApply = numberIn(await composite.innerText());
       expectScore(shownAfterApply, 'composite after apply');
@@ -254,12 +336,19 @@ test('demo spine: recruiter and candidate, through the browser', async ({ browse
       expectScore(rowComposite, 'recruiter row composite');
       expect(rowComposite, 'recruiter row composite equals the response').toBe(item.score.composite);
       expect(rowComposite, 'the recruiter sees the composite the candidate saw').toBe(ids.step3Composite);
+      // R-27 (D§7.1 W4): not assessed yet, so the row leads with the state, not a bare low score.
+      expect(item.score_state, 'the list says the applicant is awaiting the assessment').toBe('awaiting_assessment');
+      await expect(rowScore).toHaveAttribute('data-score-state', 'awaiting_assessment');
+      await expect(row.getByTestId('awaiting-assessment')).toBeVisible();
 
       const { status: ds, body: detail } = await actAndWait(p, 'GET', new RegExp(`^/api/recruiter/applications/${ids.applicationId}$`),
         () => row.getByTestId('open-drilldown').click());
       expect(ds, 'the drill-down loads').toBe(200);
       const drill = p.getByTestId('drilldown');
       await expect(drill).toHaveAttribute('data-state', 'ready');
+      expectWeightsRule(detail, 'step 4', { assessed: false });
+      await expect(drill.getByTestId('drilldown-awaiting')).toBeVisible();
+      await expect(drill.getByTestId('weights-version')).toContainText('w2-2026-11-13');
       const view = await checkDrilldown(drill, detail, 'step 4');
       expect(view.composite).toBe(rowComposite);
       expect(view.available.assessment_results, 'no assessment sub-score before the assessment').toBe(false);
@@ -401,6 +490,19 @@ test('demo spine: recruiter and candidate, through the browser', async ({ browse
       if (es === 200) {
         resultBody = graded;
         await expect(p.getByTestId('assessment-state')).toHaveAttribute('data-state', 'completed');
+      } else if (isGatewayTimeout(es, graded)) {
+        // R-33: the grade may still be stored after the 504. The page shows "Still working" and
+        // reads status back until the attempt leaves in_progress / grading_pending.
+        timeouts.push('evaluate');
+        note('evaluate answered 504 upstream_timeout; the page reads the status back (R-33)');
+        const done = await waitAssessmentState(p, ['in_progress', 'grading_pending'], Math.max(STILL_WAIT_MS, GRADING_WAIT_MS - (Date.now() - tg)));
+        if (done.timedOut && done.state === 'grading_pending') {
+          providerFailure(testInfo, `grading was still pending after the evaluate 504 and ${STILL_WAIT_MS / 1000} s of reading the status back.`);
+        }
+        expect(done.state, 'after the 504 the page ended on the completed attempt').toBe('completed');
+        await candResponses.settle();
+        resultBody = candResponses.entries.filter((e) => e.path === '/api/assessment/status' && e.body?.state === 'completed')
+          .map((e) => e.body.result).filter(Boolean).pop() || null;
       } else if (graded?.state === 'grading_pending') {
         note(`evaluate answered ${es} ${graded.error || ''}${graded.reason ? ` (${graded.reason})` : ''}; waiting for grading`);
         const done = await waitAssessmentState(p, ['grading_pending', 'in_progress'], GRADING_WAIT_MS - (Date.now() - tg));
@@ -420,6 +522,8 @@ test('demo spine: recruiter and candidate, through the browser', async ({ browse
 
       const resultView = p.getByTestId('assessment-result');
       await expect(resultView).toBeVisible();
+      await expect(p.getByTestId('still-working')).toHaveCount(0);
+      await expect(p.getByTestId('still-working-note')).toHaveCount(0);
       expect(resultBody, 'the page received the graded result').toBeTruthy();
       const score = Number(resultBody.score);
       expectScore(score, 'assessment score');
@@ -452,8 +556,9 @@ test('demo spine: recruiter and candidate, through the browser', async ({ browse
         .filter((e) => (ASSESSMENT_PATH.test(e.path) || isApplicationResult(e.path)) && e.bodyError)
         .map((e) => `${e.method} ${e.path} (${e.status}): ${e.bodyError}`);
       expect(unread, 'every assessment and result response body could be read (an unread body cannot be called clean)').toEqual([]);
-      const hits = candResponses.entries.flatMap((e) => findFieldNames(e.body).map((where) => `${e.method} ${e.path} ${where}`));
-      expect(hits, `no candidate response carries ${ANSWER_KEY_FIELDS.join(', ')}`).toEqual([]);
+      // R-37: `explanation` also counts on /api/assessment/ responses (lib/network.mjs answerKeyFieldsFor).
+      const hits = findAnswerKeyLeaks(candResponses.entries);
+      expect(hits, `no candidate response carries ${ANSWER_KEY_FIELDS.join(', ')} (or explanation on an assessment response)`).toEqual([]);
       for (const field of ANSWER_KEY_FIELDS) {
         expect(assessmentResultHtml, `the assessment result page does not contain "${field}"`).not.toContain(field);
         expect(resultPageHtml, `the Result page does not contain "${field}"`).not.toContain(field);
@@ -482,6 +587,8 @@ test('demo spine: recruiter and candidate, through the browser', async ({ browse
       for (const h of Array.isArray(detail.score_history) ? detail.score_history : []) {
         recordLeftover('scores', h.id, `score row for ${title} (composite ${h.composite})`);
       }
+      expectWeightsRule(detail, 'step 7', { assessed: true });
+      await expect(drill.getByTestId('drilldown-awaiting')).toHaveCount(0);
       const view = await checkDrilldown(drill, detail, 'step 7');
       expect(view.composite).toBe(rowComposite);
       expect(detail.score.id, 'a new score row after the assessment').not.toBe(ids.firstScoreId);
@@ -492,6 +599,12 @@ test('demo spine: recruiter and candidate, through the browser', async ({ browse
       await expect(drill.getByTestId('drilldown-assessment-state')).toHaveAttribute('data-state', 'completed');
       note(`step 7 sub-scores available: ${JSON.stringify(view.available)}; weights ${JSON.stringify(view.weights)}`);
     });
+
+    // R-33: in the short-timeout run the "Still working" path must really have been exercised.
+    note(`gateway 504s seen and recovered from: ${timeouts.length ? timeouts.join(', ') : 'none'}`);
+    if (EXPECT_GATEWAY_TIMEOUT) {
+      expect(timeouts.length, 'E2E_EXPECT_GATEWAY_TIMEOUT=1: apply or evaluate answered 504 (check the gateway was started with the short PROXY_TIMEOUT_* values)').toBeGreaterThan(0);
+    }
   } finally {
     testInfo.annotations.push({ type: 'step-timings', description: timings.join(' | ') });
   }

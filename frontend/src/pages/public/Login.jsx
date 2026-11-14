@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useId } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, Building2, Zap, Eye, EyeOff, ArrowRight, ShieldAlert, MailCheck } from 'lucide-react';
+import { Mail, Lock, User, Zap, Eye, EyeOff, ArrowRight, ShieldAlert, MailCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 
@@ -23,6 +23,16 @@ const classifyLoginError = (err) => {
   if (err?.status === 403) return 'unconfirmed';
   return 'error';
 };
+
+// R-31: the sign-up body. The same five fields for every role: the form asks for no company
+// or verification details (the profile columns stay; nothing writes them from here).
+export const buildSignupPayload = ({ email, password, username, role, name }) => ({ email, password, username, role, name });
+
+// R-31: the post-sign-up page's heading already says "Account created", so the server's message
+// (auth.controller.js signup: "Account created. Check your email ...") is shown without that
+// opening sentence. Nothing else in the message is changed.
+export const signupFollowUp = (message) =>
+  String(message || '').replace(/^\s*Account created(?: successfully)?\.\s*/i, '').trim();
 
 const ERROR_TITLES = {
   suspended: 'Account access paused',
@@ -147,10 +157,8 @@ function Login() {
   // Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [companyName, setCompanyName] = useState('');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
-  const [verificationInfo, setVerificationInfo] = useState('');
   const [signupRole, setSignupRole] = useState('candidate');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login: loginWithSession, refreshUser, user, loading: authLoading } = useAuth();
@@ -175,10 +183,6 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // "Skip Verification & Continue" is a second submit button: the browser still
-    // checks the required fields, and the payload leaves the optional details out.
-    const skipVerification = e.nativeEvent?.submitter?.name === 'skip-verification';
-
     setAuthError(null);
     setSuccessMessage('');
     setIsSubmitting(true);
@@ -197,22 +201,14 @@ function Login() {
       return;
     }
 
-    const payload = { email, password, username, role: signupRole, name };
-    if (isRecruiter && !skipVerification) {
-      payload.companyName = companyName;
-      payload.verificationInfo = verificationInfo;
-    }
+    const payload = buildSignupPayload({ email, password, username, role: signupRole, name });
 
     try {
       const data = await api.post('/api/auth/signup', payload);
-      if (skipVerification) {
-        setCompanyName('');
-        setVerificationInfo('');
-      }
       // Signup does not create a session (auth.controller.js signup). Show the
       // server's own message: with email confirmation on, it asks the person to
       // confirm before signing in.
-      setSignupDone({ email: email.trim(), message: data?.message || 'Account created.' });
+      setSignupDone({ email: email.trim(), message: signupFollowUp(data?.message) });
     } catch (err) {
       setAuthError({ kind: 'signup', message: err.message });
     } finally {
@@ -256,7 +252,7 @@ function Login() {
               <MailCheck className="h-6 w-6 text-foreground" />
             </div>
             <h1 className="text-h2 text-foreground mb-2">Account created</h1>
-            <p className="text-body-sm text-foreground">{signupDone.message}</p>
+            {signupDone.message && <p className="text-body-sm text-foreground">{signupDone.message}</p>}
             {signupDone.email && (
               <p className="mt-2 text-body-sm text-muted-foreground">
                 Email address: <span className="font-medium text-foreground">{signupDone.email}</span>
@@ -397,46 +393,7 @@ function Login() {
                 required
               />
 
-              {/* Recruiter Extra Fields */}
-              <AnimatePresence>
-                {!isLogin && isRecruiter && (
-                  <motion.div
-                    className="pt-2 space-y-4"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                  >
-                    <div className="border-t border-border pt-4">
-                      <p className="text-body-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                        <Building2 className="w-4 h-4" />
-                        Verification Details (Optional)
-                      </p>
-
-                      <div className="space-y-4">
-                        <AnimatedInput
-                          icon={Building2}
-                          label="Company Name"
-                          type="text"
-                          value={companyName}
-                          onChange={(e) => setCompanyName(e.target.value)}
-                          placeholder="Acme Corp"
-                        />
-
-                        <AnimatedInput
-                          icon={Mail}
-                          label="LinkedIn / Company Website"
-                          type="text"
-                          value={verificationInfo}
-                          onChange={(e) => setVerificationInfo(e.target.value)}
-                          placeholder="https://"
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Submit Button */}
+              {/* Submit Button: the only one, for every role (R-31) */}
               <motion.button
                 type="submit"
                 name="submit"
@@ -459,19 +416,6 @@ function Login() {
                   </>
                 )}
               </motion.button>
-
-              {!isLogin && isRecruiter && (
-                <motion.button
-                  type="submit"
-                  name="skip-verification"
-                  disabled={isSubmitting}
-                  className="w-full h-10 rounded-md border border-input bg-background text-foreground font-medium text-body-sm hover:bg-muted transition-colors disabled:opacity-50"
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                >
-                  Skip Verification & Continue
-                </motion.button>
-              )}
             </form>
 
             {isLogin && (

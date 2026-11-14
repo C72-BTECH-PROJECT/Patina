@@ -15,6 +15,71 @@ class AssessmentValidationError(ValueError):
     """Raised when generated assessment content is invalid."""
 
 
+# ── R-29 (MUST 3): options that do not give the answer away ─────────────────
+# A multiple-choice question is rejected when its correct option is BOTH longer
+# than `max_length_ratio` x the mean length of its three distractors AND at
+# least `min_length_gap` characters longer than that mean. The ratio alone
+# misfires on short options ("PATCH" against POST/PUT/GET, `ls -la` against
+# cd/pwd/rm), where a few characters are no tell. Lengths are characters after
+# collapsing whitespace. Only length is judged: a rule on grammatical form was
+# tried and withdrawn (it rejected reasonable questions); the prompt still asks
+# for options of the same form.
+
+
+def _normalised(text: str) -> str:
+    return " ".join(str(text).split())
+
+
+def mcq_option_tell(
+    options: list[dict[str, Any]],
+    correct_label: str,
+    *,
+    max_length_ratio: float,
+    min_length_gap: float,
+) -> str | None:
+    """Why this question's options give the answer away, or None when they do not."""
+    correct = next(o for o in options if o["label"] == correct_label)
+    distractors = [o for o in options if o["label"] != correct_label]
+
+    correct_len = len(_normalised(correct["text"]))
+    mean_len = sum(len(_normalised(o["text"])) for o in distractors) / len(distractors)
+    gap = correct_len - mean_len
+    if mean_len > 0 and correct_len > max_length_ratio * mean_len and gap >= min_length_gap:
+        return (
+            f"the correct option is {correct_len / mean_len:.2f}x and {gap:.1f} "
+            f"characters longer than the mean length of the distractors (limit "
+            f"{max_length_ratio:g}x and {min_length_gap:g} characters)"
+        )
+    return None
+
+
+def option_tell_violations(
+    questions_json: dict[str, Any],
+    answers_json: dict[str, Any],
+    *,
+    max_length_ratio: float,
+    min_length_gap: float,
+) -> dict[str, str]:
+    """{question_id: reason} for every MCQ in a validated pool that fails the R-29 rule."""
+    correct_by_id = {
+        answer["question_id"]: answer.get("correct_option")
+        for answer in answers_json["answers"]
+    }
+    violations = {}
+    for question in questions_json["questions"]:
+        if question["question_type"] != "mcq":
+            continue
+        reason = mcq_option_tell(
+            question["options"],
+            correct_by_id[question["question_id"]],
+            max_length_ratio=max_length_ratio,
+            min_length_gap=min_length_gap,
+        )
+        if reason:
+            violations[question["question_id"]] = reason
+    return violations
+
+
 def validate_assessment(
     payload: dict[str, Any],
     candidate_id: str,

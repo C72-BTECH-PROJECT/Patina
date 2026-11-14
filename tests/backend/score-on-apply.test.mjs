@@ -59,7 +59,7 @@ const newCandidate = () => `11111111-1111-4111-8111-${String(++candidateSeq).pad
 // ---- Supabase stub: an in-memory PostgREST (eq / in filters, order, limit, one embed) + Storage ----
 const tables = { jobs: [], applications: [], resumes: [], scores: [], assessments: [] };
 const store = new Map(); // object path -> { bytes, contentType, updated_at }
-let supaMode = {};       // { listError, assessmentError, scoreInsertError, applicationInsertError }
+let supaMode = {};       // { listError, assessmentError, scoreInsertError, applicationInsertError, applicationReadError, scoreReadError, jobReadError }
 let clock = Date.parse('2026-11-14T10:00:00Z');
 const stamp = () => new Date(clock += 1000).toISOString();
 
@@ -135,6 +135,9 @@ const supabaseHandler = (req, res, rec) => {
   }
   if (req.method === 'GET') {
     if (table === 'assessments' && supaMode.assessmentError) return dbError(res);
+    if (table === 'applications' && supaMode.applicationReadError) return dbError(res);
+    if (table === 'scores' && supaMode.scoreReadError) return dbError(res);
+    if (table === 'jobs' && supaMode.jobReadError) return dbError(res);
     let rows = filterRows(tables[table], params);
     if (table === 'applications' && /job:jobs/.test(params.get('select') || '')) {
       rows = rows.map((a) => ({ ...a, job: tables.jobs.find((j) => j.id === a.job_id) || null }));
@@ -302,7 +305,7 @@ const ready = (resumeBytes = F1) => {
 };
 
 // ---- tests ----
-test('apply with scoring OK -> 201 scored; one inserted score row; weights sum to 1; band and ownership note present', async () => {
+test('apply with scoring OK -> 201 scored; one inserted score row; weights plus unearned sum to 1; band and ownership note present', async () => {
   const { candidateId, job } = ready();
   const { res, body, text } = await apply(candidateId, job.id, { requestId: 'r10-req-0001' });
   assert.equal(res.status, 201, text);
@@ -315,7 +318,16 @@ test('apply with scoring OK -> 201 scored; one inserted score row; weights sum t
   const rows = scoresFor(candidateId, job.id);
   assert.equal(rows.length, 1, 'exactly one scores row');
   const row = rows[0];
-  assert.ok(Math.abs(weightSum(row.weights) - 1) < 1e-3, `weights sum to ${weightSum(row.weights)}`);
+  // R-27 (D§7.1): before the assessment the weights are 0.20 + 0.35 and 0.45 is unearned
+  // (was: renormalised to sum to 1).
+  assert.ok(Math.abs(weightSum(row.weights) + row.explanation.unearned_weight - 1) < 1e-3,
+    `weights ${weightSum(row.weights)} plus unearned ${row.explanation.unearned_weight}`);
+  assert.equal(row.weights[P], 0.2);
+  assert.equal(row.weights[G], 0.35);
+  assert.equal(row.explanation.unearned_weight, 0.45);
+  assert.ok(Number(row.composite_score) <= 55, 'no assessment: at most 55');
+  assert.equal(row.explanation.verification, 'partly_verified');
+  assert.equal(row.explanation.weights_version, 'w2-2026-11-13');
   assert.equal(row.subscores[P].available, true);
   assert.equal(row.subscores[G].available, true, 'GitHub fixture is active');
   assert.equal(row.subscores[A].available, false);
@@ -364,10 +376,15 @@ test('apply with the parser down -> 201 failed parser_unavailable; application e
   const mine = await call('GET', '/api/jobs/my-applications', { user: candidateId });
   assert.deepEqual(mine.body.find((a) => a.job_id === job.id).scoring, { state: 'pending' });
 
-  // Applying again is a conflict, not a second application.
+  // Applying again is not a second application. R-33 changed this answer from 409 to
+  // 200 with the existing application and its (pending) scoring state.
   process.env.NLP_PARSE_URL = nlpUrl;
-  assert.equal((await apply(candidateId, job.id)).res.status, 409);
+  const repeat = await apply(candidateId, job.id);
+  assert.equal(repeat.res.status, 200, repeat.text);
+  assert.equal(repeat.body.id, body.id);
+  assert.deepEqual(repeat.body.scoring, { state: 'pending' });
   assert.equal(tables.applications.filter((a) => a.candidate_id === candidateId).length, 1);
+  assert.equal(scoresFor(candidateId, job.id).length, 0, 'a repeated apply does not score');
 
   // Parser back: score-again as the candidate succeeds and the list reads `scored`.
   const appId = applicationOf(candidateId, job.id).id;
@@ -421,8 +438,9 @@ test('missing similarity -> parsing UNAVAILABLE with a reason, weights redistrib
   assert.equal(parsing.weight, 0);
   assert.equal(parsing.components.reason_code, 'no_similarity');
   assert.match(parsing.reason, /not scored/);
-  assert.equal(row.weights[G], 1, 'all weight moves to the evidence that exists');
-  assert.equal(Number(row.composite_score), row.subscores[G].value);
+  // R-27 (option (b)): GitHub keeps its own 0.35 before the assessment (was 1).
+  assert.equal(row.weights[G], 0.35, 'GitHub never takes the assessment share');
+  assert.equal(Number(row.composite_score), Math.round(row.subscores[G].value * 0.35 * 100) / 100);
 });
 
 test('no evidence at all (no similarity, no GitHub link, no assessment) -> failed no_evidence, application kept, no score row', async () => {
@@ -463,7 +481,8 @@ test('GitHub down degrades the score (evidence-limited), it does not fail scorin
   assert.deepEqual(body.scoring, { status: 'scored', reason: null });
   const [row] = scoresFor(candidateId, job.id);
   assert.equal(row.subscores[G].components.reason_code, 'service_unavailable');
-  assert.equal(row.weights[P], 1);
+  assert.equal(row.weights[P], 0.2, 'R-27: the résumé keeps its fixed 0.20 (was 1)');
+  assert.equal(row.explanation.verification, 'unverified');
   assert.equal(row.evidence_limited, true);
 });
 
@@ -567,4 +586,94 @@ test('scoreApplication contract: reasons are stable codes; never throws; job loa
   assert.equal(out.score.id, scoresFor(candidateId, job.id)[0].id);
   assert.equal(out.score.band, mods.x.scoreBand(out.score.composite));
   assert.equal(out.parserVersion, SNAP.f1.parser_version);
+});
+
+// ---- R-33: a retry after a gateway timeout is harmless; a lookup error is never "not applied" ----
+test('R-33: second apply -> 200 with the same application id and one application row; scored state and newest score; nothing re-scored', async () => {
+  const { candidateId, job } = ready();
+  const first = await apply(candidateId, job.id);
+  assert.equal(first.res.status, 201, first.text);
+  assert.equal(first.body.scoring.status, 'scored');
+  const scoreRows = scoresFor(candidateId, job.id).length;
+
+  const second = await apply(candidateId, job.id, { requestId: 'r33-repeat-apply' });
+  assert.equal(second.res.status, 200, second.text);
+  assert.equal(second.body.id, first.body.id, 'the same application id');
+  assert.equal(second.body.already_applied, true);
+  assert.equal(second.body.candidate_id, candidateId);
+  assert.equal(second.body.job_id, job.id);
+  assert.equal(second.body.status, 'submitted');
+  assert.deepEqual(second.body.scoring, { state: 'scored' });
+  const [row] = scoresFor(candidateId, job.id);
+  // R-28 (D§7.1 W3): the verification state goes with the band, as on GET /my-applications.
+  assert.deepEqual(second.body.score, {
+    composite: Number(row.composite_score),
+    band: mods.x.scoreBand(row.composite_score),
+    verification: mods.x.scoreVerification(row.subscores),
+  });
+  assert.ok(second.body.score.verification, 'a stored score has a verification state');
+  assert.equal(tables.applications.filter((a) => a.candidate_id === candidateId && a.job_id === job.id).length, 1, 'one application row');
+  assert.equal(scoresFor(candidateId, job.id).length, scoreRows, 'no new score row');
+  // (The first apply's background preparation parses too, so calls are matched by request id.)
+  const byRepeat = (r) => r.headers['x-request-id'] === 'r33-repeat-apply';
+  assert.equal(nlp.requests.filter(byRepeat).length, 0, 'no parse on a repeat');
+  assert.equal(gh.requests.filter(byRepeat).length, 0, 'no GitHub call on a repeat');
+  assertNoLeak(second.text);
+});
+
+test('R-33: a repeated apply whose existing-row or score lookup fails -> 500 JSON, never an invented state', async () => {
+  const { candidateId, job } = ready();
+  assert.equal((await apply(candidateId, job.id)).res.status, 201);
+  for (const mode of [{ applicationReadError: true }, { scoreReadError: true }]) {
+    supaMode = mode;
+    const r = await apply(candidateId, job.id);
+    assert.equal(r.res.status, 500, `${JSON.stringify(mode)}: ${r.text}`);
+    assert.match(r.res.headers.get('content-type') || '', /application\/json/);
+    assert.equal(r.body.error, 'database_error');
+    assert.ok(!('scoring' in r.body) && !('id' in r.body), r.text);
+    assertNoLeak(r.text);
+  }
+  supaMode = {};
+  assert.equal(tables.applications.filter((a) => a.candidate_id === candidateId && a.job_id === job.id).length, 1);
+});
+
+test('R-33: getJobById with a failing applications lookup -> 500 JSON, not applied: false', async () => {
+  const { candidateId, job } = ready();
+  let r = await call('GET', `/api/jobs/${job.id}`, { user: candidateId });
+  assert.equal(r.res.status, 200, r.text);
+  assert.equal(r.body.applied, false, 'no application yet');
+
+  supaMode = { applicationReadError: true };
+  r = await call('GET', `/api/jobs/${job.id}`, { user: candidateId });
+  assert.equal(r.res.status, 500, r.text);
+  assert.match(r.res.headers.get('content-type') || '', /application\/json/);
+  assert.equal(r.body.error, 'database_error');
+  assert.equal(typeof r.body.message, 'string');
+  assert.ok(!('applied' in r.body), `a lookup error must not read as applied: false: ${r.text}`);
+  assertNoLeak(r.text);
+
+  supaMode = {};
+  assert.equal((await apply(candidateId, job.id)).res.status, 201);
+  r = await call('GET', `/api/jobs/${job.id}`, { user: candidateId });
+  assert.equal(r.body.applied, true);
+});
+
+test('R-38: getJobById with a failing job lookup -> 500 JSON database_error, not 404 "Job not found"; a missing or malformed id is still 404', async () => {
+  const { candidateId, job } = ready();
+  supaMode = { jobReadError: true };
+  let r = await call('GET', `/api/jobs/${job.id}`, { user: candidateId });
+  supaMode = {};
+  assert.equal(r.res.status, 500, r.text);
+  assert.match(r.res.headers.get('content-type') || '', /application\/json/);
+  assert.equal(r.body.error, 'database_error');
+  assert.equal(typeof r.body.message, 'string');
+  assert.ok(!/not found/i.test(r.body.message), `a lookup error must not read as a missing job: ${r.text}`);
+  assertNoLeak(r.text);
+
+  r = await call('GET', `/api/jobs/${randomUUID()}`, { user: candidateId });
+  assert.equal(r.res.status, 404, r.text);
+  r = await call('GET', '/api/jobs/not-a-uuid', { user: candidateId });
+  assert.equal(r.res.status, 404, r.text);
+  r = await call('GET', `/api/jobs/${job.id}`, { user: candidateId });
+  assert.equal(r.res.status, 200, r.text);
 });

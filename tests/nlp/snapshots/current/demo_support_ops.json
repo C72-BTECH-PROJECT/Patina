@@ -1,0 +1,163 @@
+{
+  "entities": {
+    "candidate_name": "Teodor Halloway",
+    "education": [
+      {
+        "dates": "2014 – 2017",
+        "degree": "B.Sc. in Information Technology",
+        "grade": null,
+        "graduation_year": 2017,
+        "honours": null,
+        "institution": "Example University",
+        "text": "B.Sc. in Information Technology - Example University (2014 - 2017)"
+      }
+    ],
+    "email": "teodor.halloway@example.com",
+    "experience": [
+      {
+        "dates": "Apr 2021 – Present",
+        "highlights": [
+          "Own the L2 incident queue in ServiceNow for 1,400 staff on six sites; 95% of P2 tickets closed inside SLA.",
+          "Run ITIL change and problem management for monthly Windows Server patching of 210 servers.",
+          "Added Nagios checks for disk space, services and certificate expiry; disk-full incidents fell by 90%.",
+          "Wrote PowerShell and Python scripts that automate Active Directory joiner and leaver tasks.",
+          "Investigate data problems in the warehouse application's PostgreSQL database with read-only SQL."
+        ],
+        "organisation": "Wide World Importers ()",
+        "title": "IT Operations Engineer"
+      },
+      {
+        "dates": "Jul 2018 – Mar 2021",
+        "highlights": [
+          "First-line support for 300 staff; tracked requests and problems in Jira Service Management.",
+          "Managed Active Directory accounts, Group Policy and Windows Server file shares.",
+          "Kept the team's runbooks in Git alongside the infrastructure scripts."
+        ],
+        "organisation": "Alpine Ski House ()",
+        "title": "Service Desk Analyst"
+      }
+    ],
+    "github": null,
+    "linkedin": null,
+    "links": [],
+    "phone": "+12025550164",
+    "projects": [],
+    "skill_count": 13,
+    "skills": [
+      "python",
+      "powershell",
+      "postgresql",
+      "git",
+      "linux",
+      "servicenow",
+      "jira",
+      "itil",
+      "nagios",
+      "active directory",
+      "windows server",
+      "group policy",
+      "sql"
+    ]
+  },
+  "filename": "demo_support_ops.pdf",
+  "parser_version": "nlp-engine@2.2.0",
+  "preprocessing": {
+    "noun_chunks_preview": [
+      "teodor halloway",
+      "| +1",
+      "springfield",
+      "summary\nit operations",
+      "seven years",
+      "service desk",
+      "l2 support",
+      "windows",
+      "linux estates",
+      "incidents"
+    ],
+    "sentence_count": 9,
+    "token_count": 142,
+    "tokens_preview": [
+      "teodor",
+      "halloway",
+      "springfield",
+      "summary",
+      "operation",
+      "engineer",
+      "seven",
+      "year",
+      "service",
+      "desk",
+      "support",
+      "windows",
+      "linux",
+      "estate",
+      "patch",
+      "monitor",
+      "document",
+      "run",
+      "incident",
+      "closure"
+    ]
+  },
+  "raw_text": "Teodor Halloway\nteodor.halloway@example.com | +1 (202) 555-0164 | Springfield\nSUMMARY\nIT operations engineer with seven years of service desk and L2 support.\nI keep Windows and Linux estates patched, monitored and documented, and I\nrun incidents to closure. Most of my work is internal, so there is no public code.\nSKILLS\nServiceNow, Jira Service Management, ITIL 4, Nagios, Active Directory,\nWindows Server, Group Policy, PowerShell, Linux, SQL, PostgreSQL, Python scripting\nEXPERIENCE\nIT Operations Engineer - Wide World Importers (Apr 2021 - Present)\n- Own the L2 incident queue in ServiceNow for 1,400 staff on six sites; 95% of P2 tickets closed inside SLA.\n- Run ITIL change and problem management for monthly Windows Server patching of 210 servers.\n- Added Nagios checks for disk space, services and certificate expiry; disk-full incidents fell by 90%.\n- Wrote PowerShell and Python scripts that automate Active Directory joiner and leaver tasks.\n- Investigate data problems in the warehouse application's PostgreSQL database with read-only SQL.\nService Desk Analyst - Alpine Ski House (Jul 2018 - Mar 2021)\n- First-line support for 300 staff; tracked requests and problems in Jira Service Management.\n- Managed Active Directory accounts, Group Policy and Windows Server file shares.\n- Kept the team's runbooks in Git alongside the infrastructure scripts.\nCERTIFICATIONS\nITIL 4 Foundation (2020)\nEDUCATION\nB.Sc. in Information Technology - Example University (2014 - 2017)",
+  "raw_text_preview": "Teodor Halloway\nteodor.halloway@example.com | +1 (202) 555-0164 | Springfield\nSUMMARY\nIT operations engineer with seven years of service desk and L2 support.\nI keep Windows and Linux estates patched, monitored and documented, and I\nrun incidents to closure. Most of my work is internal, so there is n",
+  "raw_text_truncated": false,
+  "semantic_analysis": {
+    "component_weights": {
+      "semantic_score": 0.4,
+      "skill_coverage": 0.6
+    },
+    "focused_score": 0.3927,
+    "full_text_score": 0.242,
+    "jd_embedding_size": 384,
+    "jd_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "docker",
+      "git",
+      "rest api",
+      "react",
+      "redis",
+      "aws",
+      "kubernetes"
+    ],
+    "jd_source": "structured_skills",
+    "match_level": "Weak Match",
+    "match_reason": "Matched 4 of 10 job skills (from the role's listed required/preferred skills); missing: docker, rest api, react, redis, aws, kubernetes.",
+    "matched_skills": [
+      "python",
+      "sql",
+      "postgresql",
+      "git"
+    ],
+    "missing_skills": [
+      "docker",
+      "rest api",
+      "react",
+      "redis",
+      "aws",
+      "kubernetes"
+    ],
+    "resume_embedding_size": 384,
+    "resume_skills": [
+      "python",
+      "powershell",
+      "postgresql",
+      "git",
+      "linux",
+      "servicenow",
+      "jira",
+      "itil",
+      "nagios",
+      "active directory",
+      "windows server",
+      "group policy",
+      "sql"
+    ],
+    "semantic_score": 0.34,
+    "similarity_score": 0.376,
+    "skill_coverage": 0.4
+  },
+  "status": "success"
+}

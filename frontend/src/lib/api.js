@@ -32,6 +32,8 @@
 // Note: with the gateway up and core down, the gateway answers 502 'upstream_unavailable'
 // (an ApiError with a status, not a network error). Any ApiError on a list load is an
 // error state, never an empty list. Also exported: isAborted(err).
+// R-33: a 504 or a dropped connection on apply, score-again, evaluate or reset is "Still
+// working", not a failure: isStillWorking(err) and pollServerState(...) at the end of this file.
 //
 // Base URL: REACT_APP_API_BASE_URL, read once at build time by Create React App.
 // The only default is the local gateway on port 5000 (gateway/index.js). Credentials
@@ -140,6 +142,90 @@ async function request(method, path, body, options = {}) {
 }
 
 const dataOf = (promise) => promise.then((result) => result.data);
+
+// ---------------------------------------------------------------------------
+// R-33: "Still working" after a gateway timeout or a dropped connection.
+//
+// The gateway answers 504 `upstream_timeout` when core is silent for its proxy timeout
+// (60 s; 130 s on evaluate), but core keeps working: the application, score, grade or
+// reset can still be saved after that answer. So for apply, score-again, evaluate and the
+// recruiter's reset, such an error is not shown as a failure. The page says "Still
+// working" and reads the real state from the server every STILL_WORKING_POLL_MS for at
+// most STILL_WORKING_LIMIT_MS, then shows what the server holds. Nothing is assumed:
+// what is shown always comes from a read.
+// ---------------------------------------------------------------------------
+
+/** How often the real state is read while a page shows "Still working". */
+export const STILL_WORKING_POLL_MS = 3000;
+/** How long it is read before the page shows what the server holds (3 minutes). */
+export const STILL_WORKING_LIMIT_MS = 180000;
+
+/**
+ * True when the request's outcome is unknown and may still complete on the server:
+ * a gateway timeout (504) or a connection that dropped before any HTTP answer.
+ */
+export const isStillWorking = (err) =>
+  err instanceof ApiError && (err.status === 504 || err.error === 'upstream_timeout' || err.error === 'network_error');
+
+const wait = (ms, signal) => new Promise((resolve, reject) => {
+  if (signal?.aborted) {
+    reject(new ApiError({ status: 0, error: 'aborted', message: ABORTED_MESSAGE }));
+    return;
+  }
+  const onAbort = () => {
+    clearTimeout(t);
+    reject(new ApiError({ status: 0, error: 'aborted', message: ABORTED_MESSAGE }));
+  };
+  const t = setTimeout(() => {
+    signal?.removeEventListener?.('abort', onAbort);
+    resolve();
+  }, ms);
+  signal?.addEventListener?.('abort', onAbort, { once: true });
+});
+
+/**
+ * Read the server's state until `isSettled(value)` or the time runs out.
+ * The first read is immediate; then one read every `intervalMs`, while the elapsed
+ * time plus one interval stays within `limitMs`. A read error does not stop it.
+ * Resolves to:
+ *   { settled: true,  value, hasValue: true,  error: null, reads }
+ *   { settled: false, value (the last successful read, or undefined), hasValue,
+ *     error (the last read's error, or null if the last read succeeded), reads }
+ * Rejects only with an 'aborted' ApiError when `signal` aborts.
+ * `now` and `sleep` are injectable for tests.
+ */
+export async function pollServerState(read, isSettled, {
+  signal, intervalMs = STILL_WORKING_POLL_MS, limitMs = STILL_WORKING_LIMIT_MS,
+  now = () => Date.now(), sleep = wait,
+} = {}) {
+  const started = now();
+  let value;
+  let hasValue = false;
+  let error = null;
+  let reads = 0;
+  for (;;) {
+    if (signal?.aborted) throw new ApiError({ status: 0, error: 'aborted', message: ABORTED_MESSAGE });
+    try {
+      const v = await read(signal);
+      reads += 1;
+      value = v;
+      hasValue = true;
+      error = null;
+      if (isSettled(v)) return { settled: true, value: v, hasValue: true, error: null, reads };
+    } catch (err) {
+      if (isAborted(err) || signal?.aborted) throw new ApiError({ status: 0, error: 'aborted', message: ABORTED_MESSAGE });
+      reads += 1;
+      error = err;
+    }
+    if (now() - started + intervalMs > limitMs) {
+      return { settled: false, value: hasValue ? value : undefined, hasValue, error, reads };
+    }
+    await sleep(intervalMs, signal);
+  }
+}
+
+/** Whole seconds, for "checked for N s" texts. */
+export const stillWorkingSeconds = (ms = STILL_WORKING_LIMIT_MS) => Math.round(ms / 1000);
 
 export const api = {
   request,

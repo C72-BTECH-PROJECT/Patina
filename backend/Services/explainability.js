@@ -4,9 +4,10 @@
 //
 // This module owns three things and nothing else:
 //   1. Turning each evidence source into a normalised 0-100 **sub-score**.
-//   2. Aggregating available sub-scores into the composite, redistributing the
-//      weight of sources that produced no evidence (4.7 / GF-4) instead of
-//      scoring them as zero.
+//   2. Aggregating available sub-scores into the composite by the weight rule of
+//      REBUILD/DECISIONS.md §7.1 (weightPlan below): a source with no evidence is
+//      never scored as zero (4.7 / GF-4), the résumé's share is fixed, and a share
+//      no source earned stays unearned. Plus the verification state (W3).
 //   3. Emitting an **explanation record** stating which factors contributed, in
 //      which direction, with what weight, citing the evidence underneath.
 //
@@ -38,10 +39,9 @@
 //   { type:'metric',    key, label, value, display, direction, weight_within_factor, note }
 //
 // To add a source later: write a `buildXSubScore()` that returns that shape and
-// drop it into `buildScoreRecord`. Nothing else changes — `aggregate()` picks
-// up the new `available: true` entry, redistributes weight away from whatever
-// is still missing, and `buildExplanation()` renders it. The composite, the
-// weights and the factor list all follow automatically.
+// drop it into `buildScoreRecord`, and give it a place in `weightPlan()`'s rule
+// (D§7.1 names each source's role, so a new one needs a decision first).
+// `buildExplanation()` then renders it.
 //
 // Frontend consumers of this contract:
 //   * recruiter `CandidateModal.jsx` — renders explanation.factors and each
@@ -55,6 +55,8 @@
 //   * candidate `Assessment.jsx` — posts answers to `/api/assessment/evaluate`;
 //     the stored evaluation is what `buildAssessmentSubScore()` turns into the
 //     `assessment_results` entry above.
+
+import { skillIndex, skillKey } from './skillNames.js';
 
 export const SUBSCORE_KEYS = {
   PARSING: 'parsing_semantic_alignment',
@@ -102,24 +104,24 @@ export const GITHUB_REASONS = {
 // job-match similarity is "not measured", never an available 0.
 export const PARSING_REASONS = {
   no_similarity:
-    'The resume parser returned no résumé-to-job similarity for this application, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+    'The resume parser returned no résumé-to-job similarity for this application, so résumé-job alignment was not scored. It was not scored as zero.',
   // R-11 (lead's ruling 2026-11-14): after an assessment is graded the score is
   // recomputed; if the résumé cannot be parsed then, the row is anchored to the
   // newest stored parse and alignment is unavailable with the pipeline's code.
   no_resume:
-    'No résumé file was found when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+    'No résumé file was found when this score was computed, so résumé-job alignment was not scored. It was not scored as zero.',
   storage_error:
-    'The stored résumé could not be read when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+    'The stored résumé could not be read when this score was computed, so résumé-job alignment was not scored. It was not scored as zero.',
   unreadable_document:
-    'The résumé could not be read as text when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+    'The résumé could not be read as text when this score was computed, so résumé-job alignment was not scored. It was not scored as zero.',
   unsupported_file_type:
-    'The résumé file type is not supported, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+    'The résumé file type is not supported, so résumé-job alignment was not scored. It was not scored as zero.',
   parser_unavailable:
-    'The résumé parser was not available when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero. Scoring again once the parser is back would include it.',
+    'The résumé parser was not available when this score was computed, so résumé-job alignment was not scored. It was not scored as zero. Scoring again once the parser is back would include it.',
   parser_failed:
-    'The résumé parser failed when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+    'The résumé parser failed when this score was computed, so résumé-job alignment was not scored. It was not scored as zero.',
   database_error:
-    'The parsed résumé could not be saved when this score was computed, so résumé-job alignment was not scored. Its weight was redistributed rather than scored as zero.',
+    'The parsed résumé could not be saved when this score was computed, so résumé-job alignment was not scored. It was not scored as zero.',
 };
 
 /** Parsing with no measurement: weight 0, value null, the reason in words and as a code. */
@@ -161,21 +163,28 @@ const UNAVAILABLE_REASONS = {
     'No assessment has been completed by this candidate for this job yet. Candidates complete a generated technical assessment from their dashboard.',
 };
 
-// Intended weighting once all three evidence sources exist. Stated here rather
-// than buried in a formula (CHECKLIST 4.3), and overridable per deployment via
+// D§7.1 (W1, approved 2026-11-13): base weights résumé 0.20, GitHub 0.35,
+// assessment 0.45. Stated here rather than buried in a formula (CHECKLIST 4.3),
+// still provisional and uncalibrated, and overridable per deployment via
 // CREDIBILITY_WEIGHTS, e.g.
-//   CREDIBILITY_WEIGHTS={"parsing_semantic_alignment":0.3,"github_evidence":0.4,"assessment_results":0.3}
-// Only sources that actually produced evidence keep their weight; the rest is
-// redistributed proportionally (4.7).
+//   CREDIBILITY_WEIGHTS={"parsing_semantic_alignment":0.2,"github_evidence":0.35,"assessment_results":0.45}
+// An override is read as proportions (it is divided by its own total). How the
+// weights are applied is aggregate()'s rule below (W2 and option (b)).
 const DEFAULT_BASE_WEIGHTS = {
-  [SUBSCORE_KEYS.PARSING]: 0.4,
+  [SUBSCORE_KEYS.PARSING]: 0.2,
   [SUBSCORE_KEYS.GITHUB]: 0.35,
-  [SUBSCORE_KEYS.ASSESSMENT]: 0.25,
+  [SUBSCORE_KEYS.ASSESSMENT]: 0.45,
 };
+
+// D§7.1 W5: stored with every new score as `explanation.weights_version`. Change it
+// whenever a default weight or a rule of D§7.1 changes. A stored row with no
+// version was computed with the v1 rule (0.40 / 0.35 / 0.25, renormalised over
+// whatever was available); the frontend labels it so.
+export const WEIGHTS_VERSION = 'w2-2026-11-13';
 
 const readBaseWeights = () => {
   const raw = process.env.CREDIBILITY_WEIGHTS;
-  if (!raw) return { ...DEFAULT_BASE_WEIGHTS };
+  if (!raw) return { weights: { ...DEFAULT_BASE_WEIGHTS }, source: 'default' };
   try {
     const parsed = JSON.parse(raw);
     const merged = { ...DEFAULT_BASE_WEIGHTS };
@@ -184,15 +193,49 @@ const readBaseWeights = () => {
       if (Number.isFinite(value) && value >= 0) merged[key] = value;
     }
     const total = Object.values(merged).reduce((sum, n) => sum + n, 0);
-    if (total <= 0) return { ...DEFAULT_BASE_WEIGHTS };
-    return merged;
+    if (total <= 0) return { weights: { ...DEFAULT_BASE_WEIGHTS }, source: 'default' };
+    return { weights: merged, source: 'CREDIBILITY_WEIGHTS' };
   } catch {
     console.warn('CREDIBILITY_WEIGHTS is not valid JSON; using default weights.');
-    return { ...DEFAULT_BASE_WEIGHTS };
+    return { weights: { ...DEFAULT_BASE_WEIGHTS }, source: 'default' };
   }
 };
 
-export const BASE_WEIGHTS = readBaseWeights();
+const BASE_WEIGHTS_READ = readBaseWeights();
+export const BASE_WEIGHTS = BASE_WEIGHTS_READ.weights;
+export const BASE_WEIGHTS_SOURCE = BASE_WEIGHTS_READ.source;
+
+// D§7.1 W3: how far a score is verified, by how many INDEPENDENT sources (GitHub,
+// the assessment) produced evidence. The résumé is self-reported and never counts.
+export const VERIFICATION = Object.freeze({
+  UNVERIFIED: 'unverified',
+  PARTLY: 'partly_verified',
+  VERIFIED: 'verified',
+});
+
+/** The verification state of a set of (stored or new) sub-scores; null when nothing is available. */
+export const scoreVerification = (subScores) => {
+  if (!subScores || typeof subScores !== 'object') return null;
+  const avail = (key) => subScores[key]?.available === true;
+  if (!Object.values(SUBSCORE_KEYS).some(avail)) return null;
+  const independent = [SUBSCORE_KEYS.GITHUB, SUBSCORE_KEYS.ASSESSMENT].filter(avail).length;
+  if (independent === 2) return VERIFICATION.VERIFIED;
+  if (independent === 1) return VERIFICATION.PARTLY;
+  return VERIFICATION.UNVERIFIED;
+};
+
+// D§7.1 W4: the assessment states in which a candidate is still awaiting the
+// assessment (the state names of assessment.controller.js candidateView). A
+// completed attempt or used-up attempts (which covers an expired-and-graded one)
+// end it.
+export const AWAITING_ASSESSMENT_STATES = Object.freeze([
+  'not_prepared', 'preparing', 'unavailable', 'ready', 'in_progress', 'grading_pending',
+]);
+const FINAL_ASSESSMENT_STATES = new Set(['completed', 'attempts_used']);
+
+/** 'awaiting_assessment' until the assessment state is `completed` or `attempts_used`, then 'final'. */
+export const scoreState = (assessmentState) =>
+  (FINAL_ASSESSMENT_STATES.has(assessmentState) ? 'final' : 'awaiting_assessment');
 
 const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));
 const round2 = (n) => Math.round(n * 100) / 100;
@@ -653,114 +696,282 @@ export const buildAssessmentSubScore = (evaluation) => {
 
 // --- Aggregation ------------------------------------------------------------
 
-/**
- * Normalise-then-weight (CHECKLIST 4.2 / 4.3). Sub-score values are already on
- * a common 0-100 scale; weight is taken only from the sources that produced
- * evidence and renormalised to sum to 1, so a missing source costs the
- * candidate nothing rather than scoring zero (4.7 / GF-4).
- *
- * Mutates each available sub-score's `weight` and returns the composite.
- */
-export const aggregate = (subScores, baseWeights = BASE_WEIGHTS) => {
-  const available = Object.values(subScores).filter((s) => s?.available);
-  const totalBase = available.reduce((sum, s) => sum + (baseWeights[s.key] || 0), 0);
+const round4 = (n) => Math.round(n * 10000) / 10000;
 
-  for (const sub of Object.values(subScores)) {
-    if (!sub) continue;
-    // 4dp: enough to display, fine enough that the weights still sum to 1.
-    sub.weight = sub.available && totalBase > 0
-      ? Math.round(((baseWeights[sub.key] || 0) / totalBase) * 10000) / 10000
-      : 0;
+/**
+ * The weight each source gets, by the rule of D§7.1 (W2 with option (b)). Sub-score
+ * values are already on a common 0-100 scale (CHECKLIST 4.2). With base shares
+ * r (résumé), g (GitHub), a (assessment) summing to 1 (defaults 0.20 / 0.35 / 0.45):
+ *   - the résumé gets r when it was measured, and never more;
+ *   - assessment available: the rest (1 - the résumé's weight) is split between the
+ *     independent sources that produced evidence, in proportion to g and a. So both
+ *     -> 0.35 / 0.45; GitHub missing -> assessment 0.80 (GitHub is optional, GF-4);
+ *     résumé also missing -> the independent sources share all of it;
+ *   - assessment not available: GitHub (if available) keeps g and never absorbs the
+ *     assessment's share (option (b), the account's ownership is unverified), so the
+ *     ceiling is r + g = 55; with no independent source the composite is r x résumé,
+ *     at most 20.
+ * Whatever no source earned is `unearned`: 1 - the sum of the weights.
+ *
+ * Returns { weights: { key: 0..1 }, unearned }, rounded to 4 dp.
+ */
+export const weightPlan = (subScores, baseWeights = BASE_WEIGHTS) => {
+  const keys = Object.values(SUBSCORE_KEYS);
+  const total = keys.reduce((sum, k) => sum + (Number(baseWeights[k]) || 0), 0);
+  const share = (k) => (total > 0 ? (Number(baseWeights[k]) || 0) / total : 0);
+  const avail = (k) => subScores?.[k]?.available === true;
+  const { PARSING: P, GITHUB: G, ASSESSMENT: A } = SUBSCORE_KEYS;
+
+  const weights = { [P]: 0, [G]: 0, [A]: 0 };
+  if (avail(P)) weights[P] = share(P);
+  if (avail(A)) {
+    const independent = [G, A].filter(avail);
+    const independentBase = independent.reduce((sum, k) => sum + share(k), 0);
+    for (const k of independent) {
+      weights[k] = independentBase > 0 ? (1 - weights[P]) * (share(k) / independentBase) : 0;
+    }
+  } else if (avail(G)) {
+    weights[G] = share(G);
   }
 
-  const composite = available.reduce((sum, s) => sum + s.value * s.weight, 0);
+  for (const k of keys) weights[k] = round4(weights[k]);
+  const anyAvailable = keys.some(avail);
+  const sum = keys.reduce((s, k) => s + weights[k], 0);
+  return { weights, unearned: anyAvailable ? round4(Math.max(0, 1 - sum)) : null };
+};
+
+/**
+ * Applies weightPlan(): sets every sub-score's `weight` (0 for an unavailable one)
+ * and returns the composite, the weighted sum of the available values.
+ */
+export const aggregate = (subScores, baseWeights = BASE_WEIGHTS) => {
+  const { weights } = weightPlan(subScores, baseWeights);
+  let composite = 0;
+  for (const sub of Object.values(subScores)) {
+    if (!sub) continue;
+    sub.weight = sub.available ? (weights[sub.key] ?? 0) : 0;
+    if (sub.available) composite += sub.value * sub.weight;
+  }
   return round2(composite);
 };
 
-// --- Per-skill evidence (CHECKLIST 5.11) ------------------------------------
+// --- Per-skill evidence (CHECKLIST 5.11, D§7.1 skill table, card R-28) ---------
+
+// D§7.1: three statuses only. The résumé never counts as a confirming source.
+export const SKILL_STATUS = Object.freeze({
+  CLAIMED_ONLY: 'claimed_only', // the résumé lists it and no independent source confirms it
+  EVIDENCED: 'evidenced', //       GitHub or the assessment confirms it
+  NOT_FOUND: 'not_found', //       the job asks for it and no source has it
+});
+
+// One mark per source on every row.
+export const SOURCE_MARK = Object.freeze({
+  CONFIRMED: 'confirmed',
+  ABSENT: 'absent', //           the source looked and does not have it
+  UNAVAILABLE: 'unavailable', // the source produced nothing, or cannot check this skill
+});
+
+// R-28: the assessment confirms a skill when the answers on it earned at least
+// this share of its points.
+export const ASSESSMENT_CONFIRM_SHARE = 0.5;
 
 /**
- * One row per skill that either the job asked for or the résumé claimed, with
- * how many of the *available* evidence sources confirm it. No invented
- * per-skill percentages: parsing says matched / missing / claimed only, and
- * GitHub (when available) says evidenced / not_found / not_checkable from the
- * service's claim cross-reference. Only `evidenced` confirms a skill.
+ * The GitHub mark for the claims that name one skill (several when a multi-word
+ * skill matched its parts). Only `evidenced` confirms; `not_found` is a real
+ * absence; `not_checkable` (frameworks and tools cannot be read from language
+ * statistics) and a skill GitHub was not asked about are `unavailable`.
+ */
+const githubMark = (claims) => {
+  const statuses = claims.map((c) => c?.status);
+  if (statuses.length && statuses.every((s) => s === 'evidenced')) return SOURCE_MARK.CONFIRMED;
+  if (statuses.includes('not_found')) return SOURCE_MARK.ABSENT;
+  return SOURCE_MARK.UNAVAILABLE;
+};
+
+/**
+ * One row per skill that the job asked for or the résumé claimed (D§7.1 skill
+ * table), each with a status and one mark per source:
+ *   - resume: `confirmed` when the résumé lists it, `absent` when not;
+ *   - github: see githubMark(); `unavailable` for every row when GitHub produced nothing;
+ *   - assessment: from the graded attempt's per-question results. `confirmed` when the
+ *     candidate's answers on that skill earned at least half of its points, `absent`
+ *     when they earned less or no question was asked on it (never guessed),
+ *     `unavailable` when no assessment was completed.
+ * Names are matched through skillNames.js, the same way for every source.
  */
 export const buildSkillEvidence = (subScores) => {
   const parsing = subScores[SUBSCORE_KEYS.PARSING];
   if (!parsing?.available) return [];
 
-  const { jd_skills: jdSkills, matched_skills: matched, missing_skills: missing, resume_skills: resumeSkills } =
-    parsing.components;
+  const c = parsing.components || {};
+  const resumeIndex = skillIndex([...asArray(c.resume_skills), ...asArray(c.matched_skills)]);
 
-  const sourcesAvailable = Object.values(subScores).filter((s) => s?.available).length;
-  const matchedSet = new Set(matched.map((s) => s.toLowerCase()));
-  const jdSet = new Set(jdSkills.map((s) => s.toLowerCase()));
+  // Job skills: the parser's job list, plus matched/missing for rows stored without one.
+  const jobSkills = [];
+  const jobKeys = new Set();
+  for (const name of [...asArray(c.jd_skills), ...asArray(c.matched_skills), ...asArray(c.missing_skills)]) {
+    const key = skillKey(name);
+    if (key && !jobKeys.has(key)) { jobKeys.add(key); jobSkills.push(name); }
+  }
+  const resumeOnly = [];
+  for (const name of asArray(c.resume_skills)) {
+    const key = skillKey(name);
+    if (key && !jobKeys.has(key)) { jobKeys.add(key); resumeOnly.push(name); }
+  }
 
   const github = subScores[SUBSCORE_KEYS.GITHUB];
-  const githubClaims = github?.available
-    ? new Map(asArray(github.components?.claims).map((c) => [String(c?.skill).toLowerCase(), c?.status ?? null]))
+  const githubIndex = github?.available
+    ? skillIndex(asArray(github.components?.claims), (claim) => claim?.skill)
     : null;
 
-  const row = (name, status, parsingConfirms) => {
-    // null = not checked: GitHub is unavailable, or this skill was not claimed.
-    const githubStatus = githubClaims?.get(name.toLowerCase()) ?? null;
+  const assessment = subScores[SUBSCORE_KEYS.ASSESSMENT];
+  const assessmentIndex = assessment?.available
+    ? skillIndex(asArray(assessment.components?.question_outcomes), (o) => o?.skill)
+    : null;
+
+  const row = (name, requiredByJob) => {
+    const onResume = resumeIndex.has(name);
+
+    const claims = githubIndex ? githubIndex.lookup(name) : [];
+    const github = githubIndex ? githubMark(claims) : SOURCE_MARK.UNAVAILABLE;
+
+    let assessmentMark = SOURCE_MARK.UNAVAILABLE;
+    let assessmentPoints = null;
+    if (assessmentIndex) {
+      const outcomes = assessmentIndex.lookup(name);
+      const earned = round2(outcomes.reduce((sum, o) => sum + (Number(o.points) || 0), 0));
+      const possible = round2(outcomes.reduce((sum, o) => sum + (Number(o.max_points) || 0), 0));
+      assessmentPoints = { earned, possible, questions: outcomes.length };
+      assessmentMark = possible > 0 && earned >= ASSESSMENT_CONFIRM_SHARE * possible - 1e-9
+        ? SOURCE_MARK.CONFIRMED
+        : SOURCE_MARK.ABSENT;
+    }
+
+    const marks = {
+      resume: onResume ? SOURCE_MARK.CONFIRMED : SOURCE_MARK.ABSENT,
+      github,
+      assessment: assessmentMark,
+    };
+    const independent = marks.github === SOURCE_MARK.CONFIRMED || marks.assessment === SOURCE_MARK.CONFIRMED;
+    const status = independent
+      ? SKILL_STATUS.EVIDENCED
+      : onResume ? SKILL_STATUS.CLAIMED_ONLY : SKILL_STATUS.NOT_FOUND;
+
     return {
       name,
-      status, // 'matched' | 'missing' | 'claimed_only'
-      required_by_job: jdSet.has(name.toLowerCase()),
-      claimed_on_resume: status !== 'missing',
-      sources: {
-        parsing: status,
-        github: githubStatus, // 'evidenced' | 'not_found' | 'not_checkable' | null
-        assessment: null,
-      },
-      evidence_sources_confirming: parsingConfirms + (githubStatus === 'evidenced' ? 1 : 0),
-      evidence_sources_available: sourcesAvailable,
+      status,
+      required_by_job: requiredByJob,
+      claimed_on_resume: onResume,
+      marks,
+      // Audit detail behind the marks: GitHub's own claim statuses and the points.
+      github_claims: claims.map((claim) => ({ skill: claim?.skill ?? null, status: claim?.status ?? null })),
+      assessment_points: assessmentPoints,
     };
   };
 
-  const rows = [
-    ...matched.map((name) => row(name, 'matched', 1)),
-    ...missing.map((name) => row(name, 'missing', 0)),
-    ...resumeSkills
-      .filter((name) => !jdSet.has(name.toLowerCase()) && !matchedSet.has(name.toLowerCase()))
-      .map((name) => row(name, 'claimed_only', 0)),
+  return [
+    ...jobSkills.map((name) => row(name, true)),
+    ...resumeOnly.map((name) => row(name, false)),
   ];
-
-  return rows;
 };
 
-// --- Flags (CHECKLIST 4.6 / 5.9) --------------------------------------------
+// --- Flags (CHECKLIST 4.6 / 5.9, D§7.1 W6 / W7) -----------------------------
+
+// W7 (lead's proposal, a configurable default until Anthony confirms it).
+const DEFAULT_FLAG_DISAGREE_MIN_POINTS = 2;
+const DEFAULT_FLAG_DISAGREE_MAX_SHARE = 0.25;
+
+/** The W7 thresholds, from FLAG_DISAGREE_MIN_POINTS / FLAG_DISAGREE_MAX_SHARE when they are valid numbers. */
+export const readFlagSettings = (env = process.env) => {
+  const num = (raw, fallback, ok) => {
+    if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+    const n = Number(raw);
+    return Number.isFinite(n) && ok(n) ? n : fallback;
+  };
+  return {
+    minPoints: num(env.FLAG_DISAGREE_MIN_POINTS, DEFAULT_FLAG_DISAGREE_MIN_POINTS, (n) => n > 0),
+    maxShare: num(env.FLAG_DISAGREE_MAX_SHARE, DEFAULT_FLAG_DISAGREE_MAX_SHARE, (n) => n >= 0 && n <= 1),
+  };
+};
+
+const OTHER_FLAGS_NOT_BUILT =
+  'Other checks that compare résumé claims against GitHub or assessment evidence are not built yet, so no other inconsistency flags are shown. This is not a finding that the claims are consistent.';
+
+const listNames = (names) => (names.length <= 1
+  ? names.join('')
+  : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
 
 /**
- * Contradictions between claimed and evidenced skill. Every flag the spec names
- * ("claimed language absent from all repos", "claimed seniority contradicted by
- * assessment") needs an evidence source that does not exist yet, so this
- * returns an explicit unavailable state rather than a guess. A résumé skill the
- * job did not ask for is not an inconsistency, and must not be reported as one.
+ * Inconsistency flags. One kind is built (W6, rule W7): "sources disagree", over the
+ * skills GitHub confirms that the assessment asked about. When their questions carry
+ * at least `minPoints` points and the candidate earned `maxShare` or less of them, one
+ * flag names the skills and the points. It is not raised when GitHub or the assessment
+ * is unavailable, and it never changes the score. Every other flag kind is not built,
+ * so `flags_available` stays false and the reason says so: an empty list is never an
+ * all-clear.
  */
-export const buildFlags = (subScores) => {
-  const corroborating = [SUBSCORE_KEYS.GITHUB, SUBSCORE_KEYS.ASSESSMENT]
-    .filter((key) => subScores[key]?.available);
+export const buildFlags = (subScores, skillRows = buildSkillEvidence(subScores), settings = readFlagSettings()) => {
+  const githubOk = subScores[SUBSCORE_KEYS.GITHUB]?.available === true;
+  const assessmentOk = subScores[SUBSCORE_KEYS.ASSESSMENT]?.available === true;
 
-  if (!corroborating.length) {
+  if (!githubOk && !assessmentOk) {
     return {
       flags: [],
       flags_available: false,
+      flag_checks: { sources_disagree: 'not_run' },
       flags_unavailable_reason:
         'Inconsistency detection compares résumé claims against independent evidence. No corroborating source (GitHub activity or assessment results) is available for this candidate, so no claim can be contradicted.',
     };
   }
+  if (!githubOk || !assessmentOk) {
+    return {
+      flags: [],
+      flags_available: false,
+      flag_checks: { sources_disagree: 'not_run' },
+      flags_unavailable_reason:
+        `The "sources disagree" check needs both GitHub evidence and a completed assessment; ${githubOk ? 'no assessment has been completed' : 'GitHub evidence is not available'}, so it was not run. ${OTHER_FLAGS_NOT_BUILT}`,
+    };
+  }
 
-  // A corroborating source exists, but no comparison rule does yet (CHECKLIST
-  // 4.6; GitHub rules come with ROADMAP P1-9). Saying "available" with an empty
-  // list would read as an all-clear that nothing checked, so stay unavailable.
+  // Skills GitHub confirms and the assessment asked about. A question counted under
+  // two rows (a multi-word skill and one of its words) counts once.
+  const skills = [];
+  const seen = new Set();
+  let earned = 0;
+  let possible = 0;
+  const outcomes = asArray(subScores[SUBSCORE_KEYS.ASSESSMENT].components?.question_outcomes);
+  const outcomesIndex = skillIndex(outcomes, (o) => o?.skill);
+  for (const r of asArray(skillRows)) {
+    if (r?.marks?.github !== SOURCE_MARK.CONFIRMED || !(r.assessment_points?.questions > 0)) continue;
+    skills.push(r.name);
+    for (const o of outcomesIndex.lookup(r.name)) {
+      if (seen.has(o)) continue;
+      seen.add(o);
+      earned += Number(o.points) || 0;
+      possible += Number(o.max_points) || 0;
+    }
+  }
+  earned = round2(earned);
+  possible = round2(possible);
+
+  const flags = [];
+  if (skills.length && possible >= settings.minPoints && earned <= settings.maxShare * possible + 1e-9) {
+    flags.push({
+      kind: 'sources_disagree',
+      skills,
+      points_earned: earned,
+      points_possible: possible,
+      thresholds: { min_points: settings.minPoints, max_share: settings.maxShare },
+      message: `Sources disagree: GitHub shows work in ${listNames(skills)}; the assessment on ${skills.length === 1 ? 'that skill' : 'those skills'} earned ${earned} of ${possible} points.`,
+      affects_score: false,
+    });
+  }
+
   return {
-    flags: [],
+    flags,
     flags_available: false,
-    flags_unavailable_reason:
-      'Checks that compare résumé claims against GitHub or assessment evidence are not built yet, so no inconsistency flags are shown. This is not a finding that the claims are consistent.',
+    flag_checks: { sources_disagree: flags.length ? 'raised' : 'not_raised' },
+    flags_unavailable_reason: OTHER_FLAGS_NOT_BUILT,
   };
 };
 
@@ -774,7 +985,30 @@ const factorDirection = (sub, composite, availableCount) => {
   return 'neutral';
 };
 
-const buildSummary = (subScores, composite) => {
+const pct = (w) => `${Math.round((Number(w) || 0) * 100)}%`;
+
+/**
+ * D§7.1 W3: which independent sources verified the score and what would verify it
+ * further, in one or two sentences. Null when nothing is available.
+ */
+export const verificationNote = (subScores, unearned) => {
+  const verification = scoreVerification(subScores);
+  if (!verification) return null;
+  const github = subScores[SUBSCORE_KEYS.GITHUB]?.available === true;
+  const assessment = subScores[SUBSCORE_KEYS.ASSESSMENT]?.available === true;
+  if (verification === VERIFICATION.VERIFIED) {
+    return 'Verified by two independent sources: GitHub activity and the assessment.';
+  }
+  if (verification === VERIFICATION.UNVERIFIED) {
+    return `Unverified: résumé claims only. Nothing has been verified yet. Completing the assessment would verify the score; ${pct(unearned)} of it is not earned until an independent source (the assessment, or GitHub activity) answers.`;
+  }
+  if (assessment && !github) {
+    return 'Partly verified by the assessment. GitHub evidence would verify it further; GitHub is optional, so without it the assessment carries the independent share and nothing is lost.';
+  }
+  return `Partly verified by GitHub activity. Completing the assessment would verify it further; ${pct(unearned)} of the score is not earned until then, because GitHub never takes the assessment's share while account ownership is unverified.`;
+};
+
+const buildSummary = (subScores, composite, unearned) => {
   const available = Object.values(subScores).filter((s) => s?.available);
   const unavailable = Object.values(subScores).filter((s) => s && !s.available);
   if (!available.length) {
@@ -786,20 +1020,25 @@ const buildSummary = (subScores, composite) => {
   for (const sub of available) {
     const detail = sub.components?.match_reason;
     parts.push(
-      `${sub.label} contributes ${Math.round(sub.weight * 100)}% of the score at ${sub.value}/100${detail ? ` — ${detail.replace(/\.$/, '')}` : ''}.`
+      `${sub.label} contributes ${pct(sub.weight)} of the score at ${sub.value}/100${detail ? ` — ${detail.replace(/\.$/, '')}` : ''}.`
     );
   }
 
   if (unavailable.length) {
     parts.push(
-      `${unavailable.map((s) => s.label).join(' and ')} ${unavailable.length > 1 ? 'were' : 'was'} not available, so ${unavailable.length > 1 ? 'their' : 'its'} weight was redistributed across the remaining evidence rather than scored as zero.`
+      `${unavailable.map((s) => s.label).join(' and ')} ${unavailable.length > 1 ? 'were' : 'was'} not available and ${unavailable.length > 1 ? 'were' : 'was'} not scored as zero.`
     );
   }
+  if (unearned > 0) {
+    parts.push(`${pct(unearned)} of the score was not earned by any source.`);
+  }
+  const note = verificationNote(subScores, unearned);
+  if (note) parts.push(note);
 
   return parts.join(' ');
 };
 
-export const buildExplanation = (subScores, composite) => {
+export const buildExplanation = (subScores, composite, unearned = 0) => {
   const availableCount = Object.values(subScores).filter((s) => s?.available).length;
 
   const factors = Object.values(SUBSCORE_KEYS).map((key) => {
@@ -819,13 +1058,20 @@ export const buildExplanation = (subScores, composite) => {
     };
   });
 
+  const verification = scoreVerification(subScores);
+  const skillEvidence = buildSkillEvidence(subScores);
   return {
     version: 1,
     generated_at: new Date().toISOString(),
     composite,
     band: scoreBand(composite),
     band_thresholds: { ...SCORE_BAND_THRESHOLDS, note: SCORE_BAND_NOTE },
-    summary: buildSummary(subScores, composite),
+    // D§7.1 W3, W5. New keys inside the stored JSON; no schema change.
+    weights_version: WEIGHTS_VERSION,
+    verification,
+    verification_note: verificationNote(subScores, unearned),
+    unearned_weight: composite === null ? null : unearned,
+    summary: buildSummary(subScores, composite, unearned),
     // D§5/D§7: always stated, whether or not GitHub evidence was used.
     github_account: {
       source: 'resume_link',
@@ -838,12 +1084,14 @@ export const buildExplanation = (subScores, composite) => {
       .map((f) => ({ key: f.key, label: f.label, reason: f.reason })),
     evidence_limited: availableCount < Object.keys(SUBSCORE_KEYS).length,
     weighting_scheme: {
+      version: WEIGHTS_VERSION,
       base_weights: BASE_WEIGHTS,
+      base_weights_source: BASE_WEIGHTS_SOURCE,
       redistribution:
-        'Base weights are renormalised across the evidence sources that produced data; unavailable sources are excluded, never scored as zero.',
+        "The résumé's weight is fixed and never grows. Once the assessment is completed, the rest is shared between the independent sources that produced evidence (GitHub and the assessment), so a missing GitHub account costs nothing. Before the assessment, GitHub keeps only its own share and the assessment's share is not earned. Unavailable sources are never scored as zero.",
     },
-    skill_evidence: buildSkillEvidence(subScores),
-    ...buildFlags(subScores),
+    skill_evidence: skillEvidence,
+    ...buildFlags(subScores, skillEvidence),
   };
 };
 
@@ -879,7 +1127,8 @@ const finishRecord = (subscores) => {
   const anyAvailable = Object.values(subscores).some((s) => s?.available);
   const weighted = aggregate(subscores); // also sets every sub-score's weight
   const composite = anyAvailable ? weighted : null;
-  const explanation = buildExplanation(subscores, composite);
+  const { unearned } = weightPlan(subscores);
+  const explanation = buildExplanation(subscores, composite, unearned ?? 0);
 
   const weights = Object.fromEntries(
     Object.values(SUBSCORE_KEYS).map((key) => [key, subscores[key].weight])
@@ -888,6 +1137,9 @@ const finishRecord = (subscores) => {
   return {
     composite,
     band: scoreBand(composite),
+    verification: explanation.verification,
+    unearned_weight: explanation.unearned_weight,
+    weights_version: WEIGHTS_VERSION,
     subscores,
     weights,
     explanation,

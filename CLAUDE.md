@@ -89,6 +89,31 @@ Guide-review items, owner-reported (no written source in the repo):
 - Never commit, push, or open PRs (existing rule above — kept here as a
   reminder since this section is read every session).
 
+## Issue triage
+Every open entry in `ISSUES.md` carries exactly one tag. A new entry is tagged
+in the same edit that logs it; an untagged open entry is a defect in the log.
+- **NOW**: it is on the demo path, or it causes a wrong or invented output, or
+  it is a security or data problem. It becomes a task card (or is added to an
+  existing card), and the tag names the card: `NOW → R-33`.
+- **BATCH**: small and not one of the above. It is not worked on its own; it is
+  cleared in a scheduled sweep. A BATCH item a rehearsal can touch is marked
+  `BATCH·demo`.
+- **CLOSED**: with a one-line reason. **An issue closes only when its fix is
+  verified, not when a card is assigned.** Evidence is a `file:line`, a grep,
+  a test, or a verifier's result. The only closures without a fix are: a
+  duplicate of a named entry, an entry that is not a defect, and a refusal
+  recorded as a decision. An issue that a card or the roadmap will fix stays
+  NOW or BATCH and names that owner in a "Fix owned by" note.
+
+Scheduled sweeps:
+1. Nov 17, after the rehearsal: the `BATCH·demo` items.
+2. The first milestone of roadmap Track A: the whole BATCH backlog.
+3. The end of every later milestone: a short sweep of what was logged since.
+
+A sweep fixes or closes each item; it does not re-tag an item NOW to skip it.
+If a BATCH item turns out to give a wrong output or expose data, re-tag it NOW
+at once and give it a card.
+
 ## Rebuild mode (Nov 12–18, 2026): append this section to the end of CLAUDE.md
 
 A ground-up correctness rebuild is in progress on branch `rebuild/fable`. The session brief is `REBUILD/KICKOFF.md`; current state is `REBUILD/PROGRESS.md`. Every agent, the lead and all subagents, follows these rules:

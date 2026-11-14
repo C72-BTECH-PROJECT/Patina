@@ -10,7 +10,9 @@ import {
   limitMinutes, pollDelayFor, questionView, remainingMs, saveErrorAction, saveRetryDelay, screenFor,
   shouldAutoSubmit, timeLimitOf,
 } from '../../components/assessment/assessmentLogic';
-import { api, isAborted } from '../../lib/api';
+import {
+  api, isAborted, isStillWorking, pollServerState, STILL_WORKING_POLL_MS, stillWorkingSeconds,
+} from '../../lib/api';
 
 // R-17 (D§6.2, D§0 A1): the candidate's assessment for one job, at
 // /candidate/assessment?jobId=<job id>. Without a jobId the applied jobs are listed.
@@ -28,8 +30,14 @@ import { api, isAborted } from '../../lib/api';
 //   completed        the result: the evaluate answer, or on a later visit status's `result` (same shape)
 //   attempts_used    no attempt left
 // Logic lives in components/assessment/assessmentLogic.js (unit-tested).
+//
+// R-33: when evaluate's answer is lost (gateway 504 or a dropped connection) the grade may
+// still be stored. The page shows "Still working" and reads status every few seconds (lib/api.js
+// pollServerState, bounded) until the attempt leaves in_progress / grading_pending, then shows
+// the state the server holds. It never reports such a submit as failed on its own.
 
 const TEXT_SAVE_DEBOUNCE_MS = 700;
+const STILL_RUNNING = new Set(['in_progress', 'grading_pending']);
 const TICK_MS = 250;
 const mono = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
@@ -67,7 +75,9 @@ function AssessmentForJob({ jobId }) {
   const [anchor, setAnchor] = useState(null);
   const [now, setNow] = useState(mono());
   const [save, setSave] = useState({ state: 'idle', message: '' });
-  const [submit, setSubmit] = useState({ running: false, startedAt: null, error: '' });
+  // `lost`: R-33 text when evaluate's answer was lost and the server still shows the attempt open.
+  const [submit, setSubmit] = useState({ running: false, startedAt: null, error: '', lost: '' });
+  const [stillWorking, setStillWorking] = useState(false);
   const [retry, setRetry] = useState({ running: false, startedAt: null });
   const [result, setResult] = useState(null);
 
@@ -248,6 +258,27 @@ function AssessmentForJob({ jobId }) {
 
   // ---- submit (and the automatic submit at zero) ---------------------------
 
+  /**
+   * R-33: evaluate's answer was lost, but core may still be grading. Read status until the
+   * attempt leaves in_progress / grading_pending (bounded). Returns pollServerState's result,
+   * or null when the page went away.
+   */
+  const readBackAfterLostAnswer = useCallback(async () => {
+    setStillWorking(true);
+    try {
+      const out = await pollServerState(
+        (signal) => api.get(`/api/assessment/status?jobId=${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
+        (body) => Boolean(body?.state) && !STILL_RUNNING.has(body.state),
+        { signal: ctrlRef.current?.signal },
+      );
+      return aliveRef.current ? out : null;
+    } catch {
+      return null; // aborted: the page is gone
+    } finally {
+      if (aliveRef.current) setStillWorking(false);
+    }
+  }, [jobId]);
+
   const doSubmit = useCallback(async ({ auto }) => {
     const a = attemptRef.current;
     if (!a || submitStartedRef.current) return;
@@ -255,7 +286,7 @@ function AssessmentForJob({ jobId }) {
     if (auto) autoSubmittedRef.current = true;
     closedRef.current = true;
     clearTimers(flushTimerRef, retryTimerRef);
-    setSubmit({ running: true, startedAt: mono(), error: '' });
+    setSubmit({ running: true, startedAt: mono(), error: '', lost: '' });
     setNotice(auto ? 'Time is up: your answers were submitted automatically.' : '');
     try {
       const data = await api.post('/api/assessment/evaluate', {
@@ -265,10 +296,32 @@ function AssessmentForJob({ jobId }) {
       if (!aliveRef.current) return;
       setResult(candidateResultView(data));
       showState({ ...(data || {}), state: 'completed' });
-      setSubmit({ running: false, startedAt: null, error: '' });
+      setSubmit({ running: false, startedAt: null, error: '', lost: '' });
     } catch (err) {
       if (isAborted(err) || !aliveRef.current) return;
-      setSubmit({ running: false, startedAt: null, error: '' });
+      if (isStillWorking(err)) {
+        // R-33: not a failure yet. The submit stays closed while the real state is read.
+        const out = await readBackAfterLostAnswer();
+        if (!out) return;
+        if (out.hasValue && out.value.state !== 'in_progress') {
+          // completed (with its stored result), grading_pending (that screen keeps checking), or another state.
+          setSubmit({ running: false, startedAt: null, error: '', lost: '' });
+          showState(out.value);
+          return;
+        }
+        // The server still shows the attempt open, or could not be read: the submission
+        // may not have reached it. Saving resumes and submitting again is safe.
+        submitStartedRef.current = false;
+        closedRef.current = false;
+        setSubmit({
+          running: false, startedAt: null, error: '',
+          lost: out.hasValue
+            ? `The server did not answer in time and, after ${stillWorkingSeconds()} s of checking, still shows this attempt in progress, so your submission may not have reached it.`
+            : `The server did not answer in time and its current state could not be read (${out.error?.message || 'no answer'}).`,
+        });
+        return;
+      }
+      setSubmit({ running: false, startedAt: null, error: '', lost: '' });
       if (followErrorState(err, { assessmentId: a.assessmentId })) return;
       if (err?.body?.state === 'voided') {
         setNotice(err.message);
@@ -280,9 +333,9 @@ function AssessmentForJob({ jobId }) {
       // submission once); Check status re-reads.
       submitStartedRef.current = false;
       closedRef.current = false; // saving resumes; a closed attempt then reports itself
-      setSubmit({ running: false, startedAt: null, error: err.message });
+      setSubmit({ running: false, startedAt: null, error: err.message, lost: '' });
     }
-  }, [followErrorState, readStatus, showState]);
+  }, [followErrorState, readBackAfterLostAnswer, readStatus, showState]);
 
   // Clock tick (also drives the elapsed-time text while grading); auto-submit at zero.
   const ticking = (screen === 'questions' && anchor) || submit.running || retry.running;
@@ -376,6 +429,18 @@ function AssessmentForJob({ jobId }) {
       showState({ ...(data || {}), state: 'completed' });
     } catch (err) {
       if (isAborted(err) || !aliveRef.current) return;
+      if (isStillWorking(err)) {
+        // R-33: grading may still complete; read the real state (bounded) and show it.
+        const out = await readBackAfterLostAnswer();
+        if (!out) return;
+        if (out.hasValue) {
+          setNotice('');
+          showState(out.value);
+        } else {
+          setNotice(`The server did not answer in time and its current state could not be read: ${out.error?.message || 'no answer'}`);
+        }
+        return;
+      }
       if (err?.body?.state === 'completed') {
         setNotice('');
         readStatus();
@@ -565,15 +630,28 @@ function AssessmentForJob({ jobId }) {
               <div className="mt-2">{checkAgainButton}</div>
             </div>
           )}
+          {submit.lost && (
+            <div role="status" className="mb-4 p-3 rounded-md bg-warning/10 border border-warning/30 text-body-sm text-foreground" data-testid="still-working-note">
+              {submit.lost} Your answers stay on this page. Submitting again is safe.
+              <div className="mt-2">{checkAgainButton}</div>
+            </div>
+          )}
 
           <div className="flex items-center gap-3 flex-wrap">
             <Button onClick={() => doSubmit({ auto: false })} loading={submit.running} disabled={submit.running} data-testid="assessment-submit">
               {!submit.running && <Send className="w-4 h-4" aria-hidden="true" />}
               {submit.running ? 'Submitting...' : `Submit (${answered}/${attempt.questions.length})`}
             </Button>
-            {submit.running && (
+            {submit.running && !stillWorking && (
               <span className="text-body-sm text-muted-foreground">
                 Submitted; grading your answers ({elapsed} s). Please keep this page open.
+              </span>
+            )}
+            {submit.running && stillWorking && (
+              <span className="text-body-sm text-muted-foreground" role="status" data-testid="still-working">
+                Still working: the server has not answered yet, but it may still be grading your answers.
+                This page checks with the server every {Math.round(STILL_WORKING_POLL_MS / 1000)} s for up
+                to {stillWorkingSeconds()} s ({elapsed} s since Submit).
               </span>
             )}
           </div>
@@ -593,7 +671,13 @@ function AssessmentForJob({ jobId }) {
             <Button onClick={retryGrading} loading={retry.running} data-testid="assessment-retry-grading">
               {retry.running ? 'Grading...' : 'Retry grading'}
             </Button>
-            {retry.running && <span className="text-body-sm text-muted-foreground">Grading your answers ({elapsed} s).</span>}
+            {retry.running && !stillWorking && <span className="text-body-sm text-muted-foreground">Grading your answers ({elapsed} s).</span>}
+            {retry.running && stillWorking && (
+              <span className="text-body-sm text-muted-foreground" role="status" data-testid="still-working">
+                Still working: the server has not answered yet, but it may still be grading. Checking every
+                {' '}{Math.round(STILL_WORKING_POLL_MS / 1000)} s for up to {stillWorkingSeconds()} s ({elapsed} s).
+              </span>
+            )}
           </div>
         </div>
       ));

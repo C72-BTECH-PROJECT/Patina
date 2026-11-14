@@ -675,3 +675,54 @@ test('D4: one candidate cannot start, save to or evaluate another candidate\'s a
   assert.ok(!evalCalls().some((q) => q.body.assessment_id === a.id), 'nothing graded');
   await settled(b.c, job.id);
 });
+
+// ---- R-37: the key's `explanation` never reaches the candidate ----
+const fieldNames = (v, out = new Set()) => {
+  if (Array.isArray(v)) v.forEach((x) => fieldNames(x, out));
+  else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { out.add(k); fieldNames(x, out); }
+  return out;
+};
+
+test('R-37: the candidate\'s start, save, status and evaluate bodies carry no `explanation` field and no explanation text from the key', async () => {
+  const { c, job, id, startBody } = await startedAttempt();
+  const keyExplanations = db.tables.assessment_keys.find((k) => k.assessment_id === id).answer_key.answers
+    .map((a) => a.explanation).filter(Boolean);
+  assert.equal(keyExplanations.length, 6, 'the stored key carries an explanation per MCQ (the thing that must not leak)');
+
+  clock += MIN;
+  const saved = await save(c, id, [{ question_id: 'q1', response: 'C' }, { question_id: 'q7', response: 'an answer' }]);
+  assert.equal(saved.res.status, 200, saved.text);
+  const open = await status(c, job.id);
+  assert.equal(open.body.state, 'in_progress', open.text);
+  const reload = await start(c, job.id);
+  assert.equal(reload.res.status, 200, reload.text);
+  // The grader's answer as the real one writes it (assessment-service/app/evaluator.py:81 puts
+  // the key's explanation into recruiter_feedback), plus a stray `explanation` per result.
+  const keyAnswers = db.tables.assessment_keys.find((k) => k.assessment_id === id).answer_key.answers;
+  const keyById = new Map(keyAnswers.map((k) => [k.question_id, k]));
+  const graderBody = fakeEvaluate({
+    assessment_id: id, questions: startBody.questions, answer_key: keyAnswers,
+    answers: [{ question_id: 'q1', response: 'C' }, { question_id: 'q7', response: 'an answer' }, { question_id: 'q2', response: 'A' }],
+  });
+  graderBody.results = graderBody.results.map((r) => {
+    const why = keyById.get(r.question_id).explanation;
+    return why ? { ...r, recruiter_feedback: `${r.recruiter_feedback} ${why}`, explanation: why } : r;
+  });
+  evalMode = { status: 200, body: graderBody };
+  const graded = await evaluate(c, id, [{ question_id: 'q2', response: 'A' }]);
+  assert.equal(graded.res.status, 200, graded.text);
+  assert.equal(graded.body.results.length, 10, 'per-question results are in the body');
+  assert.equal(graded.body.score, graderBody.score, 'the body came from the leaky grader answer above');
+  const done = await status(c, job.id);
+  assert.equal(done.body.state, 'completed', done.text);
+  assert.ok(done.body.result, 'the completed status carries the result');
+
+  const bodies = {
+    start: { text: JSON.stringify(startBody), body: startBody },
+    save: saved, 'status (in progress)': open, 'start (reload)': reload, evaluate: graded, 'status (completed)': done,
+  };
+  for (const [name, r] of Object.entries(bodies)) {
+    assert.ok(!fieldNames(r.body).has('explanation'), `${name}: an explanation field reached the candidate`);
+    for (const s of keyExplanations) assert.ok(!r.text.includes(s), `${name}: key explanation text reached the candidate: ${s}`);
+  }
+});
