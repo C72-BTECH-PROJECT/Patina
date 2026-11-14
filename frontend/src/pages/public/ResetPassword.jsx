@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock, ArrowRight, ShieldAlert, MailCheck } from 'lucide-react';
+import { ArrowRight, ShieldAlert, MailCheck } from 'lucide-react';
 import { api, isNetworkError } from '../../lib/api';
+import PatinaMark from '../../components/PatinaMark';
 
 // Pull the Supabase recovery credentials out of the URL that the reset email
 // links to. Supabase either appends `#access_token=...&refresh_token=...&type=recovery`
@@ -121,10 +122,8 @@ function ResetPassword() {
         animate={{ opacity: 1, y: 0 }}
       >
         <Link to="/" className="flex items-center gap-2.5 no-underline">
-          <div className="w-8 h-8 flex items-center justify-center bg-primary rounded-md">
-            <Lock className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-bold text-lg tracking-tight text-foreground">PATINA</span>
+          <PatinaMark size={28} />
+          <span className="font-display font-bold text-[15px] tracking-[.14em] text-foreground">PATINA</span>
         </Link>
         <Link to="/login" className="text-body-sm text-muted-foreground hover:text-foreground transition-colors">
           ← Back to Login

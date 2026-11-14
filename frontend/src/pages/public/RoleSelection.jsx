@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Building2, ArrowRight, Zap } from 'lucide-react';
+import { User, Building2, ArrowRight } from 'lucide-react';
+import PatinaMark from '../../components/PatinaMark';
 
 const RoleCard = ({ to, icon: Icon, title, description, delay, color }) => (
   <motion.div
@@ -42,10 +43,8 @@ function RoleSelection() {
         animate={{ opacity: 1, y: 0 }}
       >
         <Link to="/" className="flex items-center gap-2.5 no-underline">
-          <div className="w-8 h-8 flex items-center justify-center bg-primary rounded-md">
-            <Zap className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-bold text-lg tracking-tight text-foreground">PATINA</span>
+          <PatinaMark size={28} />
+          <span className="font-display font-bold text-[15px] tracking-[.14em] text-foreground">PATINA</span>
         </Link>
 
         <Link

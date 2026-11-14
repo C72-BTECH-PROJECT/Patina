@@ -2,7 +2,48 @@
 
 Resume a fresh session with: "Read REBUILD/KICKOFF.md, REBUILD/CHECKPOINT1_ANSWERS.md and REBUILD/PROGRESS.md and continue."
 
-## Rebuild handed over: decisions A9 to A12 recorded, uncommitted (2026-11-15; this block is the newest and wins)
+## Design refresh D-1 to D-3 built and checked on `design/refresh`, waiting for Anthony's visual check (2026-11-15; this block is the newest and wins)
+- **Anthony approved the spec with changes, and the spec, mock and favicon now include them:**
+  - the Blue leather palette, with a violet "Partly verified" and green for evidence only;
+  - the stitched-tag `PatinaMark` logo, with `favicon.svg` as the mark without the stitch line;
+  - core cards D-1 to D-6 plus D-10, with D-7 and D-8 only if the budget allows;
+  - framer-motion removed only from restyled files, and the dependency kept until after Nov 18;
+  - his permission for O-10.
+- **Contrast** (`DESIGN_SPEC.md` §2.4): every pair passes. The tightest are destructive text on its 10% tint over the background, 4.52, and the warning ring on the track, 3.18.
+- **Built by Sonnet `patina-implementer`; the lead re-ran each check:**
+  - D-1 (R-35a): tokens, config clean-up, fonts, motion classes, MotionConfig.
+  - D-2 (R-35b): Button, Badge chips with icons, verification and skill-status variants.
+  - D-3 (R-35c): `PatinaMark` in all 9 wordmark places, the favicon, NavLink active state, `.route-root`.
+  - After each card: 11 suites / 121 tests pass and `CI=true npm run build` exits 0. The baseline before D-1 was the same.
+- **`@tailwindcss/vite` was already absent** (removed in `219249b`).
+- **Screenshots:** `tests/e2e/output/design/d3-{login,candidate-dashboard,recruiter-dashboard,landing}.png`. The stack was found running (a `start-all` run already registered, plus a dev server on :3000) and was left running for Anthony.
+- **Not run:** e2e, which is due after D-5 per the budget rule.
+- **Open:**
+  - the colour of the `Shortlisted` chip, which is still green and is a D-7/D-8 decision;
+  - the login inputs still have the old look until D-4.
+- **Next:** after Anthony's visual check, D-4, D-5 (with the e2e spine), D-6, then D-10.
+
+## Design refresh spec and mock written on `design/refresh`, waiting for approval (2026-11-15)
+- **Written, docs only, no app code changed:** `Docs/design-refs/DESIGN_SPEC.md` and `Docs/design-refs/mock.html`. The spec covers:
+  - direction (verdigris on paper);
+  - tokens, including the evidence and verification chips, all WCAG AA with the computed ratios recorded;
+  - type, spacing, radius and shadows;
+  - motion (CSS first, reduced motion, the ring count-up);
+  - components, plus the auth, landing and breakdown treatments;
+  - build cards D-1 to D-10 and O-10, which specify card R-35;
+  - the test-hook inventory.
+- **The mock uses real data only:** a stored score from `tests/e2e/output/r16-r17/recruiter-detail-A.json`.
+- **Found:**
+  - `@tailwindcss/vite` was already removed in `219249b`.
+  - The spine reads the Results ring text once (`spine.spec.mjs:310-313`), so the count-up renders in an `aria-hidden` span beside an `sr-only` test span.
+  - The landing's real breakdown needs Anthony to capture a current-format score (O-10). The only stored captures predate weights versions.
+- **Verification:**
+  - The mock renders at 1440 and 390 wide with no console errors and no horizontal scroll.
+  - Docs check: 6 problems, unchanged.
+  - No suite run, because no code changed.
+- **Waiting on Anthony:** approval of the spec and the mock. Then the cards are copied into `REBUILD/TASKS.md` as R-35a to R-35k.
+
+## Rebuild handed over: decisions A9 to A12 recorded, uncommitted (2026-11-15)
 - **The next session runs on Opus.** This was the Fable session's last task. Start from `REBUILD/HANDOFF.md`.
 - **Anthony's decisions of 2026-11-14 are recorded** as `DECISIONS.md` §0 A9 to A12: `AUDIT.md` re-verified by a full rewrite as the first card of roadmap A1 (not done yet); the `REBUILD/` files are the session protocol; the six security items accepted; parsing chosen by measurement between runtime LLM extraction and an LLM-taught spaCy NER model; O*NET Technology Skills by default and ESCO for broader skills, licences to confirm; proctoring is tab-switch and focus-loss only; design refresh in Track B unless the design branch merges before Nov 18; the demo runs from `main` after his merge and he stages the verified candidate.
 - **Changed:** `tasks/` and `WORKLOG.md` moved to `Docs/archive/` (moved, not deleted); `CLAUDE.md` (source of truth, session protocol, rebuild-mode intro); `tests/docs/check-trackers.mjs` (reads task specs from `Docs/archive/tasks`; the only non-doc file touched); `REBUILD/ROADMAP.md` (A1 first card, A2 rewritten as the comparison, A4 proctoring, decisions section); `REBUILD/HANDOFF.md`; NER wording in `eval/RESULTS.md` and `REVIEW_BRIEF.md` (no number changed).

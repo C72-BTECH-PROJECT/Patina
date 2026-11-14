@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patina refresh mock: blue leather</title>
+<!--
+  Cool-leather variant of the mock (three palettes, switch in the top bar) for Docs/design-refs/DESIGN_SPEC.md: only colour tokens differ. Not app code. Open it in a browser.
+  Every figure and sentence in the score screen is copied from a real stored score:
+  tests/e2e/output/r16-r17/recruiter-detail-A.json (e2e run of 2026-11-13, score row created
+  2026-11-13T09:43:35Z). Candidate name and email are left out. Nothing is invented.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* ---------- Tokens (DESIGN_SPEC.md §2-§4) ---------- */
+:root {
+  --background: #F5F0E8;  --surface: #FFFFFF;  --sunken: #EEE7DC;  --track: #E8DFD1;
+  --border: #E2D8C8;      --border-strong: #8A7B69;
+  --foreground: #211B16;  --muted-foreground: #62574D;
+  --primary: #6B3F24;     --primary-hover: #56321C;  --primary-soft: #F2E6DA; --primary-foreground: #FFFFFF;
+  --copper: #2E7D6E;      --copper-soft: #DCEEEA;
+  --success: #1B6F3B;     --warning: #B2700C;  --destructive: #BB3326;
+  --success-text: #1D6A36; --warning-text: #6F5600; --destructive-text: #A1271C;
+  --info: #2B4AA3;
+  /* evidence statuses */
+  --ev-bg: #E3F2E7; --ev-fg: #1D6A36; --ev-bd: #B9DEC3;
+  --cl-bg: #FBF3D2; --cl-fg: #6F5600; --cl-bd: #EAD891;
+  --nf-bg: #FBE5E2; --nf-fg: #A1271C; --nf-bd: #F1BDB6;
+  /* verification */
+  --uv-bg: #ECE6DD; --uv-fg: #514840; --uv-bd: #D8CDBE;
+  --pv-bg: #E4EAFA; --pv-fg: #2B4AA3; --pv-bd: #BDCBF1;
+  --vf-bg: #DDEFE7; --vf-fg: #0F5946; --vf-bd: #A9D6C3;
+
+  --font-display: 'Bricolage Grotesque', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+  --shadow-xs: 0 1px 2px rgb(var(--ink-rgb) / .06);
+  --shadow-card: 0 1px 2px rgb(var(--ink-rgb) / .05), 0 4px 12px -4px rgb(var(--ink-rgb) / .08);
+  --shadow-pop: 0 12px 32px -8px rgb(var(--ink-rgb) / .18), 0 2px 6px rgb(var(--ink-rgb) / .06);
+  --focus: 0 0 0 3px rgb(var(--primary-rgb) / .28);
+
+  --dur-press: 100ms; --dur-fast: 150ms; --dur-base: 220ms; --dur-slow: 400ms; --dur-signature: 1200ms;
+  --ease-out: cubic-bezier(.2,.7,.2,1); --ease-emph: cubic-bezier(.16,1,.3,1);
+  --stagger: 40ms;
+}
+/* Leather palettes (override the base tokens above). Default: blue leather */
+:root {
+  --background:#F2F3F5; --sunken:#E7EAEE; --track:#E1E5EA; --border:#D8DDE3; --border-strong:#7B8490;
+  --foreground:#161B21; --muted-foreground:#55606B; --primary:#1F3D58; --primary-hover:#172F45; --primary-soft:#E2EAF2;
+  --uv-bg:#E8EBEF; --uv-fg:#4A525C; --uv-bd:#D0D6DD;
+  --pv-bg:#EFEAFB; --pv-fg:#5B3F9E; --pv-bd:#D3C6F1;
+  --primary-rgb:31 61 88; --bg-rgb:242 243 245; --ink-rgb:22 27 33;
+}
+:root[data-palette="smoked"] {
+  --background:#F2F1EE; --sunken:#E8E6E2; --track:#E2DFDA; --border:#DAD6D0; --border-strong:#847C76;
+  --foreground:#1D1A19; --muted-foreground:#5C5653; --primary:#4A3A36; --primary-hover:#382B28; --primary-soft:#EAE5E3;
+  --uv-bg:#E8E5E1; --uv-fg:#4E4744; --uv-bd:#D3CEC9;
+  --pv-bg:#E4EAFA; --pv-fg:#2B4AA3; --pv-bd:#BDCBF1;
+  --primary-rgb:74 58 54; --bg-rgb:242 241 238; --ink-rgb:29 26 25;
+}
+:root[data-palette="taupe-unused"] {
+  --background:#F3F2EF; --sunken:#E9E7E3; --track:#E3E0DB; --border:#DBD7D1; --border-strong:#857E77;
+  --foreground:#1C1B1A; --muted-foreground:#5B5652; --primary:#5A5049; --primary-hover:#463E38; --primary-soft:#ECE9E6;
+  --uv-bg:#E9E6E2; --uv-fg:#4E4945; --uv-bd:#D4CFC9;
+  --primary-rgb:90 80 73; --bg-rgb:243 242 239; --ink-rgb:28 27 26;
+}
+:root[data-palette="oxblood"] {
+  --background:#F4F2F1; --sunken:#EAE6E5; --track:#E4DEDD; --border:#DCD5D4; --border-strong:#877C7B;
+  --foreground:#1E1A1B; --muted-foreground:#5E5657; --primary:#5E2A33; --primary-hover:#4A2028; --primary-soft:#F1E4E6;
+  --uv-bg:#EAE5E5; --uv-fg:#504849; --uv-bd:#D6CDCD;
+  --pv-bg:#E4EAFA; --pv-fg:#2B4AA3; --pv-bd:#BDCBF1;
+  --primary-rgb:94 42 51; --bg-rgb:244 242 241; --ink-rgb:30 26 27;
+}
+*,*::before,*::after { box-sizing: border-box; }
+html,body { margin: 0; }
+body { background: var(--background); color: var(--foreground); font: 400 16px/1.6 var(--font-sans); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button { font: inherit; }
+
+/* ---------- Type ---------- */
+.eyebrow { font: 500 11px/1.4 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); }
+.text-h1 { font: 600 30px/1.2 var(--font-display); letter-spacing: -.02em; margin: 0; }
+.text-h2 { font: 600 22px/1.3 var(--font-display); letter-spacing: -.01em; margin: 0; }
+.text-h3 { font: 600 17px/1.4 var(--font-sans); margin: 0; }
+.text-body-sm { font-size: 14px; line-height: 1.5; }
+.text-caption { font-size: 12px; line-height: 1.45; }
+.muted { color: var(--muted-foreground); }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ---------- Mock chrome (not part of the spec) ---------- */
+.mock-bar { position: sticky; top: 0; z-index: 60; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; background: #1D1A19; color: #EEECE9; font-size: 13px; }
+.mock-bar b { font-family: var(--font-mono); font-weight: 500; letter-spacing: .06em; font-size: 11px; text-transform: uppercase; margin-right: 8px; }
+.mock-bar a { color: #ECEAE4; padding: 4px 10px; border-radius: 999px; border: 1px solid #45403d; text-decoration: none; }
+.mock-bar a:hover { background: #2c2826; }
+.mock-bar button { margin-left: auto; background: #CFC6C0; color: #1D1A19; border: 0; border-radius: 999px; padding: 5px 12px; font-weight: 600; cursor: pointer; }
+.mock-label { max-width: 1152px; margin: 40px auto 12px; padding: 0 16px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.mock-label h2 { font: 600 13px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; margin: 0; }
+.mock-frame { max-width: 1152px; margin: 0 auto; border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; background: var(--background); box-shadow: var(--shadow-card); }
+@media (max-width: 1184px) { .mock-frame { margin: 0 16px; } }
+
+/* ---------- Components ---------- */
+.wordmark { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+.logo-tile { width: 28px; height: 28px; display: block; flex: none; }
+.logo-tile svg { width: 28px; height: 28px; display: block; }
+.wordmark span { font: 700 15px/1 var(--font-display); letter-spacing: .14em; color: var(--foreground); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: var(--radius-md); font-weight: 500; font-size: 14px; border: 1px solid transparent; cursor: pointer; text-decoration: none; transition: background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out); }
+.btn:active { transform: scale(.98); }
+.btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.btn-primary { background: var(--primary); color: var(--primary-foreground); box-shadow: var(--shadow-xs); }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-outline { background: var(--surface); border-color: var(--border); color: var(--foreground); }
+.btn-outline:hover { background: var(--sunken); }
+.btn-ghost { background: transparent; color: var(--muted-foreground); }
+.btn-ghost:hover { background: var(--sunken); color: var(--foreground); }
+.btn-block { width: 100%; height: 44px; }
+.btn svg { width: 16px; height: 16px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-card); }
+
+.field label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+.field label svg { width: 16px; height: 16px; color: var(--muted-foreground); }
+.input-wrap { position: relative; }
+.input { width: 100%; height: 44px; padding: 0 14px 0 42px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface); color: var(--foreground); font-size: 15px; transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
+.input.pw { padding: 0 44px 0 14px; }
+.input::placeholder { color: var(--muted-foreground); }
+.input:hover { border-color: var(--foreground); }
+.input:focus { outline: none; border-color: var(--primary); box-shadow: var(--focus); }
+.input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted-foreground); pointer-events: none; }
+.input-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted-foreground); border-radius: var(--radius-sm); cursor: pointer; }
+.input-btn:hover { color: var(--foreground); background: var(--sunken); }
+.input-btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.input-btn svg { width: 18px; height: 18px; }
+
+.chip { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px; border: 1px solid; font-size: 12px; font-weight: 500; line-height: 1; white-space: nowrap; }
+.chip svg { width: 12px; height: 12px; flex: none; }
+.chip-evidenced { background: var(--ev-bg); color: var(--ev-fg); border-color: var(--ev-bd); }
+.chip-claimed   { background: var(--cl-bg); color: var(--cl-fg); border-color: var(--cl-bd); }
+.chip-notfound  { background: var(--nf-bg); color: var(--nf-fg); border-color: var(--nf-bd); }
+.chip-unverified{ background: var(--uv-bg); color: var(--uv-fg); border-color: var(--uv-bd); }
+.chip-partly    { background: var(--pv-bg); color: var(--pv-fg); border-color: var(--pv-bd); }
+.chip-verified  { background: var(--vf-bg); color: var(--vf-fg); border-color: var(--vf-bd); }
+.chip-neutral   { background: var(--surface); color: var(--foreground); border-color: var(--border); }
+.chip-low       { background: var(--nf-bg); color: var(--nf-fg); border-color: var(--nf-bd); }
+.chip-warn      { background: var(--cl-bg); color: var(--cl-fg); border-color: var(--cl-bd); }
+
+/* ---------- App nav ---------- */
+.appnav { position: sticky; top: 0; z-index: 10; height: 60px; display: flex; align-items: center; background: rgb(var(--bg-rgb) / .85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+.appnav .in { width: 100%; max-width: 1152px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.role-pill { font: 500 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); padding: 5px 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); }
+.navlinks { display: flex; gap: 2px; align-items: center; }
+.navlink { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: var(--radius-md); font-size: 14px; color: var(--muted-foreground); text-decoration: none; position: relative; transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+.navlink:hover { background: var(--sunken); color: var(--foreground); }
+.navlink[aria-current="page"] { background: var(--surface); color: var(--foreground); font-weight: 500; box-shadow: inset 0 0 0 1px var(--border); }
+.navlink[aria-current="page"]::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: -13px; height: 2px; border-radius: 2px; background: var(--primary); }
+.navlink svg { width: 16px; height: 16px; }
+@media (max-width: 720px) { .navlink .lbl { display: none; } }
+
+/* ---------- Login ---------- */
+.auth { min-height: 760px; display: flex; flex-direction: column; background:
+    radial-gradient(60% 50% at 50% 0%, rgb(var(--primary-rgb) / .10), transparent 70%),
+    radial-gradient(40% 35% at 85% 90%, rgb(46 125 110 / .08), transparent 70%),
+    var(--background); position: relative; }
+.auth::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+  background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 48px 48px; mask-image: radial-gradient(ellipse 70% 55% at 50% 40%, #000 30%, transparent 75%); -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 40%, #000 30%, transparent 75%); }
+.auth header { position: relative; display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.auth main { position: relative; flex: 1; display: flex; justify-content: center; align-items: center; padding: 32px 16px; }
+.auth .card { width: 100%; max-width: 448px; padding: 32px; box-shadow: var(--shadow-pop); }
+.auth h1 { font: 600 30px/1.15 var(--font-display); letter-spacing: -.02em; margin: 8px 0 4px; }
+.alert { margin-top: 16px; display: flex; gap: 12px; text-align: left; padding: 14px; border-radius: var(--radius-lg); border: 1px solid var(--nf-bd); background: var(--nf-bg); }
+.alert .ic { flex: none; width: 32px; height: 32px; border-radius: var(--radius-md); display: grid; place-items: center; background: rgb(187 51 38 / .12); color: var(--destructive-text); }
+.alert .ic svg { width: 18px; height: 18px; }
+.alert p { margin: 0; color: var(--destructive-text); font-size: 14px; }
+.link-quiet { background: none; border: 0; color: var(--muted-foreground); cursor: pointer; font-size: 14px; text-decoration: none; }
+.link-quiet:hover { color: var(--foreground); }
+.link-strong { color: var(--primary); font-weight: 600; text-decoration: none; background: none; border: 0; cursor: pointer; font-size: 14px; }
+.link-strong:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- Results / breakdown ---------- */
+.page { max-width: 768px; margin: 0 auto; padding: 32px 16px 48px; }
+.composite { padding: 32px; display: flex; gap: 32px; align-items: center; }
+@media (max-width: 720px) { .composite { flex-direction: column; text-align: center; padding: 24px; } .composite .chips { justify-content: center; } }
+.ring { position: relative; width: 168px; height: 168px; flex: none; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .arc { transition: stroke-dashoffset var(--dur-signature) var(--ease-emph); }
+.ring .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.ring .num { font: 700 44px/1 var(--font-display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.ring .of { font-size: 12px; color: var(--muted-foreground); margin-top: 4px; }
+.ring::after { content: ''; position: absolute; inset: 18px; border-radius: 50%; background: radial-gradient(circle, rgb(187 51 38 / .07), transparent 70%); pointer-events: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.note { margin-top: 12px; padding: 12px 14px; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--sunken); text-align: left; }
+.note p { margin: 0; font-size: 14px; }
+
+.section-card { padding: 24px; margin-top: 24px; }
+.section-card > h2 { font: 600 17px/1.4 var(--font-sans); margin: 0 0 16px; }
+.summary { padding: 16px; border-radius: var(--radius-lg); background: var(--sunken); border: 1px solid var(--border); }
+.summary p { margin: 0; font-size: 14px; line-height: 1.6; }
+.limited { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; color: var(--warning-text); font-size: 12px; }
+.limited svg { width: 16px; height: 16px; color: var(--warning); flex: none; margin-top: 1px; }
+h3.sec { font: 600 15px/1.4 var(--font-sans); margin: 24px 0 12px; }
+
+.factor { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: 16px 16px 12px 19px; position: relative; overflow: hidden; }
+.factor + .factor { margin-top: 12px; }
+.factor::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--muted-foreground); }
+.factor[data-direction="raises"]::before { background: var(--success); }
+.factor[data-direction="lowers"]::before { background: var(--destructive); }
+.factor[data-direction="unavailable"]::before { background: repeating-linear-gradient(var(--border-strong) 0 6px, transparent 6px 10px); }
+.factor .head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.factor h4 { margin: 0; font: 600 15px/1.4 var(--font-sans); display: flex; align-items: center; gap: 8px; }
+.factor h4 svg { width: 16px; height: 16px; }
+.dir { font-size: 12px; margin-top: 2px; }
+.dir.raises, .raises-ic { color: var(--success-text); }
+.dir.lowers, .lowers-ic { color: var(--destructive-text); }
+.dir.na, .unavail-ic { color: var(--muted-foreground); }
+.stats { display: flex; gap: 20px; text-align: right; }
+.stats .v { font: 600 16px/1.3 var(--font-sans); font-variant-numeric: tabular-nums; }
+.stats .k { font-size: 11px; color: var(--muted-foreground); }
+.evid { margin-top: 12px; border-top: 1px solid var(--border); }
+.evid > div { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.evid > div:last-child { border-bottom: 0; }
+.metric-top { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.metric-top b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; margin-top: 6px; }
+.bar i { display: block; height: 100%; border-radius: 999px; background: var(--primary); width: 0; transition: width var(--dur-slow) var(--ease-out); }
+.bar i.neg { background: var(--destructive); }
+.evid p { margin: 6px 0 0; font-size: 12px; color: var(--muted-foreground); }
+.skillset { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.qlist { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12px; }
+.qlist li { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.qlist .no { color: var(--destructive-text); font-variant-numeric: tabular-nums; }
+.unavailable { padding: 14px 16px; border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); background: var(--background); margin-top: 12px; }
+.unavailable .t { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: var(--muted-foreground); }
+.unavailable .t svg { width: 16px; height: 16px; }
+.unavailable p { margin: 4px 0 0; font-size: 12px; color: var(--muted-foreground); }
+
+table.skills { width: 100%; border-collapse: collapse; text-align: left; }
+.skills-wrap { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+.skills th { font-size: 11px; font-weight: 500; color: var(--muted-foreground); padding: 8px 12px 8px 0; border-bottom: 1px solid var(--border); font-family: var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+.skills td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+.skills tr:last-child td { border-bottom: 0; }
+.skills tbody tr { transition: background-color var(--dur-fast) var(--ease-out); }
+.skills tbody tr:hover { background: var(--background); }
+.mark { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; white-space: nowrap; }
+.mark svg { width: 14px; height: 14px; }
+.mark.ok { color: var(--success-text); } .mark.no { color: var(--destructive-text); } .mark.na { color: var(--muted-foreground); }
+.flagcheck { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.foot { margin-top: 24px; font-size: 12px; color: var(--muted-foreground); }
+
+/* token sheet */
+.sheet { padding: 24px; display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.sw { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; background: var(--surface); font-size: 11px; }
+.sw i { display: block; height: 40px; }
+.sw span { display: block; padding: 6px 8px; font-family: var(--font-mono); }
+.legend { display: grid; gap: 10px; }
+.legend div { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+
+/* ---------- Motion (DESIGN_SPEC.md §5) ---------- */
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.anim-page { animation: rise var(--dur-base) var(--ease-out) both; }
+.anim-stagger > * { animation: rise var(--dur-base) var(--ease-out) both; }
+.anim-stagger > *:nth-child(2) { animation-delay: calc(var(--stagger) * 1); }
+.anim-stagger > *:nth-child(3) { animation-delay: calc(var(--stagger) * 2); }
+.anim-stagger > *:nth-child(4) { animation-delay: calc(var(--stagger) * 3); }
+.anim-stagger > *:nth-child(5) { animation-delay: calc(var(--stagger) * 4); }
+.anim-stagger > *:nth-child(6) { animation-delay: calc(var(--stagger) * 5); }
+.anim-stagger > *:nth-child(7) { animation-delay: calc(var(--stagger) * 6); }
+.anim-stagger > *:nth-child(n+8) { animation-delay: calc(var(--stagger) * 7); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="mock-bar">
+  <b>Patina · blue leather</b>
+  <a href="#login">Login</a>
+  <a href="#breakdown">Score breakdown</a>
+  <a href="#tokens">Tokens &amp; chips</a>
+  <span style="margin-left:12px;opacity:.7">Palette:</span>
+  <a href="#" data-pal="blue">Blue leather</a>
+  <a href="#" data-pal="smoked">Smoked leather</a>
+  <button type="button" id="replay">Replay score animation</button>
+</div>
+
+<!-- SVG icon sprite (lucide paths) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-patina" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="var(--primary)"/><rect x="3" y="3" width="26" height="26" rx="5.5" fill="none" stroke="#FFFFFF" stroke-opacity=".35" stroke-width="1" stroke-dasharray="2.2 1.8"/><path d="M11 9.4V22.8" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/><g fill="none" stroke-width="2.6" stroke-linecap="round"><path d="M19.43 9.00A5.2 5.2 0 0 1 23.05 15.26" stroke="#FFFFFF"/><path d="M21.61 17.74A5.2 5.2 0 0 1 14.39 17.74" stroke="#FFFFFF"/><path d="M12.95 15.26A5.2 5.2 0 0 1 16.57 9.00" stroke="#5FC4B0"/></g></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="i-shield-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-circle-dashed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.1 2.18a9.93 9.93 0 0 1 3.8 0"/><path d="M17.6 3.71a9.95 9.95 0 0 1 2.69 2.7"/><path d="M21.82 10.1a9.93 9.93 0 0 1 0 3.8"/><path d="M20.29 17.6a9.95 9.95 0 0 1-2.7 2.69"/><path d="M13.9 21.82a9.94 9.94 0 0 1-3.8 0"/><path d="M6.4 20.29a9.95 9.95 0 0 1-2.69-2.7"/><path d="M2.18 13.9a9.93 9.93 0 0 1 0-3.8"/><path d="M3.71 6.4a9.95 9.95 0 0 1 2.7-2.69"/></symbol>
+  <symbol id="i-x-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="i-shield-half" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 22V2"/></symbol>
+  <symbol id="i-shield-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-up-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></symbol>
+  <symbol id="i-down-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10"/><path d="M17 7v10H7"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+  <symbol id="i-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol>
+  <symbol id="i-briefcase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.27 21a2 2 0 0 0 3.46 0"/><path d="M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></symbol>
+</svg>
+
+<!-- =============================== LOGIN =============================== -->
+<div class="mock-label" id="login"><h2>1 · Login</h2><span class="text-caption muted">/login · layout unchanged: header, centred card, same fields, same order. Error state shown with the real "Could not sign in" title.</span></div>
+<div class="mock-frame">
+  <div class="auth">
+    <header>
+      <a class="wordmark" href="#login"><span class="logo-tile"><svg aria-hidden="true"><use href="#i-patina"/></svg></span><span>PATINA</span></a>
+      <a class="link-quiet" href="#login">← Back</a>
+    </header>
+    <main>
+      <div class="card anim-page">
+        <div style="text-align:center;margin-bottom:28px">
+          <div class="eyebrow">Credibility, explained</div>
+          <h1>Welcome Back</h1>
+          <p class="text-body-sm muted" style="margin:0">Sign in to your account</p>
+          <div class="alert" role="alert">
+            <span class="ic"><svg><use href="#i-shield-alert"/></svg></span>
+            <div><p style="font-weight:600">Could not sign in</p><p style="margin-top:2px">Invalid username or password.</p></div>
+          </div>
+        </div>
+        <form onsubmit="return false" style="display:grid;gap:16px">
+          <div class="field">
+            <label for="u"><svg><use href="#i-user"/></svg>Username</label>
+            <div class="input-wrap"><input class="input" id="u" placeholder="johndoe" autocomplete="username"><svg class="input-icon"><use href="#i-user"/></svg></div>
+          </div>
+          <div class="field">
+            <label for="p"><svg><use href="#i-lock"/></svg>Password</label>
+            <div class="input-wrap"><input class="input pw" id="p" type="password" placeholder="••••••••"><button class="input-btn" type="button" aria-label="Show password"><svg><use href="#i-eye"/></svg></button></div>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit" style="margin-top:4px">Sign In <svg><use href="#i-arrow-right"/></svg></button>
+        </form>
+        <div style="margin-top:16px;display:grid;gap:10px;text-align:center">
+          <a class="link-strong" href="#login">Forgot password?</a>
+          <button class="link-quiet" type="button">Didn't get the confirmation email?</button>
+        </div>
+        <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);text-align:center" class="text-body-sm muted">
+          Don't have an account? <button class="link-strong" type="button">Sign Up</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<p class="mock-label text-caption muted" style="margin-top:8px">The error text "Invalid username or password." stands in for <code>err.message</code>, which the page prints as the server sends it.</p>
+
+<!-- ============================ SCORE BREAKDOWN ============================ -->
+<div class="mock-label" id="breakdown"><h2>2 · Score breakdown</h2><span class="text-caption muted">/candidate/results/:applicationId · Real stored score: <code>tests/e2e/output/r16-r17/recruiter-detail-A.json</code> (e2e run, 2026-11-13). It was stored before weights versions, so it shows the legacy wording and no verification chip; the chip set is on the token sheet below.</span></div>
+<div class="mock-frame">
+  <nav class="appnav"><div class="in">
+    <a class="wordmark" href="#breakdown"><span class="logo-tile"><svg aria-hidden="true"><use href="#i-patina"/></svg></span><span>PATINA</span><span class="role-pill">Candidate</span></a>
+    <div class="navlinks">
+      <a class="navlink" href="#breakdown"><svg><use href="#i-dashboard"/></svg><span class="lbl">Dashboard</span></a>
+      <a class="navlink" href="#breakdown"><svg><use href="#i-briefcase"/></svg><span class="lbl">Jobs</span></a>
+      <a class="navlink" href="#breakdown" aria-current="page"><svg><use href="#i-chart"/></svg><span class="lbl">Results</span></a>
+      <a class="navlink" href="#breakdown"><svg><use href="#i-bell"/></svg><span class="lbl">Notifications</span></a>
+      <a class="navlink" href="#breakdown"><svg><use href="#i-logout"/></svg><span class="lbl">Sign out</span></a>
+    </div>
+  </div></nav>
+
+  <div class="page">
+    <div class="anim-page" style="margin-bottom:24px">
+      <div class="eyebrow">Result for your application to</div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:6px">
+        <h1 class="text-h1">[VERIFY R16 2026-11-13T09-40-37-828Z] A</h1>
+        <span class="chip chip-neutral">Submitted</span>
+      </div>
+    </div>
+
+    <div class="anim-stagger">
+      <!-- Composite -->
+      <div class="card composite">
+        <div class="ring" id="ring" data-value="42.49">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle cx="60" cy="60" r="52" fill="none" stroke="var(--track)" stroke-width="10"/>
+            <circle class="arc" cx="60" cy="60" r="52" fill="none" stroke="var(--destructive)" stroke-width="10" stroke-linecap="round"/>
+          </svg>
+          <div class="center">
+            <span class="num" style="color:var(--destructive)" id="ringNum" aria-hidden="true">0</span>
+            <span class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">42.49</span>
+            <span class="of">/100</span>
+          </div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="chips">
+            <span class="chip chip-low">Low</span>
+            <span class="chip chip-warn"><svg><use href="#i-shield-alert"/></svg>Evidence-limited</span>
+          </div>
+          <p class="text-body-sm" style="margin:0">Résumé match to the job description: <b class="tnum">69.04/100</b>
+            <span class="text-caption muted" style="display:block">How closely the résumé's text and skills match the job description. It is one part of the score, not a verdict on the application.</span></p>
+          <p class="text-caption muted" style="margin:8px 0 0">Bands are presentation labels (high at 80 or more, medium at 60 or more, low below 60). They are not calibrated.</p>
+          <div class="note"><p>Your score is partly verified by the assessment. GitHub is optional and its absence costs nothing; a GitHub profile link on your résumé, with recent public work, would add a second independent source.</p></div>
+          <p class="text-caption muted" style="margin:8px 0 0">The weights are provisional: a design choice, not yet calibrated. Weights version: v1 (0.40 / 0.35 / 0.25).</p>
+          <p class="text-caption muted" style="margin:8px 0 0">The GitHub account was taken from the link on the résumé. Ownership of that account is not verified, so its evidence may not be the candidate's own work.</p>
+        </div>
+      </div>
+
+      <!-- Breakdown -->
+      <div class="card section-card">
+        <h2>How this score was calculated</h2>
+        <div class="summary">
+          <p>Credibility 42.49/100. Résumé ↔ Job Semantic Alignment contributes 62% of the score at 69.04/100 — Matched 4 of 5 job skills (from the role's listed required/preferred skills); missing: nodejs. Assessment Results contributes 38% of the score at 0/100 — Scored 0% across 10 generated questions. GitHub Evidence was not available, so its weight was redistributed across the remaining evidence rather than scored as zero.</p>
+          <div class="limited"><svg><use href="#i-shield-alert"/></svg><span>Evidence-limited: scored on 2 of 3 evidence sources. Missing sources had their weight redistributed, not counted as zero.</span></div>
+        </div>
+
+        <h3 class="sec">What produced this score</h3>
+        <div class="anim-stagger">
+          <div class="factor" data-direction="raises">
+            <div class="head">
+              <div><h4><svg class="raises-ic"><use href="#i-up-right"/></svg>Résumé ↔ Job Semantic Alignment</h4><div class="dir raises">Raises the score</div></div>
+              <div class="stats"><div><div class="v">69.04/100</div><div class="k">Sub-score</div></div><div><div class="v">0.6154 (62%)</div><div class="k">Weight used</div></div><div><div class="v">42.49</div><div class="k">Points</div></div></div>
+            </div>
+            <div class="evid">
+              <div><div style="display:flex;align-items:center;gap:8px;font-size:14px"><svg width="16" height="16" class="raises-ic"><use href="#i-check-circle"/></svg>Job skills found in the résumé <span class="text-caption muted">(4)</span></div>
+                <div class="skillset"><span class="chip chip-neutral">javascript</span><span class="chip chip-neutral">react</span><span class="chip chip-neutral">python</span><span class="chip chip-neutral">docker</span></div></div>
+              <div><div style="display:flex;align-items:center;gap:8px;font-size:14px"><svg width="16" height="16" class="lowers-ic"><use href="#i-x-circle"/></svg>Job skills not found in the résumé <span class="text-caption muted">(1)</span></div>
+                <div class="skillset"><span class="chip chip-neutral">nodejs</span></div></div>
+              <div><div class="metric-top"><span>Skill coverage</span><b>4 of 5 job skills (80%)</b></div><div class="bar"><i data-w="80"></i></div><p>Share of the technical skills the job asks for that also appear in the résumé. Job skills are taken from the role's listed required and preferred skills. <span style="color:var(--foreground)">Weight within this factor: 0.6.</span></p></div>
+              <div><div class="metric-top"><span>Semantic similarity</span><b>53%</b></div><div class="bar"><i data-w="52.59"></i></div><p>Sentence-embedding similarity between the résumé and the job description, so related wording counts even when the exact term differs. <span style="color:var(--foreground)">Weight within this factor: 0.4.</span></p></div>
+              <div><div class="metric-top"><span>Similarity of skill-evidence lines</span><b>53%</b></div><div class="bar"><i data-w="53.27"></i></div><p>Input to semantic similarity: only the résumé lines that substantiate a detected skill.</p></div>
+              <div><div class="metric-top"><span>Similarity of the full résumé text</span><b>51%</b></div><div class="bar"><i data-w="51.32"></i></div><p>Input to semantic similarity: the whole résumé against the job description.</p></div>
+            </div>
+          </div>
+
+          <div class="factor" data-direction="unavailable">
+            <div class="head">
+              <div><h4><svg class="unavail-ic"><use href="#i-minus"/></svg>GitHub Evidence</h4><div class="dir na">No evidence</div></div>
+              <div class="stats"><div><div class="v">—</div><div class="k">Sub-score</div></div><div><div class="v">—</div><div class="k">Weight used</div></div><div><div class="v">—</div><div class="k">Points</div></div></div>
+            </div>
+            <div class="unavailable"><div class="t"><svg><use href="#i-info"/></svg>Not available for this score</div><p>The GitHub account named on the resume does not exist.</p></div>
+          </div>
+
+          <div class="factor" data-direction="lowers">
+            <div class="head">
+              <div><h4><svg class="lowers-ic"><use href="#i-down-right"/></svg>Assessment Results</h4><div class="dir lowers">Lowers the score</div></div>
+              <div class="stats"><div><div class="v">0/100</div><div class="k">Sub-score</div></div><div><div class="v">0.3846 (38%)</div><div class="k">Weight used</div></div><div><div class="v">0</div><div class="k">Points</div></div></div>
+            </div>
+            <div class="evid">
+              <div><div class="metric-top"><span>Assessment score</span><b>0%</b></div><div class="bar"><i class="neg" data-w="0"></i></div><p>Unproctored online assessment. Scored server-side against the answer key generated with the questions: 0 of 10 points.</p></div>
+              <div><div class="metric-top"><span>Multiple-choice results</span><b>0 of 6 correct</b></div><div class="bar"><i data-w="0"></i></div><p>Deterministic match against the answer key.</p></div>
+              <div><div class="metric-top"><span>Short-answer questions</span><b>4 questions, rubric-graded</b></div><p>Each answer was graded against its ideal answer and key points (0, 0.5 or 1).</p></div>
+              <div><div class="metric-top"><span>Per-question outcomes</span><b>0 of 10 questions with full marks</b></div><p>Right or wrong and points per question, in the order served. Short answers can earn 0, 0.5 or 1.</p>
+                <ol class="qlist">
+                  <li><span>1. React <span class="muted">(multiple choice)</span></span><span class="no">Not right · 0 of 1</span></li>
+                  <li><span>2. Docker <span class="muted">(multiple choice)</span></span><span class="no">Not right · 0 of 1</span></li>
+                  <li><span>3. Node.js <span class="muted">(multiple choice)</span></span><span class="no">Not right · 0 of 1</span></li>
+                  <li><span>4. Node.js <span class="muted">(short answer)</span></span><span class="no">Not right · 0 of 1</span></li>
+                  <li><span>5. SQL <span class="muted">(short answer)</span></span><span class="no">Not right · 0 of 1</span></li>
+                  <li><span>6. REST API <span class="muted">(multiple choice)</span></span><span class="no">Not right · 0 of 1</span></li>
+                  <li><span>7. FastAPI <span class="muted">(multiple choice)</span></span><span class="no">Not right · 0 of 1</span></li>
+                  <li><span>8. JavaScript <span class="muted">(short answer)</span></span><span class="no">Not right · 0 of 1</span></li>
+                  <li><span>9. Pytest <span class="muted">(multiple choice)</span></span><span class="no">Not right · 0 of 1</span></li>
+                  <li><span>10. Python <span class="muted">(short answer)</span></span><span class="no">Not right · 0 of 1</span></li>
+                </ol></div>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="sec" style="margin-bottom:4px">Skill-level evidence</h3>
+        <p class="text-caption muted" style="margin:0 0 12px">Every skill this job asked for, plus the ones the résumé claims, with one mark per source. Only GitHub or the assessment can make a skill evidenced; the résumé is a claim.</p>
+        <div class="skills-wrap">
+          <table class="skills">
+            <thead><tr><th>Skill</th><th>Status</th><th>Résumé</th><th>GitHub</th><th>Assessment</th></tr></thead>
+            <tbody id="skillRows"></tbody>
+          </table>
+        </div>
+        <p class="text-caption muted" style="margin:8px 0 0">Stored before per-source marks: a résumé match is shown as claimed only, and the assessment was not recorded per skill.</p>
+
+        <h3 class="sec">Inconsistency flags</h3>
+        <div class="flagcheck">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="text-body-sm" style="font-weight:500">Sources-disagree check</span><span class="chip chip-neutral">Not recorded</span></div>
+          <p class="text-caption muted" style="margin:4px 0 0">This score was stored before the check existed.</p>
+        </div>
+        <div class="unavailable"><div class="t"><svg><use href="#i-info"/></svg>Other flag kinds: not built yet</div><p>Other flag kinds (claims contradicted by GitHub or by the assessment in other ways) are not built yet, so none is shown. This is not a finding that the claims are consistent.</p></div>
+
+        <p class="foot">Stored with the score on 13/11/2026, 15:13:34 · explanation format v1 · weights v1 (0.40 / 0.35 / 0.25)</p>
+      </div>
+
+      <div class="card section-card" style="color:var(--muted-foreground)">
+        <h2 style="color:var(--foreground)">What was read from your resume</h2>
+        <p class="text-body-sm" style="margin:0">Unchanged section: same card style as above. Left out of the mock because this stored row is shown without its parsed entities.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:32px;display:flex;gap:12px;flex-wrap:wrap">
+      <a class="btn btn-outline" style="flex:1;height:44px" href="#breakdown"><svg><use href="#i-dashboard"/></svg>My applications</a>
+      <a class="btn btn-primary" style="flex:1;height:44px" href="#breakdown"><svg><use href="#i-briefcase"/></svg>Browse jobs</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ TOKENS ============================ -->
+<div class="mock-label" id="tokens"><h2>3 · Tokens &amp; status chips</h2><span class="text-caption muted">Labels and hints are the strings the app already renders. Every text pair here passes WCAG AA (≥4.5:1); ring colours pass 3:1 against the track.</span></div>
+<div class="mock-frame" style="margin-bottom:64px">
+  <div class="sheet">
+    <div>
+      <div class="eyebrow" style="margin-bottom:10px">Evidence status (skill table)</div>
+      <div class="legend">
+        <div><span class="chip chip-evidenced"><svg><use href="#i-check-circle"/></svg>Evidenced</span><span class="muted">GitHub or the assessment confirms it.</span></div>
+        <div><span class="chip chip-claimed"><svg><use href="#i-circle-dashed"/></svg>Claimed only</span><span class="muted">Résumé only, nothing confirms it.</span></div>
+        <div><span class="chip chip-notfound"><svg><use href="#i-x-circle"/></svg>Not found</span><span class="muted">The job asks for it, no source has it.</span></div>
+      </div>
+      <div class="eyebrow" style="margin:20px 0 10px">Verification (score)</div>
+      <div class="legend">
+        <div><span class="chip chip-unverified"><svg><use href="#i-shield"/></svg>Unverified</span><span class="muted">Résumé claims only.</span></div>
+        <div><span class="chip chip-partly"><svg><use href="#i-shield-half"/></svg>Partly verified</span><span class="muted">One independent source.</span></div>
+        <div><span class="chip chip-verified"><svg><use href="#i-shield-check"/></svg>Verified</span><span class="muted">Both independent sources.</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:10px">Core colours</div>
+      <div class="swatches">
+        <div class="sw"><i style="background:var(--background)"></i><span>background</span></div>
+        <div class="sw"><i style="background:#FFFFFF"></i><span>surface FFFFFF</span></div>
+        <div class="sw"><i style="background:var(--sunken)"></i><span>muted</span></div>
+        <div class="sw"><i style="background:var(--border)"></i><span>border</span></div>
+        <div class="sw"><i style="background:var(--foreground)"></i><span>foreground</span></div>
+        <div class="sw"><i style="background:var(--muted-foreground)"></i><span>muted-fg</span></div>
+        <div class="sw"><i style="background:var(--primary)"></i><span>primary</span></div>
+        <div class="sw"><i style="background:#5FC4B0"></i><span>verdigris (logo) 5FC4B0</span></div>
+        <div class="sw"><i style="background:#1B6F3B"></i><span>success 1B6F3B</span></div>
+        <div class="sw"><i style="background:#B2700C"></i><span>warning B2700C</span></div>
+        <div class="sw"><i style="background:#BB3326"></i><span>destructive BB3326</span></div>
+        <div class="sw"><i style="background:#2B4AA3"></i><span>info 2B4AA3</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:10px">Buttons &amp; input</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <button class="btn btn-primary">Primary</button>
+        <button class="btn btn-outline">Outline</button>
+        <button class="btn btn-ghost">Ghost</button>
+        <button class="btn" style="background:var(--destructive);color:#fff">Destructive</button>
+      </div>
+      <div class="input-wrap" style="max-width:320px"><input class="input" placeholder="Focus me (Tab)"><svg class="input-icon"><use href="#i-user"/></svg></div>
+      <div class="eyebrow" style="margin:20px 0 10px">Type</div>
+      <div style="font:700 40px/1.05 var(--font-display);letter-spacing:-.03em">Display</div>
+      <div class="text-h1">Heading 1</div>
+      <div class="text-h2">Heading 2</div>
+      <div class="text-body-sm">Body small, Inter 14/1.5</div>
+      <div class="eyebrow">Eyebrow · JetBrains Mono 11</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Skill rows: legacy row view (ScoreBreakdown.skillRowView) of the stored skill_evidence.
+const ROWS = [
+  ['javascript','matched',true],['react','matched',true],['python','matched',true],['docker','matched',true],['nodejs','missing',true],
+  ['django','claimed_only',false],['fastapi','claimed_only',false],['postgresql','claimed_only',false],['redis','claimed_only',false],['aws','claimed_only',false],
+  ['git','claimed_only',false],['github','claimed_only',false],['sql','claimed_only',false],['pytest','claimed_only',false],['rest api','claimed_only',false],
+];
+const chip = (s) => s === 'missing'
+  ? '<span class="chip chip-notfound"><svg><use href="#i-x-circle"/></svg>Not found</span>'
+  : '<span class="chip chip-claimed"><svg><use href="#i-circle-dashed"/></svg>Claimed only</span>';
+const mark = (cls, icon, label) => `<span class="mark ${cls}"><svg><use href="#i-${icon}"/></svg>${label}</span>`;
+document.getElementById('skillRows').innerHTML = ROWS.map(([n, s, req]) => `<tr>
+  <td>${n}${req ? '' : ' <span class="text-caption muted">(not asked for by this job)</span>'}</td>
+  <td>${chip(s)}</td>
+  <td>${s === 'missing' ? mark('no','x-circle','Absent') : mark('ok','check-circle','Confirmed')}</td>
+  <td>${mark('na','minus','Unavailable')}</td>
+  <td>${mark('na','minus','Not recorded')}</td></tr>`).join('');
+
+// Signature moment: ring arc + count-up (DESIGN_SPEC.md §5.3). Reduced motion: final state at once.
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+function playRing() {
+  const ring = document.getElementById('ring');
+  const arc = ring.querySelector('.arc');
+  const num = document.getElementById('ringNum');
+  const value = Number(ring.dataset.value);
+  const text = ring.dataset.value;
+  const decimals = (text.split('.')[1] || '').length;
+  const C = 2 * Math.PI * 52;
+  arc.style.strokeDasharray = C;
+  arc.style.transition = 'none';
+  arc.style.strokeDashoffset = C;
+  document.querySelectorAll('.bar i').forEach((b) => { b.style.transition = 'none'; b.style.width = '0'; });
+  arc.getBoundingClientRect();
+  const finalOffset = C - (Math.min(100, Math.max(0, value)) / 100) * C;
+  if (reduce.matches) {
+    arc.style.strokeDashoffset = finalOffset; num.textContent = text;
+    document.querySelectorAll('.bar i').forEach((b) => { b.style.width = b.dataset.w + '%'; });
+    return;
+  }
+  requestAnimationFrame(() => {
+    arc.style.transition = '';
+    arc.style.strokeDashoffset = finalOffset;
+    document.querySelectorAll('.bar i').forEach((b, i) => { b.style.transition = ''; b.style.transitionDelay = (300 + i * 40) + 'ms'; b.style.width = b.dataset.w + '%'; });
+  });
+  const dur = 1200, t0 = performance.now();
+  const ease = (t) => 1 - Math.pow(1 - t, 4); // close to cubic-bezier(.16,1,.3,1)
+  (function tick(now) {
+    const t = Math.min(1, (now - t0) / dur);
+    num.textContent = t < 1 ? (value * ease(t)).toFixed(decimals) : text;
+    if (t < 1) requestAnimationFrame(tick);
+  })(t0);
+}
+playRing();
+document.getElementById('replay').addEventListener('click', () => { location.hash = '#breakdown'; setTimeout(playRing, 250); });
+
+// Palette switcher (mock only)
+document.querySelectorAll('[data-pal]').forEach((a) => a.addEventListener('click', (e) => {
+  e.preventDefault();
+  const p = a.dataset.pal;
+  if (p === 'blue') document.documentElement.removeAttribute('data-palette'); else document.documentElement.setAttribute('data-palette', p);
+  document.querySelectorAll('[data-pal]').forEach((x) => { x.style.background = x === a ? '#3a3533' : ''; });
+}));
+document.querySelector('[data-pal="blue"]').style.background = '#3a3533';
+</script>
+</body>
+</html>

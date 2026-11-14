@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import {
-  ArrowDownRight, ArrowUpRight, CheckCircle2, Circle, Info, Minus, ShieldAlert, XCircle,
+  ArrowDownRight, ArrowUpRight, CheckCircle2, Circle, CircleDashed, Info, Minus, ShieldAlert, XCircle,
 } from 'lucide-react';
 import Badge from '../Badge';
 import { VerificationBadge, weightsVersionLabel } from '../ScoreBadge';
@@ -35,17 +35,20 @@ const DIRECTION_STYLES = {
 // counts as a confirming source.
 const SKILL_STATUS = {
   evidenced: {
-    variant: 'success',
+    variant: 'evidenced',
+    icon: CheckCircle2,
     label: 'Evidenced',
     hint: 'GitHub or the assessment confirms it.',
   },
   claimed_only: {
-    variant: 'warning',
+    variant: 'claimed',
+    icon: CircleDashed,
     label: 'Claimed only',
     hint: 'The résumé lists it and no independent source (GitHub or the assessment) confirms it.',
   },
   not_found: {
-    variant: 'destructive',
+    variant: 'notfound',
+    icon: XCircle,
     label: 'Not found',
     hint: 'The job asks for it and no source has it.',
   },
@@ -417,7 +420,7 @@ function SkillEvidenceTable({ rows }) {
                   )}
                 </td>
                 <td className="py-2 pr-3">
-                  <Badge variant={status.variant} title={status.hint}>
+                  <Badge variant={status.variant} icon={status.icon} title={status.hint}>
                     {status.label}
                   </Badge>
                 </td>

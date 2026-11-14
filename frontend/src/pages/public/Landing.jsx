@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Zap, Brain, Sparkles, ArrowRight, ChevronDown, FileText, GitBranch, ListChecks, Scale } from 'lucide-react';
+import { Brain, Sparkles, ArrowRight, ChevronDown, FileText, GitBranch, ListChecks, Scale } from 'lucide-react';
+import PatinaMark from '../../components/PatinaMark';
 
 // R-15 (D§8.2): this page describes what the system does and nothing else. The
 // demo score, the visitor statistics, the stock avatars, the rating and the
@@ -211,10 +212,8 @@ const Footer = () => (
     <div className="max-w-5xl mx-auto px-6">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 flex items-center justify-center bg-primary rounded-md">
-            <Zap className="w-3.5 h-3.5 text-primary-foreground" />
-          </div>
-          <span className="font-bold text-base tracking-tight text-foreground">PATINA</span>
+          <PatinaMark size={24} />
+          <span className="font-display font-bold text-[15px] tracking-[.14em] text-foreground">PATINA</span>
         </div>
         <div className="text-xs text-muted-foreground">
           © 2026 PATINA. All rights reserved.
@@ -237,10 +236,8 @@ function Landing() {
       >
         <div className="max-w-5xl mx-auto flex justify-between items-center px-6 py-3">
           <Link to="/" className="flex items-center gap-2.5 no-underline">
-            <div className="w-7 h-7 flex items-center justify-center bg-primary rounded-md">
-              <Zap className="w-3.5 h-3.5 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-base tracking-tight text-foreground">PATINA</span>
+            <PatinaMark size={28} />
+            <span className="font-display font-bold text-[15px] tracking-[.14em] text-foreground">PATINA</span>
           </Link>
           <div className="flex items-center gap-3">
             <Link to="/login" className="text-body-sm text-muted-foreground hover:text-foreground transition-colors">

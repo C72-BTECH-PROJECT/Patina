@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useId } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, Zap, Eye, EyeOff, ArrowRight, ShieldAlert, MailCheck } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowRight, ShieldAlert, MailCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
+import PatinaMark from '../../components/PatinaMark';
 
 // Where to send someone once they're authenticated. Roles arrive uppercase from
 // /api/auth/me and /api/auth/login (auth.controller.js formatProfile).
@@ -227,10 +228,8 @@ function Login() {
       animate={{ opacity: 1, y: 0 }}
     >
       <Link to="/" className="flex items-center gap-2.5 no-underline">
-        <div className="w-8 h-8 flex items-center justify-center bg-primary rounded-md">
-          <Zap className="w-4 h-4 text-primary-foreground" />
-        </div>
-        <span className="font-bold text-lg tracking-tight text-foreground">PATINA</span>
+        <PatinaMark size={28} />
+        <span className="font-display font-bold text-[15px] tracking-[.14em] text-foreground">PATINA</span>
       </Link>
 
       <Link

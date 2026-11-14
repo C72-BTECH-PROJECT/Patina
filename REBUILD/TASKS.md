@@ -350,6 +350,25 @@ All of these keep the rules at the top of this file. Each ends with the e2e spin
 - **Status:** todo · **Agent:** patina-implementer · **Depends:** all MUST cards, S-3 · **Risk:** medium (touches every screen's look)
 - **Do:** palette, type scale, spacing and the three accent colours in `tailwind.config.js` and `index.css` (today all three accents are `#0a0a0a`); the auth screens; `ScoreBreakdown` as the centrepiece. No layout is restructured, no figure is invented. Anthony's references are in his claude.ai project doc `claude/redesign-references.md`; he supplies them or the palette, since an agent cannot read that doc from the repo.
 - **Check:** e2e spine passes after each change; text contrast at least 4.5:1 on every changed token; verifier screenshots of landing, login, recruiter table, drill-down, candidate result.
+- **Superseded 2026-11-15 by `Docs/design-refs/DESIGN_SPEC.md`**, approved by Anthony with changes. That
+  file holds the full card text, the acceptance checks and the hook inventory. The work is on branch
+  `design/refresh`, never on `main`.
+  - **Builders:** Sonnet `patina-implementer`; Opus after two failed checks.
+  - **Who checks:** the lead runs each card's check.
+
+  | Card | Spec | Scope | Status |
+  |---|---|---|---|
+  | R-35a | D-1 | Tokens, config clean-up, fonts, global motion | **PASS** 2026-11-15. Lead re-ran: 11 suites / 121 tests, build exit 0; the three greps are empty |
+  | R-35b | D-2 | Button, Badge, chips, Spinner, EmptyState | **PASS** 2026-11-15. Lead re-ran: 121/121, build exit 0; unknown status/verification still `outline` |
+  | R-35c | D-3 | PatinaMark logo, favicon, navigation, page transition | **PASS** 2026-11-15. Lead re-ran: 121/121, build exit 0; `PATINA` text unchanged in all 9 places; `/favicon.svg` served `image/svg+xml`; screenshots in `tests/e2e/output/design/d3-*.png`. **Waiting for Anthony's visual check** |
+  | R-35d | D-4 | Auth screens | todo (core) |
+  | R-35e | D-5 | Results page and the score ring; e2e spine | todo (core) |
+  | R-35f | D-6 | ScoreBreakdown and drill-down | todo (core) |
+  | R-35g | D-7 | Candidate pages | only if Anthony says the budget allows. Open question first: Shortlisted colour |
+  | R-35h | D-8 | Recruiter and admin pages | only if the budget allows |
+  | R-35i | O-10 | Anthony captures the support candidate's result (permission given 2026-11-15) | Anthony |
+  | R-35j | D-9 | Landing page | waits for O-10 |
+  | R-35k | D-10 | Verification pass | core, last |
 
 ### R-36 · Nov 17 sweep of the `BATCH·demo` issues
 - **Status:** todo · **Agent:** patina-implementer, one per service; a fresh patina-verifier · **Depends:** the Nov 17 rehearsal · **Risk:** low if each fix stays small

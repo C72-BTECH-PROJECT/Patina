@@ -14,6 +14,7 @@ import {
   Clock,
 } from 'lucide-react';
 import Badge from '../../components/Badge';
+import PatinaMark from '../../components/PatinaMark';
 import { api } from '../../lib/api';
 import { EDUCATION_EMPTY_ENTRY, educationLine } from '../../lib/education';
 
@@ -333,10 +334,8 @@ function Upload() {
         </Link>
 
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 flex items-center justify-center bg-primary rounded-md">
-            <UploadIcon className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-bold text-lg tracking-tight">PATINA</span>
+          <PatinaMark size={28} />
+          <span className="font-display font-bold text-[15px] tracking-[.14em] text-foreground">PATINA</span>
         </div>
 
         <div className="w-[60px]" />

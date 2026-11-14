@@ -24,23 +24,19 @@ function Button({
   ...props
 }) {
   const base = [
-    'inline-flex items-center justify-center gap-2',
-    'font-medium rounded-md',
-    'transition-all duration-200',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-    'disabled:pointer-events-none disabled:opacity-50',
-    'cursor-pointer select-none',
+    'inline-flex items-center justify-center gap-2 rounded-md font-medium',
+    'transition-[background-color,box-shadow,transform] duration-150 ease-out active:scale-[.98]',
+    'focus-visible:outline-none focus-visible:shadow-focus',
+    'disabled:opacity-50 disabled:pointer-events-none',
   ].join(' ');
 
+  // Design spec §6.1; the .btn classes in index.css must look the same.
   const variants = {
-    primary: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/95 shadow-xs hover:shadow-card',
-    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/70',
-    // The `accent` colour has sub-keys only in tailwind.config.js (no DEFAULT), so the
-    // bare accent hover classes generated no CSS; `muted` is the hover surface the
-    // other controls use.
-    outline: 'border border-input bg-background hover:bg-muted hover:text-foreground active:bg-muted/80',
-    ghost: 'hover:bg-muted hover:text-foreground active:bg-muted/80',
-    destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/95',
+    primary: 'bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover',
+    secondary: 'bg-secondary text-secondary-foreground hover:bg-border',
+    outline: 'border border-border bg-surface text-foreground hover:bg-muted',
+    ghost: 'text-muted-foreground hover:bg-muted hover:text-foreground',
+    destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
   };
 
   const sizes = {

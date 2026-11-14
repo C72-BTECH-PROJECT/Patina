@@ -1,4 +1,5 @@
 import React from 'react';
+import { Shield, ShieldCheck, ShieldHalf } from 'lucide-react';
 import Badge from './Badge';
 
 /**
@@ -53,17 +54,20 @@ function ScoreBadge({ band, size = 'sm', className = '' }) {
 const VERIFICATION = {
   unverified: {
     label: 'Unverified',
-    variant: 'outline',
+    variant: 'unverified',
+    icon: Shield,
     hint: 'Résumé claims only. Nothing has been verified yet: neither GitHub activity nor the assessment has answered.',
   },
   partly_verified: {
     label: 'Partly verified',
-    variant: 'primary',
+    variant: 'partly',
+    icon: ShieldHalf,
     hint: 'One independent source (GitHub activity or the assessment) verified this score.',
   },
   verified: {
     label: 'Verified',
-    variant: 'success',
+    variant: 'verified',
+    icon: ShieldCheck,
     hint: 'Both independent sources, GitHub activity and the assessment, verified this score.',
   },
 };
@@ -81,6 +85,7 @@ export function VerificationBadge({ verification, size = 'sm', className = '' })
   return (
     <Badge
       variant={view.variant}
+      icon={view.icon}
       size={size}
       className={className}
       title={`Verification: ${view.hint}`}
