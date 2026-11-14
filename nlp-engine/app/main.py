@@ -44,7 +44,8 @@ from app.embedder import analyse
 # "API" need technical context, Node.js is not JavaScript, C / Go / R detected
 # (Go's canonical name is now "go", was "golang"), IT support tools added;
 # links and email addresses are not read for skills.
-PARSER_VERSION = "nlp-engine@2.2.0"
+# 2.3.0: "sas" added; "statistics" added as a context skill (technical context only).
+PARSER_VERSION = "nlp-engine@2.3.0"
 SERVICE_VERSION = PARSER_VERSION.split("@", 1)[1]
 
 # `raw_text` carries the full extracted text up to this many characters.

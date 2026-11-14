@@ -637,13 +637,13 @@ const recordFrom = (resume, github, assessment) => buildScoreRecord(
   },
 );
 
-test('R-27: base weights are 0.20 / 0.35 / 0.45 and the version is w2-2026-11-13', () => {
+test('R-27: base weights are 0.20 / 0.35 / 0.45 and the version is w3-2026-11-14', () => {
   assert.deepEqual({ ...X.BASE_WEIGHTS }, { [P]: 0.2, [G]: 0.35, [A]: 0.45 });
-  assert.equal(WEIGHTS_VERSION, 'w2-2026-11-13');
+  assert.equal(WEIGHTS_VERSION, 'w3-2026-11-14');
   const r = recordFrom(60, 70, 80);
-  assert.equal(r.explanation.weights_version, 'w2-2026-11-13');
-  assert.equal(r.weights_version, 'w2-2026-11-13');
-  assert.equal(r.explanation.weighting_scheme.version, 'w2-2026-11-13');
+  assert.equal(r.explanation.weights_version, 'w3-2026-11-14');
+  assert.equal(r.weights_version, 'w3-2026-11-14');
+  assert.equal(r.explanation.weighting_scheme.version, 'w3-2026-11-14');
   assert.deepEqual(r.explanation.weighting_scheme.base_weights, { [P]: 0.2, [G]: 0.35, [A]: 0.45 });
 });
 
@@ -654,7 +654,8 @@ test('R-27: the five worked cases of D§7.1 reproduce to two decimals', () => {
     ['same resume, average assessment, no GitHub', 95, null, 50, 59, 'low', 'partly_verified'],
     ['short resume, strong GitHub and assessment', 40, 85, 85, 76, 'medium', 'verified'],
     ['long skill list, weak GitHub and assessment', 95, 30, 30, 43, 'low', 'verified'],
-    ['support candidate, no GitHub, strong assessment', 60, null, 90, 84, 'high', 'partly_verified'],
+    // Partly verified: capped at 79 from 84 (the high band needs two independent sources).
+    ['support candidate, no GitHub, strong assessment', 60, null, 90, 79, 'medium', 'partly_verified'],
   ];
   for (const [name, resume, github, assessment, composite, band, verification] of cases) {
     const r = recordFrom(resume, github, assessment);
@@ -741,4 +742,32 @@ test('R-27: an override is read as proportions; weightPlan keeps the same rule',
   );
   assert.deepEqual(plan.weights, { [P]: 0.2, [G]: 0.35, [A]: 0 });
   assert.equal(plan.unearned, 0.45);
+});
+
+test('Partly-verified cap: one independent source never reaches the high band; two can', () => {
+  // Assessment only, top marks: 0.2 x 100 + 0.8 x 100 = 100, capped at 79.
+  const top = recordFrom(100, null, 100);
+  assert.equal(X.PARTLY_VERIFIED_CAP, 79);
+  assert.equal(top.verification, 'partly_verified');
+  assert.equal(top.composite, 79);
+  assert.equal(top.band, 'medium');
+  assert.equal(top.explanation.composite, 79);
+  assert.deepEqual(
+    { cap: top.explanation.partly_verified_cap.cap, uncapped: top.explanation.partly_verified_cap.uncapped_composite },
+    { cap: 79, uncapped: 100 },
+  );
+  assert.match(top.explanation.summary, /Capped at 79 from 100: the high band needs two independent sources/);
+  // Below the cap nothing changes and no cap is recorded.
+  const mid = recordFrom(60, null, 70);
+  assert.equal(mid.composite, 68);
+  assert.equal(mid.explanation.partly_verified_cap, null);
+  // Both sources: the high band is reachable.
+  const both = recordFrom(100, 100, 100);
+  assert.equal(both.verification, 'verified');
+  assert.equal(both.composite, 100);
+  assert.equal(both.band, 'high');
+  assert.equal(both.explanation.partly_verified_cap, null);
+  // Unverified and GitHub-only scores are untouched by the cap (their ceilings are 20 and 55).
+  assert.equal(recordFrom(100, null, null).explanation.partly_verified_cap, null);
+  assert.equal(recordFrom(100, 100, null).composite, 55);
 });

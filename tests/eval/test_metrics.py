@@ -132,3 +132,23 @@ def test_labeller_agreement_exact():
     assert micro.f1 == Fraction(2, 3)
     assert macro.f1 == Fraction(3, 4)
     assert only_a == ["only_a.pdf"] and only_b == []
+
+
+def test_in_vocabulary_recall_counts_only_gold_skills_the_parser_can_name():
+    import run_parsing_eval as r
+    vocab = {"postgresql": ["postgres"], "python": [], "linux": []}
+    vset = r.vocabulary_set(vocab, ALIASES)
+    # r1: gold {python, postgresql, sas}, found {python}: sas is outside the vocabulary
+    # r2: gold {linux, cobol}, found {linux, java}
+    per = [{"counts": pm.compare_skills({"python", "postgresql", "sas"}, {"python"})},
+           {"counts": pm.compare_skills({"linux", "cobol"}, {"linux", "java"})}]
+    assert r.in_vocabulary_recall(per, vset) == (2, 3)
+    assert r.summarise(per)["totals"] == (2, 1, 3)
+
+
+def test_spelling_mismatch_pairs_a_false_find_with_its_missed_spelling():
+    import run_parsing_eval as r
+    vocab = {"exchange server": ["microsoft exchange"], "sql": []}
+    per = [{"row": {"resume_file": "a.pdf"},
+            "counts": pm.compare_skills({"microsoft exchange", "dns"}, {"exchange server", "sql"})}]
+    assert r.spelling_mismatches(per, vocab, ALIASES) == [("a.pdf", "exchange server", "microsoft exchange")]

@@ -278,7 +278,7 @@ test('f1 upload -> 201 with skills; stored at a new key candidates/<id>/resume-<
   assert.equal(row.candidate_id, id);
   assert.equal(row.job_id, null);
   assert.equal(row.file_ref, key);
-  assert.equal(row.parser_version, 'nlp-engine@2.2.0');
+  assert.equal(row.parser_version, 'nlp-engine@2.3.0');
   assert.deepEqual(row.skills, SNAP.f1.entities.skills);
   assert.ok(!('raw_text' in row), 'the full text must never be persisted');
   assert.ok(row.raw_text_preview.length <= 300);
@@ -602,7 +602,7 @@ test('runResumePipeline with a job: downloads the stored file, sends jd and skil
     ['contact', 'entities', 'parserVersion', 'rawText', 'rawTextTruncated', 'resume', 'semanticAnalysis', 'storagePath']);
   assert.equal(out.rawText, SNAP.f1.raw_text);
   assert.equal(out.rawTextTruncated, false);
-  assert.equal(out.parserVersion, 'nlp-engine@2.2.0');
+  assert.equal(out.parserVersion, 'nlp-engine@2.3.0');
   assert.deepEqual(out.semanticAnalysis, SNAP.f1.semantic_analysis);
   assert.equal(out.contact.email, SNAP.f1.entities.email);
   assert.equal(out.contact.github, SNAP.f1.entities.github);

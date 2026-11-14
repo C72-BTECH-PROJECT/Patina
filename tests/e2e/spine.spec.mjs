@@ -90,7 +90,7 @@ function expectWeightsRule(detail, label, { assessed }) {
   const w = detail.weights || {};
   const sum = Object.values(w).reduce((a, b) => a + Number(b), 0);
   const unearned = Number(detail.explanation?.unearned_weight ?? NaN);
-  expect(detail.explanation?.weights_version, `${label}: the score records its weights version`).toBe('w2-2026-11-13');
+  expect(detail.explanation?.weights_version, `${label}: the score records its weights version`).toBe('w3-2026-11-14');
   expect(Number(w.parsing_semantic_alignment), `${label}: the résumé weighs at most 0.20`).toBeLessThanOrEqual(0.2 + 1e-9);
   expect(Number.isFinite(unearned), `${label}: the unearned share is stored`).toBe(true);
   expect(Math.abs(sum + unearned - 1), `${label}: weights ${JSON.stringify(w)} plus unearned ${unearned} sum to 1`).toBeLessThanOrEqual(0.001);
@@ -348,7 +348,7 @@ test('demo spine: recruiter and candidate, through the browser', async ({ browse
       await expect(drill).toHaveAttribute('data-state', 'ready');
       expectWeightsRule(detail, 'step 4', { assessed: false });
       await expect(drill.getByTestId('drilldown-awaiting')).toBeVisible();
-      await expect(drill.getByTestId('weights-version')).toContainText('w2-2026-11-13');
+      await expect(drill.getByTestId('weights-version')).toContainText('w3-2026-11-14');
       const view = await checkDrilldown(drill, detail, 'step 4');
       expect(view.composite).toBe(rowComposite);
       expect(view.available.assessment_results, 'no assessment sub-score before the assessment').toBe(false);

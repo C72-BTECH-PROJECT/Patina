@@ -228,3 +228,110 @@ Written by hand by the R-21 implementer to pair the two harness sections above. 
   was not tuned against. That number needs the TM-1 set.
 - **Still missed after:** `ecs`, `eks` (AWS service names, not in the vocabulary), `pl/sql` (not added: a language,
   not a support tool; logged in `ISSUES.md`), and all of f6 (image-only, no OCR).
+
+## 2026-11-14 11:28 UTC - Evaluation run on `eval/labels/gold.csv`
+
+**Stated limits (read before quoting any number below):**
+
+- n = 20 résumés, all from the public Kaggle Resume Dataset named in the SRS. The labelling guide planned 30; this is 20.
+- How they were chosen: by file name, not by content or layout. The first 12 files by name in the INFORMATION-TECHNOLOGY folder, plus the first 2 by name in each of ENGINEERING, FINANCE, HR and DESIGNER. None was skipped.
+- Labels: AI-drafted from the résumé text only (the parser's output was never consulted) and checked against each PDF by one human labeller (Anthony). One labeller, so no inter-labeller agreement figure exists and none is reported.
+- Labelling rulings R1–R7 and the per-row decisions are in `eval/labels/RULINGS.md`, kept with the label set (git-ignored, like `gold.csv`). They were made before this run.
+- Role mix: 11 of 20 are not IT roles (role type `other`), 9 are support/operations, and none is a development role. The numbers say little about development résumés.
+- Frozen before the run: the alias table and the out-of-scope list (same SHA-256 as the 2026-11-12 smoke run, so unchanged since before labelling) and the parser vocabulary, taken after the owner-approved sas/statistics change (nlp-engine@2.3.0). Nothing was changed after seeing this run's misses.
+- Two résumés have no gold skills; they count only through false finds.
+
+- Label set: `eval/labels/gold.csv`, 20 resumes
+- Sources: kaggle 20, consented 0, smoke 0
+- Role types: development 0, other 11, support_operations 9
+- Parser version (`parser_version` in /parse responses): nlp-engine@2.3.0
+- Service version (`GET /` `version` field): 2.3.0
+- Alias table: `eval/aliases.json`, 57 aliases, sha256 b23afa6e66fc
+- Out-of-scope list: `eval/out_of_scope_terms.json`, 43 terms, sha256 b8582b81dc6d
+- `jd` sent: no
+
+### Skills
+
+| | Precision | Recall | F1 | Resumes averaged (P / R / F1) |
+|---|---|---|---|---|
+| Micro (TP 58, FP 15, FN 221) | 0.795 | 0.208 | 0.330 | 20 / 20 / 20 |
+| Macro (per-resume mean) | 0.745 | 0.162 | 0.235 | 12 / 18 / 18 |
+
+Macro rules: precision averages resumes where the parser kept at least one skill; recall averages resumes with at least one gold skill; F1 = 2TP/(2TP+FP+FN) per resume, averaged over resumes where either side is non-empty (an unreadable resume with gold skills scores F1 0).
+Out-of-scope terms removed from the parser's output: 5 in total.
+
+#### Recall on gold skills the parser can name
+
+Frozen vocabulary: `eval/vocabulary_frozen.json`, 180 skills, sha256 47b4908ebfe0; checked identical to the live `GET /skills/vocabulary` before the run. A gold skill is in the vocabulary when its canonical form (eval alias table applied) equals the canonical form of a vocabulary name or one of its spellings. Always read the two recall figures together: the first is what a recruiter gets; the second is how well the parser finds what it is built to find.
+
+| Recall over | Gold skills | Found | Recall |
+|---|---|---|---|
+| All gold skills | 279 | 58 | 0.208 |
+| Gold skills in the frozen vocabulary | 67 | 58 | 0.866 |
+
+212 of 279 gold skills (0.760) are not in the vocabulary, so the parser cannot find them whatever the résumé says.
+
+#### Same skill, different name (alias-table gaps; reported, not corrected)
+
+7 false finds are the parser's canonical name for a gold skill it then counts as missed, because the frozen alias table does not join the two names. Each is counted once as a false find and once as a miss above: parser `exchange server` vs gold `microsoft exchange` (5 résumés); parser `sccm` vs gold `system center configuration manager` (2 résumés).
+
+#### Sensitivity: the result with `10089434.pdf` excluded
+
+`10089434.pdf` holds 62 of 279 gold skills (0.222), 16 of 58 correct finds, 3 of 15 false finds and 46 of 221 misses.
+
+| Set | Resumes | Micro P | Micro R | Micro F1 | Macro P | Macro R | Macro F1 |
+|---|---|---|---|---|---|---|---|
+| All | 20 | 0.795 | 0.208 | 0.330 | 0.745 | 0.162 | 0.235 |
+| Without `10089434.pdf` (TP 42, FP 12, FN 175) | 19 | 0.778 | 0.194 | 0.310 | 0.736 | 0.156 | 0.225 |
+
+Without `10089434.pdf`: recall on all gold skills 0.194; recall on gold skills in the frozen vocabulary 0.857 (42 of 49).
+
+| Role type | Resumes | Micro P | Micro R | Micro F1 |
+|---|---|---|---|---|
+| other | 11 | 0.917 | 0.164 | 0.278 |
+| support_operations | 9 | 0.770 | 0.222 | 0.344 |
+
+### Contact fields (exact match after normalisation)
+
+Normalisation: email trimmed and lower-cased; GitHub and LinkedIn URLs trimmed, lower-cased, with a leading `http://`/`https://`, a leading `www.` and trailing `/` removed. Nothing else.
+
+| Field | Resumes with the field in gold | Correct of those | Accuracy over all resumes (empty = empty counts as correct) | Parser value where gold is empty |
+|---|---|---|---|---|
+| email | 0 | 0 (n/a) | 20/20 (1.000) | 0 |
+| github_url | 0 | 0 (n/a) | 20/20 (1.000) | 0 |
+| linkedin_url | 0 | 0 (n/a) | 20/20 (1.000) | 0 |
+
+### Parse time
+
+Client-side wall clock per `POST /parse` on loopback, over the 20 resumes that returned HTTP 200: median 0.939 s, maximum 1.713 s.
+
+### Resumes not parsed
+
+None. Every resume returned HTTP 200 with text.
+
+<details><summary>Per-resume detail</summary>
+
+| Resume | Role | Status | TP | FP | FN | Missed | False finds |
+|---|---|---|---|---|---|---|---|
+| `10030015.pdf` | other | parsed | 0 | 0 | 2 | dasylab, labview | - |
+| `10089434.pdf` | support_operations | parsed | 16 | 3 | 46 | .net framework, active directory federation services, asp.net mvc, backup exec, batch, bbars, blackberry enterprise server, cacti, cisco asa, data domain, dhcp, distributed file system, dns, enterprise vault, epolicy orchestrator, exchange activesync, forefront threat management gateway, iis, isa server, jsp, ldap, mcafee, microsoft exchange, microsoft office, nmap, ntfs, sharepoint, solarwinds, storsimple, system center configuration manager, systems management server, t-sql, tcp/ip, team foundation server, twinstrata, ubuntu, vb.net, vbscript, veeam, veritas netbackup, visual studio, vpn, vranger, vsphere, windows, zenmap | .net, exchange server, sccm |
+| `10219099.pdf` | other | parsed | 0 | 0 | 5 | cavs ii, lss, microsoft office, promis, wds | - |
+| `10247517.pdf` | support_operations | parsed | 2 | 3 | 37 | adtran, apple airport, apple keynote, apple numbers, apple pages, autocad, autodesk, barracuda message archiver, barracuda web filter, catalyst, cisco, dell powervault, dos, excel, hp procurve, juniper, macos, meraki, microsoft access, microsoft exchange, microsoft project, microsoft word, mitel, nortel, outlook, palo alto, powerpoint, publisher, riverbed, sap, shoretel, solidworks, sonicwall, sql server, system center configuration manager, visio, windows | exchange server, sccm, sql |
+| `10265057.pdf` | other | parsed | 7 | 1 | 13 | ansoft designer, apple keynote, apple numbers, apple pages, awr microwave office, eagle, excel, labview, microsoft office, ni multisim, pcb artist, spice, spss | statistics |
+| `10399912.pdf` | other | parsed | 0 | 0 | 5 | excel, microsoft word, outlook, peoplesoft, powerpoint | - |
+| `10466583.pdf` | other | parsed | 0 | 0 | 0 | - | - |
+| `10549585.pdf` | other | parsed | 2 | 0 | 3 | cics, dos, vpn | - |
+| `10553553.pdf` | support_operations | parsed | 6 | 1 | 12 | acronis snap deploy, act, adobe acrobat, dentrix, dexis, macos, microsoft exchange, microsoft office, novell, symantec endpoint security, symantec ghost, windows | exchange server |
+| `10641230.pdf` | support_operations | parsed | 11 | 0 | 10 | actionscript, adobe creative suite, batch, eaglesoft, macos, microsoft office, tcp/ip, ubuntu, windows, windows phone | - |
+| `10694288.pdf` | other | parsed | 0 | 0 | 5 | banner, benefits eligibility system, peopleadmin, personnel management information system, vrs navigator | - |
+| `10748989.pdf` | other | parsed | 0 | 0 | 4 | adobe indesign, autocad, rhino, sketchup | - |
+| `10839851.pdf` | support_operations | parsed | 1 | 0 | 5 | avaya, cisco, microsoft office, remedy, tcp/ip | - |
+| `10840430.pdf` | other | parsed | 0 | 0 | 1 | acas | - |
+| `11441764.pdf` | other | parsed | 2 | 0 | 18 | adp, as400, dynamics ax, e-time heavy, easypay, excel, ezlabor, great plains, jd edwards, mas90, microsoft access, microsoft office, quickbooks, report smith, sap, sbt, timesaver, ultipro | - |
+| `11580408.pdf` | support_operations | parsed | 3 | 3 | 26 | 3com, act, blackberry, c/side, cisco, coral, fortinet, freepbx, ipswitch imail, magento, microsoft access, microsoft exchange, microsoft office, microsoft sbs, navision, netgear, nortel, omd, sco unix, sql server, sybase, visio, webgui, windows, windows mobile, windows server | c, exchange server, sql |
+| `11584809.pdf` | support_operations | parsed | 3 | 1 | 4 | macos, microsoft dynamics, microsoft exchange, vmware | exchange server |
+| `11957080.pdf` | support_operations | parsed | 5 | 2 | 20 | adobe indesign, asp.net, crystal reports, dos, excel, groupwise, heat, heatweb-fs, microsoft access, microsoft office, microsoft word, netmotion, novell imanager, powerpoint, publisher, sap, t3 voicemail, unix, visual studio, windows | .net, vue.js |
+| `12045067.pdf` | other | parsed | 0 | 0 | 0 | - | - |
+| `12334140.pdf` | support_operations | parsed | 0 | 1 | 5 | basic, dos, lotus, novell netware, wordperfect | express.js |
+
+</details>

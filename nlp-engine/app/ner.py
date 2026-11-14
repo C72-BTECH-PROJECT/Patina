@@ -49,6 +49,10 @@ SKILL_KEYWORDS = [
     "deep learning", "computer vision", "data science", "jupyter",
     "spark", "hadoop", "airflow", "mlflow", "transformers", "bert",
     "langchain", "openai", "hugging face",
+    # 2.3.0 (owner decision 2026-11-14, ISSUES R-32 entry): "sas" is matched as a
+    # word anywhere; "statistics" is an ordinary English word, so it is a context
+    # skill (CONTEXT_SKILLS) and needs a technical context.
+    "sas", "statistics",
 
     # mobile
     "android", "ios", "react native", "flutter", "xamarin", "ionic",
@@ -186,6 +190,17 @@ CONTEXT_SKILLS = {
         "context": [
             r"(?i:\brustlang\b|\brust\s*(?:lang|language|programming)\b)",
             _BUILT_IN + r"Rust\b",
+        ],
+    },
+    # "statistics" in prose ("Bureau of Labor Statistics", "sales statistics") is
+    # not a skill. Found when it is a list item (rule 2), a named branch of the
+    # field, or tied to a statistical tool.
+    "statistics": {
+        # A sentence-final period is allowed: "SAS, R and statistics."
+        "bare": r"(?i:statistics)\.?",
+        "context": [
+            r"(?i:\b(?:applied|bayesian|inferential|mathematical|computational|multivariate)\s+statistics\b)",
+            r"(?i:\bstatistics\s+(?:with|using|in)\s+(?:r|python|sas|spss|stata|matlab)\b)",
         ],
     },
 }

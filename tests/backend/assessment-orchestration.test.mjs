@@ -743,7 +743,8 @@ test('evaluate with no prior score row and the parser down creates one, marked e
   assert.equal(row.subscores[G].components.reason_code, 'no_github_link');
   assert.equal(row.subscores[A].available, true);
   assert.equal(row.weights[A], 1);
-  assert.equal(Number(row.composite_score), row.subscores[A].value);
+  // Assessment only is partly verified: capped at 79 (D§7.1, w3-2026-11-14).
+  assert.equal(Number(row.composite_score), Math.min(row.subscores[A].value, 79));
 });
 
 test('evaluate with no resumes row at all: no score row, scoring failed, the graded attempt stays stored', async () => {

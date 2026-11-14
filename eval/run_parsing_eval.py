@@ -136,6 +136,21 @@ def sha12(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
 
 
+def vocabulary_names(body: object) -> dict[str, list[str]]:
+    """{name: aliases} from a GET /skills/vocabulary body (R-32)."""
+    if not isinstance(body, dict) or not isinstance(body.get("skills"), list):
+        raise InputError("vocabulary: expected a GET /skills/vocabulary body with a 'skills' list")
+    return {str(e["name"]): [str(a) for a in e.get("aliases") or []] for e in body["skills"]}
+
+
+def vocabulary_set(vocab: dict[str, list[str]], aliases) -> set[str]:
+    """Every spelling the parser knows, canonicalised with the eval alias table, so
+    a gold skill can be tested for membership in the same form the metrics use."""
+    spellings = [s for name, al in vocab.items() for s in [name, *al]]
+    kept, _ = pm.skill_set(spellings, aliases)
+    return kept
+
+
 # ---------------------------------------------------------------------------
 # NLP service client
 # ---------------------------------------------------------------------------
@@ -203,6 +218,10 @@ class NlpClient:
         with urllib.request.urlopen(self.base + "/", timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
+    def vocabulary(self) -> dict:
+        with urllib.request.urlopen(self.base + "/skills/vocabulary", timeout=15) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
     def parse(self, file_path: Path) -> dict:
         """Returns {status: parsed|unreadable|failed, ...}. Raises URLError if
         the service is unreachable (the run aborts rather than miscounting)."""
@@ -232,6 +251,45 @@ class NlpClient:
 
 def _fmt(x) -> str:
     return "n/a" if x is None else f"{float(x):.3f}"
+
+
+def in_vocabulary_recall(per_resume, vocab_set: set[str]):
+    """(found, gold) over gold skills whose canonical form is in the frozen vocabulary."""
+    gold_in = found_in = 0
+    for p in per_resume:
+        c = p["counts"]
+        gold = (c.true_found | c.missed) & vocab_set
+        gold_in += len(gold)
+        found_in += len(c.true_found & vocab_set)
+    return found_in, gold_in
+
+
+def spelling_mismatches(per_resume, vocab: dict[str, list[str]], aliases) -> list[tuple[str, str, str]]:
+    """(resume, false find, missed gold skill) where the parser's own vocabulary lists
+    the missed gold skill as a spelling of the false find: the same skill under a
+    name the frozen alias table does not join. Reported, never corrected."""
+    spellings = {}
+    for name, al in vocab.items():
+        canon = pm.canonical_skill(name, aliases)
+        spellings.setdefault(canon, set()).update(
+            s for s in (pm.canonical_skill(a, aliases) for a in [name, *al]) if s)
+    out = []
+    for p in per_resume:
+        c = p["counts"]
+        for f in sorted(c.false_found):
+            for m in sorted(c.missed & spellings.get(f, set())):
+                out.append((p["row"]["resume_file"], f, m))
+    return out
+
+
+def summarise(per_resume) -> dict:
+    counts = [p["counts"] for p in per_resume]
+    return {
+        "micro": pm.micro_prf(counts),
+        "macro": pm.macro_prf(counts),
+        "totals": (sum(c.tp for c in counts), sum(c.fp for c in counts), sum(c.fn for c in counts)),
+        "n": len(counts),
+    }
 
 
 def evaluate(rows, resumes_dir: Path, client: NlpClient, aliases, oos_terms) -> dict:
@@ -347,6 +405,12 @@ def render_section(args, rows, res, health, agree) -> str:
     else:
         L.append(f"## {now} - Evaluation run on `{rel(args.labels)}`")
     L.append("")
+    if args.limit:
+        L.append("**Stated limits (read before quoting any number below):**")
+        L.append("")
+        for text in args.limit:
+            L.append(f"- {text}")
+        L.append("")
     L.append(f"- Label set: `{rel(args.labels)}`, {n} resumes")
     L.append(f"- Sources: kaggle {src['kaggle']}, consented {src['consented']}, smoke {src[SMOKE_SOURCE]}")
     L.append("- Role types: " + ", ".join(f"{k} {v}" for k, v in roles.items()))
@@ -376,6 +440,70 @@ def render_section(args, rows, res, health, agree) -> str:
              "either side is non-empty (an unreadable resume with gold skills scores F1 0).")
     L.append(f"Out-of-scope terms removed from the parser's output: {removed_total} in total.")
     L.append("")
+    if args._vocab is not None:
+        found_in, gold_in = in_vocabulary_recall(res["per_resume"], args._vocab_set)
+        all_gold = tp + fn
+        L.append("#### Recall on gold skills the parser can name")
+        L.append("")
+        L.append(f"Frozen vocabulary: `{rel(args.vocabulary)}`, {len(args._vocab)} skills, sha256 "
+                 f"{sha12(args.vocabulary)}; checked identical to the live `GET /skills/vocabulary` before the run. "
+                 "A gold skill is in the vocabulary when its canonical form (eval alias table applied) equals the "
+                 "canonical form of a vocabulary name or one of its spellings. Always read the two recall figures together: "
+                 "the first is what a recruiter gets; the second is how well the parser finds what it is built to find.")
+        L.append("")
+        L.append("| Recall over | Gold skills | Found | Recall |")
+        L.append("|---|---|---|---|")
+        L.append(f"| All gold skills | {all_gold} | {tp} | {_fmt(micro.recall)} |")
+        L.append(f"| Gold skills in the frozen vocabulary | {gold_in} | {found_in} | "
+                 f"{_fmt(pm._ratio(found_in, gold_in))} |")
+        L.append("")
+        L.append(f"{all_gold - gold_in} of {all_gold} gold skills ({_fmt(pm._ratio(all_gold - gold_in, all_gold))}) "
+                 "are not in the vocabulary, so the parser cannot find them whatever the résumé says.")
+        L.append("")
+        mism = spelling_mismatches(res["per_resume"], args._vocab, args._aliases)
+        L.append("#### Same skill, different name (alias-table gaps; reported, not corrected)")
+        L.append("")
+        if not mism:
+            L.append("None: no false find is the parser's name for a missed gold skill.")
+        else:
+            pairs = {}
+            for resume, f, m in mism:
+                pairs.setdefault((f, m), []).append(resume)
+            L.append(f"{len(mism)} false finds are the parser's canonical name for a gold skill it then counts as "
+                     f"missed, because the frozen alias table does not join the two names. Each is counted once as a "
+                     f"false find and once as a miss above: "
+                     + "; ".join(f"parser `{f}` vs gold `{m}` ({len(r)} résumé{'s' if len(r) > 1 else ''})"
+                                 for (f, m), r in sorted(pairs.items())) + ".")
+        L.append("")
+    for name in args.sensitivity or []:
+        focus = [p for p in res["per_resume"] if p["row"]["resume_file"] == name]
+        rest = [p for p in res["per_resume"] if p["row"]["resume_file"] != name]
+        if not focus:
+            L.append(f"Sensitivity: `{name}` is not in the label set; nothing excluded.")
+            L.append("")
+            continue
+        fc = focus[0]["counts"]
+        s = summarise(rest)
+        r_tp, r_fp, r_fn = s["totals"]
+        L.append(f"#### Sensitivity: the result with `{name}` excluded")
+        L.append("")
+        L.append(f"`{name}` holds {fc.tp + fc.fn} of {tp + fn} gold skills "
+                 f"({_fmt(pm._ratio(fc.tp + fc.fn, tp + fn))}), {fc.tp} of {tp} correct finds, {fc.fp} of {fp} false finds "
+                 f"and {fc.fn} of {fn} misses.")
+        L.append("")
+        L.append("| Set | Resumes | Micro P | Micro R | Micro F1 | Macro P | Macro R | Macro F1 |")
+        L.append("|---|---|---|---|---|---|---|---|")
+        L.append(f"| All | {n} | {_fmt(micro.precision)} | {_fmt(micro.recall)} | {_fmt(micro.f1)} | "
+                 f"{_fmt(macro.precision)} | {_fmt(macro.recall)} | {_fmt(macro.f1)} |")
+        L.append(f"| Without `{name}` (TP {r_tp}, FP {r_fp}, FN {r_fn}) | {s['n']} | {_fmt(s['micro'].precision)} | "
+                 f"{_fmt(s['micro'].recall)} | {_fmt(s['micro'].f1)} | {_fmt(s['macro'].precision)} | "
+                 f"{_fmt(s['macro'].recall)} | {_fmt(s['macro'].f1)} |")
+        if args._vocab is not None:
+            f_in, g_in = in_vocabulary_recall(rest, args._vocab_set)
+            L.append("")
+            L.append(f"Without `{name}`: recall on all gold skills {_fmt(s['micro'].recall)}; recall on gold skills "
+                     f"in the frozen vocabulary {_fmt(pm._ratio(f_in, g_in))} ({f_in} of {g_in}).")
+        L.append("")
     L.append("| Role type | Resumes | Micro P | Micro R | Micro F1 |")
     L.append("|---|---|---|---|---|")
     for role, (cnt, prf) in res["by_role"].items():
@@ -474,15 +602,39 @@ def main(argv=None) -> int:
     ap.add_argument("--no-write", action="store_true", help="print only; do not append to RESULTS.md")
     ap.add_argument("--labeller-a", type=Path)
     ap.add_argument("--labeller-b", type=Path)
+    ap.add_argument("--vocabulary", type=Path,
+                    help="frozen GET /skills/vocabulary body; adds recall on in-vocabulary gold skills")
+    ap.add_argument("--freeze-vocabulary", action="store_true",
+                    help="write the live vocabulary to --vocabulary and exit")
+    ap.add_argument("--sensitivity", action="append", metavar="RESUME_FILE",
+                    help="also report the scores with this resume excluded (repeatable)")
+    ap.add_argument("--limit", action="append", metavar="TEXT",
+                    help="a stated limit printed at the top of the section (repeatable)")
     args = ap.parse_args(argv)
     if args.smoke:
         args.labels = HERE / "smoke" / "gold.csv"
         args.resumes = REPO / "tests" / "fixtures"
+    args._vocab = None
+
+    if args.freeze_vocabulary:
+        if not args.vocabulary:
+            print("error: --freeze-vocabulary needs --vocabulary PATH", file=sys.stderr)
+            return 2
+        body = NlpClient(args.nlp_url).vocabulary()
+        args.vocabulary.write_text(json.dumps(body, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"Froze {len(vocabulary_names(body))} skills ({body.get('parser_version')}) to "
+              f"{rel(args.vocabulary)}, sha256 {sha12(args.vocabulary)}")
+        return 0
 
     try:
         rows = read_labels(args.labels)
         args._aliases = load_aliases(args.aliases)
         args._oos = load_out_of_scope(args.out_of_scope)
+        if args.vocabulary:
+            if not args.vocabulary.is_file():
+                raise InputError(f"vocabulary file not found: {args.vocabulary}")
+            args._vocab = vocabulary_names(json.loads(args.vocabulary.read_text(encoding="utf-8")))
+            args._vocab_set = vocabulary_set(args._vocab, args._aliases)
         if bool(args.labeller_a) != bool(args.labeller_b):
             raise InputError("--labeller-a and --labeller-b must be given together")
         agree = labeller_agreement(args.labeller_a, args.labeller_b, args._aliases) if args.labeller_a else None
@@ -497,6 +649,13 @@ def main(argv=None) -> int:
     except (urllib.error.URLError, OSError, ValueError) as err:
         print(f"error: NLP service not reachable at {args.nlp_url}: {err}", file=sys.stderr)
         return 2
+    if args._vocab is not None:
+        live = vocabulary_names(client.vocabulary())
+        if live != args._vocab:
+            print(f"error: the live vocabulary differs from the frozen {rel(args.vocabulary)} "
+                  f"(only live: {sorted(set(live) - set(args._vocab))[:10]}; "
+                  f"only frozen: {sorted(set(args._vocab) - set(live))[:10]}); nothing written", file=sys.stderr)
+            return 2
 
     print(f"Evaluating {len(rows)} resumes from {rel(args.labels)} against {args.nlp_url}")
     try:

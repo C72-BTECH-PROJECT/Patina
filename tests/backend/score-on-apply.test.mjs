@@ -327,7 +327,7 @@ test('apply with scoring OK -> 201 scored; one inserted score row; weights plus 
   assert.equal(row.explanation.unearned_weight, 0.45);
   assert.ok(Number(row.composite_score) <= 55, 'no assessment: at most 55');
   assert.equal(row.explanation.verification, 'partly_verified');
-  assert.equal(row.explanation.weights_version, 'w2-2026-11-13');
+  assert.equal(row.explanation.weights_version, 'w3-2026-11-14');
   assert.equal(row.subscores[P].available, true);
   assert.equal(row.subscores[G].available, true, 'GitHub fixture is active');
   assert.equal(row.subscores[A].available, false);

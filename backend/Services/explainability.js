@@ -180,7 +180,14 @@ const DEFAULT_BASE_WEIGHTS = {
 // whenever a default weight or a rule of D§7.1 changes. A stored row with no
 // version was computed with the v1 rule (0.40 / 0.35 / 0.25, renormalised over
 // whatever was available); the frontend labels it so.
-export const WEIGHTS_VERSION = 'w2-2026-11-13';
+// w3-2026-11-14: the partly-verified cap below (Anthony, 2026-11-14).
+export const WEIGHTS_VERSION = 'w3-2026-11-14';
+
+// D§7.1 (Anthony, 2026-11-14): the top band needs two independent sources. A
+// partly verified score (one of GitHub and the assessment) is capped one point
+// below the high band. Only the assessment-only case can reach it: GitHub alone
+// is already held at 55 by option (b).
+export const PARTLY_VERIFIED_CAP = SCORE_BAND_THRESHOLDS.high - 1;
 
 const readBaseWeights = () => {
   const raw = process.env.CREDIBILITY_WEIGHTS;
@@ -1008,7 +1015,7 @@ export const verificationNote = (subScores, unearned) => {
   return `Partly verified by GitHub activity. Completing the assessment would verify it further; ${pct(unearned)} of the score is not earned until then, because GitHub never takes the assessment's share while account ownership is unverified.`;
 };
 
-const buildSummary = (subScores, composite, unearned) => {
+const buildSummary = (subScores, composite, unearned, cap = null) => {
   const available = Object.values(subScores).filter((s) => s?.available);
   const unavailable = Object.values(subScores).filter((s) => s && !s.available);
   if (!available.length) {
@@ -1034,11 +1041,23 @@ const buildSummary = (subScores, composite, unearned) => {
   }
   const note = verificationNote(subScores, unearned);
   if (note) parts.push(note);
+  if (cap) parts.push(cap.reason);
 
   return parts.join(' ');
 };
 
-export const buildExplanation = (subScores, composite, unearned = 0) => {
+/** The cap record for a partly verified composite above the cap, else null. */
+export const partlyVerifiedCap = (subScores, composite) => {
+  if (composite === null || composite === undefined) return null;
+  if (scoreVerification(subScores) !== VERIFICATION.PARTLY || composite <= PARTLY_VERIFIED_CAP) return null;
+  return {
+    cap: PARTLY_VERIFIED_CAP,
+    uncapped_composite: composite,
+    reason: `Capped at ${PARTLY_VERIFIED_CAP} from ${composite}: the high band needs two independent sources (GitHub activity and the assessment), and this score has one.`,
+  };
+};
+
+export const buildExplanation = (subScores, composite, unearned = 0, cap = null) => {
   const availableCount = Object.values(subScores).filter((s) => s?.available).length;
 
   const factors = Object.values(SUBSCORE_KEYS).map((key) => {
@@ -1071,7 +1090,10 @@ export const buildExplanation = (subScores, composite, unearned = 0) => {
     verification,
     verification_note: verificationNote(subScores, unearned),
     unearned_weight: composite === null ? null : unearned,
-    summary: buildSummary(subScores, composite, unearned),
+    // Null unless the partly-verified cap lowered the composite; factor
+    // contributions still add up to `uncapped_composite`.
+    partly_verified_cap: cap,
+    summary: buildSummary(subScores, composite, unearned, cap),
     // D§5/D§7: always stated, whether or not GitHub evidence was used.
     github_account: {
       source: 'resume_link',
@@ -1126,9 +1148,10 @@ export const buildScoreRecord = (nlpJson, { github, assessmentEvaluation, parsin
 const finishRecord = (subscores) => {
   const anyAvailable = Object.values(subscores).some((s) => s?.available);
   const weighted = aggregate(subscores); // also sets every sub-score's weight
-  const composite = anyAvailable ? weighted : null;
+  const cap = anyAvailable ? partlyVerifiedCap(subscores, weighted) : null;
+  const composite = !anyAvailable ? null : cap ? cap.cap : weighted;
   const { unearned } = weightPlan(subscores);
-  const explanation = buildExplanation(subscores, composite, unearned ?? 0);
+  const explanation = buildExplanation(subscores, composite, unearned ?? 0, cap);
 
   const weights = Object.fromEntries(
     Object.values(SUBSCORE_KEYS).map((key) => [key, subscores[key].weight])

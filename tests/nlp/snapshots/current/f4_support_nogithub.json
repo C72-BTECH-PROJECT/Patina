@@ -59,7 +59,7 @@
     ]
   },
   "filename": "f4_support_nogithub.docx",
-  "parser_version": "nlp-engine@2.2.0",
+  "parser_version": "nlp-engine@2.3.0",
   "preprocessing": {
     "noun_chunks_preview": [
       "samuel adeyemi",

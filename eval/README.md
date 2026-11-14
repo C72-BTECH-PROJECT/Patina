@@ -12,10 +12,12 @@ Run from the repo root with the NLP service running (see `REBUILD/inventory/base
 ```
 nlp-engine\venv\Scripts\python eval\run_parsing_eval.py --nlp-url http://127.0.0.1:8000 --labeller-a eval\labels\aaron.csv --labeller-b eval\labels\anurag.csv
 nlp-engine\venv\Scripts\python eval\run_parsing_eval.py --smoke --nlp-url http://127.0.0.1:8000
+nlp-engine\venv\Scripts\python eval\run_parsing_eval.py --vocabulary eval\vocabulary_frozen.json --freeze-vocabulary
+nlp-engine\venv\Scripts\python eval\run_parsing_eval.py --vocabulary eval\vocabulary_frozen.json --sensitivity 10089434.pdf --limit "..."
 nlp-engine\venv\Scripts\python -m pytest tests\eval -q
 ```
 
-`--no-write` prints the section without appending it.
+`--no-write` prints the section without appending it. `--vocabulary` (a frozen `GET /skills/vocabulary` body, `vocabulary_frozen.json`, written once by `--freeze-vocabulary`) adds recall on the gold skills the parser can name, shown beside overall recall, and lists false finds that are the parser's name for a missed gold skill; the run stops if the live vocabulary differs from the frozen one. `--sensitivity FILE` adds the scores with that resume excluded. `--limit TEXT` prints a stated limit at the top of the section. The TM-1 run of 2026-11-14 used all three.
 
 ## Multiple-choice option report (card R-29)
 

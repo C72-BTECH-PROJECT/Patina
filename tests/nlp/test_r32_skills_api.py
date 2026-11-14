@@ -77,13 +77,22 @@ def test_vocabulary_names_are_canonical_and_carry_their_aliases(client):
         assert not set(aliases) & set(vocab), name
 
 
-def test_sas_and_statistics_are_not_in_the_vocabulary_yet(client):
-    # Recorded, not wanted: the R-21 vocabulary has neither (ISSUES.md, R-32 entry).
-    # A recruiter adds them as custom skills. When they are added this test is
-    # replaced by one that finds them.
+def test_sas_and_statistics_are_in_the_vocabulary(client):
+    # Owner decision 2026-11-14 (nlp-engine@2.3.0): sas outright, statistics in context.
     vocab = _vocabulary(client)
-    assert "sas" not in vocab
-    assert "statistics" not in vocab
+    assert "sas" in vocab
+    assert "statistics" in vocab
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("Analysis in SAS and SPSS.", ["sas"]),
+    ("Required: SAS, R and statistics.", ["r", "sas", "statistics"]),
+    ("Applied statistics and Bayesian methods.", ["statistics"]),
+    ("Compiled sales statistics for the Bureau of Labor Statistics.", []),
+    ("Styled with Sass.", ["sass"]),
+])
+def test_sas_anywhere_and_statistics_only_in_context(text, expected):
+    assert sorted(extract_skills(text)) == expected
 
 
 @pytest.mark.parametrize("jd, expected", [

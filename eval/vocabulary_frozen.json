@@ -1,0 +1,857 @@
+{
+  "parser_version": "nlp-engine@2.3.0",
+  "skills": [
+    {
+      "aliases": [],
+      "name": "active directory"
+    },
+    {
+      "aliases": [],
+      "name": "agile"
+    },
+    {
+      "aliases": [],
+      "name": "airflow"
+    },
+    {
+      "aliases": [],
+      "name": "algorithms"
+    },
+    {
+      "aliases": [],
+      "name": "android"
+    },
+    {
+      "aliases": [
+        "angular.js",
+        "angularjs"
+      ],
+      "name": "angular"
+    },
+    {
+      "aliases": [],
+      "name": "ansible"
+    },
+    {
+      "aliases": [
+        "apache http",
+        "apache http server",
+        "apache httpd",
+        "apache web server",
+        "apache2"
+      ],
+      "name": "apache"
+    },
+    {
+      "aliases": [],
+      "name": "aws"
+    },
+    {
+      "aliases": [],
+      "name": "azure"
+    },
+    {
+      "aliases": [],
+      "name": "bash"
+    },
+    {
+      "aliases": [],
+      "name": "bert"
+    },
+    {
+      "aliases": [],
+      "name": "bitbucket"
+    },
+    {
+      "aliases": [
+        "remedyforce"
+      ],
+      "name": "bmc remedy"
+    },
+    {
+      "aliases": [],
+      "name": "bootstrap"
+    },
+    {
+      "aliases": [
+        "c language",
+        "c programming"
+      ],
+      "name": "c"
+    },
+    {
+      "aliases": [
+        "c sharp",
+        "csharp"
+      ],
+      "name": "c#"
+    },
+    {
+      "aliases": [
+        "c plus plus",
+        "cpp"
+      ],
+      "name": "c++"
+    },
+    {
+      "aliases": [],
+      "name": "cassandra"
+    },
+    {
+      "aliases": [],
+      "name": "celery"
+    },
+    {
+      "aliases": [
+        "cd",
+        "ci",
+        "ci cd",
+        "cicd"
+      ],
+      "name": "ci/cd"
+    },
+    {
+      "aliases": [],
+      "name": "circleci"
+    },
+    {
+      "aliases": [],
+      "name": "clean code"
+    },
+    {
+      "aliases": [],
+      "name": "cloudflare"
+    },
+    {
+      "aliases": [
+        "amazon cloudwatch",
+        "aws cloudwatch",
+        "cloud watch"
+      ],
+      "name": "cloudwatch"
+    },
+    {
+      "aliases": [],
+      "name": "computer vision"
+    },
+    {
+      "aliases": [],
+      "name": "couchdb"
+    },
+    {
+      "aliases": [],
+      "name": "css"
+    },
+    {
+      "aliases": [],
+      "name": "cypress"
+    },
+    {
+      "aliases": [],
+      "name": "dart"
+    },
+    {
+      "aliases": [],
+      "name": "data science"
+    },
+    {
+      "aliases": [],
+      "name": "data structures"
+    },
+    {
+      "aliases": [],
+      "name": "datadog"
+    },
+    {
+      "aliases": [],
+      "name": "deep learning"
+    },
+    {
+      "aliases": [],
+      "name": "design patterns"
+    },
+    {
+      "aliases": [],
+      "name": "devops"
+    },
+    {
+      "aliases": [],
+      "name": "digitalocean"
+    },
+    {
+      "aliases": [],
+      "name": "django"
+    },
+    {
+      "aliases": [],
+      "name": "docker"
+    },
+    {
+      "aliases": [],
+      "name": "dynamodb"
+    },
+    {
+      "aliases": [],
+      "name": "elasticsearch"
+    },
+    {
+      "aliases": [
+        "exchange online",
+        "microsoft exchange"
+      ],
+      "name": "exchange server"
+    },
+    {
+      "aliases": [],
+      "name": "expo"
+    },
+    {
+      "aliases": [
+        "express js",
+        "express.js",
+        "expressjs"
+      ],
+      "name": "express"
+    },
+    {
+      "aliases": [],
+      "name": "fastapi"
+    },
+    {
+      "aliases": [],
+      "name": "firebase"
+    },
+    {
+      "aliases": [],
+      "name": "flask"
+    },
+    {
+      "aliases": [],
+      "name": "flutter"
+    },
+    {
+      "aliases": [],
+      "name": "freshdesk"
+    },
+    {
+      "aliases": [],
+      "name": "freshservice"
+    },
+    {
+      "aliases": [],
+      "name": "gatsby"
+    },
+    {
+      "aliases": [],
+      "name": "gcp"
+    },
+    {
+      "aliases": [],
+      "name": "git"
+    },
+    {
+      "aliases": [],
+      "name": "gitlab"
+    },
+    {
+      "aliases": [
+        "go lang",
+        "go language",
+        "go programming",
+        "golang"
+      ],
+      "name": "go"
+    },
+    {
+      "aliases": [],
+      "name": "grafana"
+    },
+    {
+      "aliases": [],
+      "name": "graphql"
+    },
+    {
+      "aliases": [],
+      "name": "group policy"
+    },
+    {
+      "aliases": [],
+      "name": "grpc"
+    },
+    {
+      "aliases": [],
+      "name": "grunt"
+    },
+    {
+      "aliases": [],
+      "name": "hadoop"
+    },
+    {
+      "aliases": [],
+      "name": "heroku"
+    },
+    {
+      "aliases": [],
+      "name": "html"
+    },
+    {
+      "aliases": [],
+      "name": "hugging face"
+    },
+    {
+      "aliases": [
+        "hyperv"
+      ],
+      "name": "hyper-v"
+    },
+    {
+      "aliases": [],
+      "name": "integration testing"
+    },
+    {
+      "aliases": [],
+      "name": "intune"
+    },
+    {
+      "aliases": [],
+      "name": "ionic"
+    },
+    {
+      "aliases": [],
+      "name": "ios"
+    },
+    {
+      "aliases": [
+        "itil 4",
+        "itil v3",
+        "itil v4",
+        "itil4",
+        "itilv3",
+        "itilv4"
+      ],
+      "name": "itil"
+    },
+    {
+      "aliases": [],
+      "name": "java"
+    },
+    {
+      "aliases": [
+        "java script",
+        "js"
+      ],
+      "name": "javascript"
+    },
+    {
+      "aliases": [],
+      "name": "jenkins"
+    },
+    {
+      "aliases": [],
+      "name": "jest"
+    },
+    {
+      "aliases": [
+        "jira service desk",
+        "jira service management",
+        "jira software"
+      ],
+      "name": "jira"
+    },
+    {
+      "aliases": [],
+      "name": "jquery"
+    },
+    {
+      "aliases": [],
+      "name": "json"
+    },
+    {
+      "aliases": [],
+      "name": "jupyter"
+    },
+    {
+      "aliases": [],
+      "name": "jwt"
+    },
+    {
+      "aliases": [],
+      "name": "kafka"
+    },
+    {
+      "aliases": [],
+      "name": "keras"
+    },
+    {
+      "aliases": [],
+      "name": "kotlin"
+    },
+    {
+      "aliases": [
+        "k8s"
+      ],
+      "name": "kubernetes"
+    },
+    {
+      "aliases": [],
+      "name": "langchain"
+    },
+    {
+      "aliases": [],
+      "name": "laravel"
+    },
+    {
+      "aliases": [],
+      "name": "linux"
+    },
+    {
+      "aliases": [],
+      "name": "lua"
+    },
+    {
+      "aliases": [],
+      "name": "machine learning"
+    },
+    {
+      "aliases": [],
+      "name": "mariadb"
+    },
+    {
+      "aliases": [],
+      "name": "matlab"
+    },
+    {
+      "aliases": [],
+      "name": "matplotlib"
+    },
+    {
+      "aliases": [],
+      "name": "maven"
+    },
+    {
+      "aliases": [],
+      "name": "mern stack"
+    },
+    {
+      "aliases": [],
+      "name": "microservices"
+    },
+    {
+      "aliases": [],
+      "name": "mlflow"
+    },
+    {
+      "aliases": [],
+      "name": "mocha"
+    },
+    {
+      "aliases": [
+        "mongo",
+        "mongo db"
+      ],
+      "name": "mongodb"
+    },
+    {
+      "aliases": [],
+      "name": "mongoose"
+    },
+    {
+      "aliases": [],
+      "name": "mysql"
+    },
+    {
+      "aliases": [],
+      "name": "nagios"
+    },
+    {
+      "aliases": [],
+      "name": "neo4j"
+    },
+    {
+      "aliases": [
+        ".net"
+      ],
+      "name": "net"
+    },
+    {
+      "aliases": [],
+      "name": "netlify"
+    },
+    {
+      "aliases": [
+        "next js",
+        "next.js"
+      ],
+      "name": "nextjs"
+    },
+    {
+      "aliases": [],
+      "name": "nginx"
+    },
+    {
+      "aliases": [],
+      "name": "nlp"
+    },
+    {
+      "aliases": [
+        "node",
+        "node js",
+        "node.js"
+      ],
+      "name": "nodejs"
+    },
+    {
+      "aliases": [],
+      "name": "nosql"
+    },
+    {
+      "aliases": [],
+      "name": "numpy"
+    },
+    {
+      "aliases": [
+        "nuxt js",
+        "nuxt.js"
+      ],
+      "name": "nuxtjs"
+    },
+    {
+      "aliases": [],
+      "name": "oauth"
+    },
+    {
+      "aliases": [
+        "m365",
+        "microsoft 365",
+        "o365",
+        "office365"
+      ],
+      "name": "office 365"
+    },
+    {
+      "aliases": [],
+      "name": "oop"
+    },
+    {
+      "aliases": [],
+      "name": "openai"
+    },
+    {
+      "aliases": [],
+      "name": "opencv"
+    },
+    {
+      "aliases": [
+        "oracle database",
+        "oracle db",
+        "oracle sql"
+      ],
+      "name": "oracle"
+    },
+    {
+      "aliases": [],
+      "name": "pagerduty"
+    },
+    {
+      "aliases": [],
+      "name": "pandas"
+    },
+    {
+      "aliases": [],
+      "name": "perl"
+    },
+    {
+      "aliases": [],
+      "name": "php"
+    },
+    {
+      "aliases": [
+        "postgre",
+        "postgre sql",
+        "postgres"
+      ],
+      "name": "postgresql"
+    },
+    {
+      "aliases": [],
+      "name": "postman"
+    },
+    {
+      "aliases": [
+        "power shell"
+      ],
+      "name": "powershell"
+    },
+    {
+      "aliases": [],
+      "name": "prisma"
+    },
+    {
+      "aliases": [],
+      "name": "prometheus"
+    },
+    {
+      "aliases": [],
+      "name": "pytest"
+    },
+    {
+      "aliases": [],
+      "name": "python"
+    },
+    {
+      "aliases": [
+        "py torch"
+      ],
+      "name": "pytorch"
+    },
+    {
+      "aliases": [
+        "r language",
+        "r programming"
+      ],
+      "name": "r"
+    },
+    {
+      "aliases": [],
+      "name": "rabbitmq"
+    },
+    {
+      "aliases": [],
+      "name": "rails"
+    },
+    {
+      "aliases": [
+        "react.js",
+        "reactjs"
+      ],
+      "name": "react"
+    },
+    {
+      "aliases": [],
+      "name": "react native"
+    },
+    {
+      "aliases": [],
+      "name": "redis"
+    },
+    {
+      "aliases": [],
+      "name": "redux"
+    },
+    {
+      "aliases": [],
+      "name": "remix"
+    },
+    {
+      "aliases": [
+        "api",
+        "api development",
+        "apis",
+        "rest",
+        "rest apis",
+        "restful",
+        "restful api",
+        "restful apis"
+      ],
+      "name": "rest api"
+    },
+    {
+      "aliases": [],
+      "name": "ruby"
+    },
+    {
+      "aliases": [
+        "rust language",
+        "rustlang"
+      ],
+      "name": "rust"
+    },
+    {
+      "aliases": [],
+      "name": "sas"
+    },
+    {
+      "aliases": [],
+      "name": "sass"
+    },
+    {
+      "aliases": [],
+      "name": "scala"
+    },
+    {
+      "aliases": [
+        "mecm",
+        "microsoft endpoint configuration manager",
+        "system center configuration manager"
+      ],
+      "name": "sccm"
+    },
+    {
+      "aliases": [
+        "scikit learn",
+        "sklearn"
+      ],
+      "name": "scikit-learn"
+    },
+    {
+      "aliases": [],
+      "name": "scrum"
+    },
+    {
+      "aliases": [],
+      "name": "seaborn"
+    },
+    {
+      "aliases": [],
+      "name": "selenium"
+    },
+    {
+      "aliases": [],
+      "name": "sequelize"
+    },
+    {
+      "aliases": [
+        "service now",
+        "service-now"
+      ],
+      "name": "servicenow"
+    },
+    {
+      "aliases": [],
+      "name": "solid principles"
+    },
+    {
+      "aliases": [],
+      "name": "spark"
+    },
+    {
+      "aliases": [],
+      "name": "splunk"
+    },
+    {
+      "aliases": [
+        "spring framework"
+      ],
+      "name": "spring"
+    },
+    {
+      "aliases": [
+        "spring-boot",
+        "springboot"
+      ],
+      "name": "spring boot"
+    },
+    {
+      "aliases": [],
+      "name": "sql"
+    },
+    {
+      "aliases": [],
+      "name": "sqlite"
+    },
+    {
+      "aliases": [],
+      "name": "statistics"
+    },
+    {
+      "aliases": [],
+      "name": "supabase"
+    },
+    {
+      "aliases": [],
+      "name": "svelte"
+    },
+    {
+      "aliases": [],
+      "name": "swift"
+    },
+    {
+      "aliases": [],
+      "name": "system design"
+    },
+    {
+      "aliases": [],
+      "name": "tailwind"
+    },
+    {
+      "aliases": [],
+      "name": "tensorflow"
+    },
+    {
+      "aliases": [],
+      "name": "terraform"
+    },
+    {
+      "aliases": [],
+      "name": "tomcat"
+    },
+    {
+      "aliases": [],
+      "name": "transformers"
+    },
+    {
+      "aliases": [
+        "ts",
+        "type script"
+      ],
+      "name": "typescript"
+    },
+    {
+      "aliases": [],
+      "name": "unit testing"
+    },
+    {
+      "aliases": [],
+      "name": "vercel"
+    },
+    {
+      "aliases": [],
+      "name": "vite"
+    },
+    {
+      "aliases": [],
+      "name": "vmware"
+    },
+    {
+      "aliases": [
+        "vue.js",
+        "vuejs"
+      ],
+      "name": "vue"
+    },
+    {
+      "aliases": [],
+      "name": "webpack"
+    },
+    {
+      "aliases": [],
+      "name": "websocket"
+    },
+    {
+      "aliases": [
+        "windows servers"
+      ],
+      "name": "windows server"
+    },
+    {
+      "aliases": [],
+      "name": "xamarin"
+    },
+    {
+      "aliases": [],
+      "name": "xml"
+    },
+    {
+      "aliases": [],
+      "name": "yaml"
+    },
+    {
+      "aliases": [],
+      "name": "zabbix"
+    },
+    {
+      "aliases": [],
+      "name": "zendesk"
+    }
+  ]
+}

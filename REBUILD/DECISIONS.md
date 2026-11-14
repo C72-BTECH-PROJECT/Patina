@@ -229,6 +229,7 @@ Status: **W1 to W3 APPROVED by Anthony on 2026-11-13, with option (b) for the op
 - Assessment available, GitHub not: assessment 0.80. (GitHub is optional, GF-4.)
 - **GitHub available, assessment not yet taken (option b): GitHub stays at 0.35 and the assessment's 0.45 is unearned. The ceiling is 55, which is the low band.** GitHub never absorbs the assessment's share.
 - Neither: 0.20 × resume sub-score, ceiling 20.
+- **Partly-verified cap (Anthony, 2026-11-14; weights version `w3-2026-11-14`):** a partly verified score (exactly one of GitHub and the assessment) is capped at 79, one point below the high band, so the high band needs two independent sources. Only the assessment-only case can reach it (GitHub alone is held at 55). The stored explanation keeps the uncapped composite in `partly_verified_cap` and the summary says why; the support worked case below becomes 79, medium. Code: `backend/Services/explainability.js` `partlyVerifiedCap`; test `Partly-verified cap: one independent source never reaches the high band; two can`.
 
 | # | Addition (Anthony, 2026-11-13) | How it is built |
 |---|---|---|

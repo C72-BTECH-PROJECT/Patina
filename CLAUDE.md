@@ -127,3 +127,4 @@ A ground-up correctness rebuild is in progress on branch `rebuild/fable`. The se
 - Never fabricate data or stub results to make something look complete; unfinished features are shown honestly as specced-not-built.
 - `REBUILD/DECISIONS.md`, once Anthony approves it, overrides older design notes in other docs where they conflict.
 - Out-of-scope findings go to `ISSUES.md`.
+- Never pipe `scripts/start-all.ps1`, or any command that launches servers, into `Select-Object` or another buffering command (`Out-String`, `| tail`, `| head`, `Sort-Object`): the pipe waits for every process holding the output, and dev servers never exit. Run it unpiped, or in the background, and check readiness by port or health endpoint (`http://127.0.0.1:5000/health`, `:5001/api/health`, `:8000/`, `:3000/`).
