@@ -114,7 +114,7 @@ function CandidateNotifications() {
     body = <p className="text-body-sm text-muted-foreground text-center py-10">No notifications yet.</p>;
   } else {
     body = (
-      <ul className="space-y-3">
+      <ul className="space-y-3 anim-stagger">
         {notifications.map((notification) => {
           const style = getNotificationStyle(notification);
           const Icon = style.icon;
@@ -157,7 +157,7 @@ function CandidateNotifications() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-3xl font-extrabold text-foreground mb-6">Notifications</h1>
+      <h1 className="text-h1 text-foreground mb-6">Notifications</h1>
       {body}
     </div>
   );

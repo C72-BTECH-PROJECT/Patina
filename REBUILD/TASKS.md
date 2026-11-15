@@ -361,14 +361,14 @@ All of these keep the rules at the top of this file. Each ends with the e2e spin
   | R-35a | D-1 | Tokens, config clean-up, fonts, global motion | **PASS** 2026-11-15. Lead re-ran: 11 suites / 121 tests, build exit 0; the three greps are empty |
   | R-35b | D-2 | Button, Badge, chips, Spinner, EmptyState | **PASS** 2026-11-15. Lead re-ran: 121/121, build exit 0; unknown status/verification still `outline` |
   | R-35c | D-3 | PatinaMark logo, favicon, navigation, page transition | **PASS** 2026-11-15. Lead re-ran: 121/121, build exit 0; `PATINA` text unchanged in all 9 places; `/favicon.svg` served `image/svg+xml`; screenshots in `tests/e2e/output/design/d3-*.png`. **Waiting for Anthony's visual check** |
-  | R-35d | D-4 | Auth screens | todo (core) |
-  | R-35e | D-5 | Results page and the score ring; e2e spine | todo (core) |
-  | R-35f | D-6 | ScoreBreakdown and drill-down | todo (core) |
-  | R-35g | D-7 | Candidate pages | only if Anthony says the budget allows. Open question first: Shortlisted colour |
-  | R-35h | D-8 | Recruiter and admin pages | only if the budget allows |
+  | R-35d | D-4 | Auth screens | **PASS** 2026-11-15 overnight. Lead re-ran: 121/121, build exit 0; submit count 2 unchanged; screenshots `d4-*.png` |
+  | R-35e | D-5 | Results page and the score ring; e2e spine | **PASS** 2026-11-15 overnight. 125/125, build exit 0; e2e run 1 failed on an NLP timeout at apply (not D-5), re-run exit 0 |
+  | R-35f | D-6 | ScoreBreakdown and drill-down | **PASS** 2026-11-15 overnight. 125/125, build exit 0; framer grep empty; screenshot `d6-drilldown.png` |
+  | R-35g | D-7 | Candidate pages | **PASS** 2026-11-15 overnight (run approved in `OVERNIGHT_RUN.md`). 125/125, build exit 0; Shortlisted = filled primary + Star via new Badge `solid` variant |
+  | R-35h | D-8 | Recruiter and admin pages | **PASS** 2026-11-15 overnight (run approved in `OVERNIGHT_RUN.md`). 125/125, build exit 0; framer grep empty; Shortlisted = `solid` + Star |
   | R-35i | O-10 | Anthony captures the support candidate's result (permission given 2026-11-15) | Anthony |
   | R-35j | D-9 | Landing page | waits for O-10 |
-  | R-35k | D-10 | Verification pass | core, last |
+  | R-35k | D-10 | Verification pass | **Done 2026-11-15 overnight; `VERIFY.md`:** G PASS; e2e spine/smoke PASS, `unreadable` FAIL on a 429 rate limit (ISSUES); contrast PASS; framer left in App.jsx + Landing.jsx; reduced motion needs Anthony |
 
 ### R-36 · Nov 17 sweep of the `BATCH·demo` issues
 - **Status:** todo · **Agent:** patina-implementer, one per service; a fresh patina-verifier · **Depends:** the Nov 17 rehearsal · **Risk:** low if each fix stays small

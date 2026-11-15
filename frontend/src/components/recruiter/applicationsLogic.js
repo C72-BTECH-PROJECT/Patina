@@ -15,6 +15,8 @@
 //   void record            { by, role, at, reason, prior_state } (assessmentService.js voidRecord)
 //   scoring reason codes   Services/scoringPipeline.js, sent as `scoring: { status, reason }`
 
+import { Star } from 'lucide-react';
+
 /** The three sub-score keys (backend/Services/explainability.js SUBSCORE_KEYS), in display order. */
 export const SUBSCORES = [
   { key: 'parsing_semantic_alignment', testId: 'subscore-parsing', label: 'Resume to job alignment' },
@@ -32,7 +34,7 @@ export const subscoreLabel = (key) => SUBSCORES.find((s) => s.key === key)?.labe
 const APPLICATION_STATUS = {
   submitted: { label: 'Submitted', filterLabel: 'Submitted (no decision yet)', variant: 'outline' },
   under_review: { label: 'Under review', filterLabel: 'Under review', variant: 'primary' },
-  shortlisted: { label: 'Shortlisted', filterLabel: 'Shortlisted', variant: 'success' },
+  shortlisted: { label: 'Shortlisted', filterLabel: 'Shortlisted', variant: 'solid', icon: Star },
   rejected: { label: 'Rejected', filterLabel: 'Rejected', variant: 'destructive' },
   withdrawn: { label: 'Withdrawn', filterLabel: 'Withdrawn', variant: 'default' },
 };

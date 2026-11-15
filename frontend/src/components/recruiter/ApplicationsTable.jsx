@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
 import { AlertTriangle, ChevronRight, RefreshCw, Users } from 'lucide-react';
 import Badge from '../Badge';
 import Button from '../Button';
@@ -79,7 +78,7 @@ export function useApplications(jobId) {
 export function StatusBadge({ status, testId = 'status-badge' }) {
   const text = statusText(status);
   return (
-    <Badge variant={text.variant} data-testid={testId || undefined} data-status={status || ''}>
+    <Badge variant={text.variant} icon={text.icon} data-testid={testId || undefined} data-status={status || ''}>
       {text.label}
     </Badge>
   );
@@ -275,7 +274,7 @@ function DecisionButtons({ item, onStatus }) {
 function ApplicationRow({ item, rank, showJob, currentUserId, onOpen, onStatus, onScored }) {
   return (
     <tr
-      className="border-b border-border last:border-0 align-top"
+      className="border-b border-border last:border-0 align-top hover:bg-background"
       data-testid={`application-row-${item.id}`}
       data-status={item.status || ''}
       data-scoring={item.scoring?.state || ''}
@@ -397,17 +396,17 @@ function ApplicationsTable({ data, showJob = true, emptyText }) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/40">
-                <th className="py-2 pl-4 pr-3 text-caption font-medium text-muted-foreground">Rank</th>
-                <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Candidate</th>
-                {showJob && <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Job</th>}
-                <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Credibility score</th>
-                <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Assessment</th>
-                <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Status</th>
-                <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Decision</th>
-                <th className="py-2 text-caption font-medium text-muted-foreground"><span className="sr-only">Details</span></th>
+                <th className="py-2 pl-4 pr-3 eyebrow text-muted-foreground">Rank</th>
+                <th className="py-2 pr-3 eyebrow text-muted-foreground">Candidate</th>
+                {showJob && <th className="py-2 pr-3 eyebrow text-muted-foreground">Job</th>}
+                <th className="py-2 pr-3 eyebrow text-muted-foreground">Credibility score</th>
+                <th className="py-2 pr-3 eyebrow text-muted-foreground">Assessment</th>
+                <th className="py-2 pr-3 eyebrow text-muted-foreground">Status</th>
+                <th className="py-2 pr-3 eyebrow text-muted-foreground">Decision</th>
+                <th className="py-2 eyebrow text-muted-foreground"><span className="sr-only">Details</span></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="anim-stagger">
               {visible.map((item) => (
                 <ApplicationRow
                   key={item.id}
@@ -430,16 +429,14 @@ function ApplicationsTable({ data, showJob = true, emptyText }) {
       )}
     </div>
 
-    <AnimatePresence>
-      {openId && (
-        <CandidateModal
-          applicationId={openId}
-          onClose={closeDrilldown}
-          onChanged={reload}
-          currentUserId={user?.id || null}
-        />
-      )}
-    </AnimatePresence>
+    {openId && (
+      <CandidateModal
+        applicationId={openId}
+        onClose={closeDrilldown}
+        onChanged={reload}
+        currentUserId={user?.id || null}
+      />
+    )}
     </>
   );
 }

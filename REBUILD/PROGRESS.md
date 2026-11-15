@@ -2,7 +2,18 @@
 
 Resume a fresh session with: "Read REBUILD/KICKOFF.md, REBUILD/CHECKPOINT1_ANSWERS.md and REBUILD/PROGRESS.md and continue."
 
-## Design refresh D-1 to D-3 built and checked on `design/refresh`, waiting for Anthony's visual check (2026-11-15; this block is the newest and wins)
+## Overnight run D-4 to D-10 on `design/refresh`, unattended (2026-11-15 night; this block is the newest and wins)
+- Run by `REBUILD/OVERNIGHT_RUN.md`; the final summary is `REBUILD/MORNING_REPORT.md`. Backups of every card's files are in `REBUILD/backup/<card>/`.
+- **D-4 (R-35d) PASS:** Sonnet `patina-mechanical` built it; the lead re-ran G: 11 suites / 121 tests, build exit 0, only the 5 auth files changed, hook-grep lines differ in `className` only, `type="submit"` count 2 (unchanged). Screenshots `tests/e2e/output/design/d4-{login,signup,select-role}.png`.
+- **D-5 (R-35e) PASS:** G 12 suites / 125 tests (4 new `useCountUp` tests), build exit 0. e2e spine run 1 failed at apply with `parser_unavailable` (core log: nlp timeout after 30000 ms, before the results page; not caused by D-5); re-run once: exit 0, 5 passed, 1 opt-in skip (spine :313 and :548 pass). Logs `tests/e2e/output/design/e2e-d5-{1,2}.log`. Screenshot `d5-result.png` (ring 16.23 = stored composite).
+- **D-6 (R-35f) PASS:** G 12 suites / 125 tests, build exit 0; no `framer-motion` in ScoreBreakdown or CandidateModal; hook diff adds one `aria-hidden` stripe span, `skill-row` line changed in `className` only. Screenshot `d6-drilldown.png` (taken with a throwaway click helper `tests/e2e/output/design/shot-click.mjs`, git-ignored).
+- **D-7 (R-35g) PASS:** G 12 suites / 125 tests, build exit 0; no `framer-motion` in `pages/candidate`. Shortlisted chip is now filled primary with a `Star` (OVERNIGHT_RUN §2) via one new Badge variant `solid` (decision: Badge had no filled variant). Hook diff: `className` on the save indicator, `icon` prop on `status-badge`. Screenshots `d7-candidate-{dashboard,jobs}.png`.
+- **D-8 (R-35h) PASS:** G 12 suites / 125 tests, build exit 0; no `framer-motion` in recruiter pages, recruiter components or admin. Shortlisted chip `solid` + `Star` in `applicationsLogic.js` (also reaches CandidateModal, without the icon). `AnimatePresence` around CandidateModal removed; the modal still mounts only on `openId`. Step indicator kept as numbered circles (dots would change content/aria). `Applications.jsx`, `Profile.jsx` needed no change. Screenshot `d8-recruiter-dashboard.png`.
+- **D-10 (R-35k) done, one e2e failure recorded:** `Docs/design-refs/VERIFY.md`. G 12 / 125, build exit 0. e2e: spine, smoke and signup pass; `unreadable` returned **429** (gateway global rate limit straight after the spine; ISSUES, BATCH·demo); not re-run because of the one-run cap. Contrast: 36/36 pairs pass, identical to §2.4. `framer-motion` is left only in `App.jsx` (MotionConfig) and `Landing.jsx` (D-9 not run). Ten `d10-*.png` screenshots, no page errors, no horizontal scroll at 390. Reduced motion **not checked**: Anthony checks by hand.
+- **D-9 not run** (waits for O-10). **Stack left running** on :3000.
+- **Next:** Anthony reads `REBUILD/MORNING_REPORT.md`, checks the screens and reduced motion, commits per card (suggested in the report), and sweeps the leftover e2e rows.
+
+## Design refresh D-1 to D-3 built and checked on `design/refresh`, waiting for Anthony's visual check (2026-11-15)
 - **Anthony approved the spec with changes, and the spec, mock and favicon now include them:**
   - the Blue leather palette, with a violet "Partly verified" and green for evidence only;
   - the stitched-tag `PatinaMark` logo, with `favicon.svg` as the mark without the stitch line;

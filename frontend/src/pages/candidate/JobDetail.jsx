@@ -234,7 +234,7 @@ function CandidateJobDetail() {
       if (heading) {
         const title = heading[2].replace(/\*\*/g, '').trim();
         return (
-          <h3 key={index} className={`text-base font-bold text-foreground ${index === 0 ? '' : 'mt-6'}`}>
+          <h3 key={index} className={`text-h3 text-foreground ${index === 0 ? '' : 'mt-6'}`}>
             {title}
           </h3>
         );
@@ -262,7 +262,7 @@ function CandidateJobDetail() {
       {!loading && error && (
         <div className="card p-8 text-center" role="alert">
           <AlertCircle className="mx-auto mb-3 h-8 w-8 text-destructive" />
-          <h2 className="text-lg font-semibold text-foreground">Could not load this job</h2>
+          <h2 className="text-h3 text-foreground">Could not load this job</h2>
           <p className="mt-2 text-sm text-muted-foreground">{error}</p>
         </div>
       )}
@@ -274,7 +274,7 @@ function CandidateJobDetail() {
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <Briefcase className="h-5 w-5" />
               </div>
-              <h1 className="text-2xl font-bold leading-tight text-foreground md:text-3xl">{job.title}</h1>
+              <h1 className="text-h1 text-foreground">{job.title}</h1>
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
@@ -331,7 +331,7 @@ function CandidateJobDetail() {
                 </div>
                 <Link
                   to="/candidate/upload"
-                  className="inline-flex flex-shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground no-underline transition hover:bg-primary/90"
+                  className="inline-flex flex-shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground no-underline transition hover:bg-primary-hover active:scale-[.98] focus-visible:outline-none focus-visible:shadow-focus"
                 >
                   <FileUp className="h-4 w-4" />
                   Upload resume
@@ -357,7 +357,7 @@ function CandidateJobDetail() {
                 className={`inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-all ${
                   applied
                     ? 'cursor-not-allowed border border-border bg-muted text-muted-foreground'
-                    : 'cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'cursor-pointer bg-primary text-primary-foreground hover:bg-primary-hover active:scale-[.98] focus-visible:outline-none focus-visible:shadow-focus'
                 } disabled:cursor-not-allowed disabled:opacity-60`}
               >
                 {applying ? (
@@ -432,7 +432,7 @@ function CandidateJobDetail() {
           <div className="card p-6 md:p-8">
             <div className="mb-4 flex items-center gap-2.5">
               <Layers className="h-5 w-5 text-foreground" />
-              <h2 className="text-lg font-semibold text-foreground">Full job description</h2>
+              <h2 className="text-h3 text-foreground">Full job description</h2>
             </div>
             <div className="text-body leading-7 text-foreground">{renderJobDescription(job.description)}</div>
           </div>

@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import {
   ArrowDownRight, ArrowUpRight, CheckCircle2, Circle, CircleDashed, Info, Minus, ShieldAlert, XCircle,
 } from 'lucide-react';
@@ -22,6 +21,14 @@ import { subscoreTestId } from './applicationsLogic';
  *                                         evidenceLimited={detail.score.evidence_limited} showFlags={false} />
  *   candidate Results     <ScoreBreakdown analysis={score} />  (the serializeCandidate shape)
  */
+
+const STRIPE_BEFORE = "relative overflow-hidden before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:content-['']";
+const STRIPE_COLOR = {
+  raises: 'before:bg-success',
+  lowers: 'before:bg-destructive',
+  sole: 'before:bg-primary',
+  neutral: 'before:bg-muted-foreground',
+};
 
 const DIRECTION_STYLES = {
   raises: { icon: ArrowUpRight, className: 'text-success', label: 'Raises the score' },
@@ -133,7 +140,7 @@ function SkillMark({ source, row }) {
     : '';
   return (
     <td
-      className="py-2 pr-3 text-caption whitespace-nowrap"
+      className="py-2.5 pr-3 text-caption whitespace-nowrap"
       data-testid={`skill-mark-${source}`}
       data-mark={row.marks?.[source] ?? ''}
       title={markTitle(source, row)}
@@ -149,7 +156,7 @@ function SkillMark({ source, row }) {
 /** Explicit "we have no evidence here" panel — never a zero, never a blank. */
 function EvidenceUnavailable({ title, reason }) {
   return (
-    <div className="p-4 rounded-lg border border-dashed border-border bg-muted/40">
+    <div className="p-4 rounded-lg border border-dashed border-input/60 bg-background">
       <div className="flex items-center gap-2 mb-1">
         <Info className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
         <span className="text-body-sm font-medium text-muted-foreground">{title}</span>
@@ -201,7 +208,7 @@ function FlagsPanel({ storedReason, flags, checks }) {
     <section data-testid="flags-panel">
       <h3 className="text-body font-medium text-foreground mb-3">Inconsistency flags</h3>
       <div
-        className="mb-3 p-3 rounded-lg border border-border bg-background"
+        className="mb-3 p-3 rounded-lg border border-border bg-surface"
         data-testid="flag-check-sources-disagree"
         data-state={check.state}
       >
@@ -249,14 +256,12 @@ function MetricEvidence({ item }) {
         </span>
       </div>
       {hasValue && (
-        <div className="h-1.5 rounded-full bg-border overflow-hidden">
-          <motion.div
-            className={`h-full rounded-full ${
+        <div className="h-1.5 rounded-full bg-[hsl(var(--track))] overflow-hidden">
+          <div
+            className={`h-full rounded-full bar-grow ${
               item.direction === 'negative' ? 'bg-destructive' : 'bg-primary'
             }`}
-            initial={{ width: 0 }}
-            animate={{ width: `${pct}%` }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
+            style={{ width: `${pct}%` }}
           />
         </div>
       )}
@@ -289,7 +294,7 @@ function SkillSetEvidence({ item }) {
       {list.length ? (
         <div className="flex flex-wrap gap-1.5">
           {list.map((skill) => (
-            <Badge key={skill} variant={positive ? 'success' : 'destructive'}>
+            <Badge key={skill} variant="outline">
               {skill}
             </Badge>
           ))}
@@ -341,15 +346,23 @@ function Factor({ factor }) {
 
   return (
     <div
-      className="rounded-lg border border-border bg-background p-4"
+      className={`rounded-lg border border-border bg-surface p-4 pl-[19px] ${STRIPE_BEFORE} ${factor.direction === 'unavailable' ? '' : (STRIPE_COLOR[factor.direction] || STRIPE_COLOR.neutral)}`}
       data-testid={subscoreTestId(factor.key) || undefined}
       data-available={factor.available ? 'true' : 'false'}
+      data-direction={factor.direction}
     >
+      {factor.direction === 'unavailable' && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 w-[3px]"
+          style={{ background: 'repeating-linear-gradient(hsl(var(--input)) 0 6px, transparent 6px 10px)' }}
+        />
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <DirectionIcon className={`w-4 h-4 ${direction.className}`} aria-hidden="true" />
-            <h4 className="text-body font-medium text-foreground">{factor.label}</h4>
+            <h4 className="text-body font-semibold text-foreground">{factor.label}</h4>
           </div>
           <p className={`text-caption mt-0.5 ${direction.className}`}>{direction.label}</p>
         </div>
@@ -359,19 +372,19 @@ function Factor({ factor }) {
             <div className="text-body font-semibold text-foreground tabular-nums" data-testid="subscore-value">
               {factor.available ? `${factor.value}/100` : '—'}
             </div>
-            <div className="text-caption text-muted-foreground">Sub-score</div>
+            <div className="text-[11px] text-muted-foreground">Sub-score</div>
           </div>
           <div>
             <div className="text-body font-semibold text-foreground tabular-nums">
               {factor.available ? `${factor.weight} (${factor.weight_pct}%)` : '—'}
             </div>
-            <div className="text-caption text-muted-foreground">Weight used</div>
+            <div className="text-[11px] text-muted-foreground">Weight used</div>
           </div>
           <div>
             <div className="text-body font-semibold text-foreground tabular-nums">
               {factor.available ? `${factor.contribution}` : '—'}
             </div>
-            <div className="text-caption text-muted-foreground">Points</div>
+            <div className="text-[11px] text-muted-foreground">Points</div>
           </div>
         </div>
       </div>
@@ -401,25 +414,25 @@ function SkillEvidenceTable({ rows }) {
       <table className="w-full text-left border-collapse" data-testid="skill-evidence-table">
         <thead>
           <tr className="border-b border-border">
-            <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Skill</th>
-            <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Status</th>
-            <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Résumé</th>
-            <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">GitHub</th>
-            <th className="py-2 text-caption font-medium text-muted-foreground">Assessment</th>
+            <th className="py-2 pr-3 eyebrow text-muted-foreground">Skill</th>
+            <th className="py-2 pr-3 eyebrow text-muted-foreground">Status</th>
+            <th className="py-2 pr-3 eyebrow text-muted-foreground">Résumé</th>
+            <th className="py-2 pr-3 eyebrow text-muted-foreground">GitHub</th>
+            <th className="py-2 eyebrow text-muted-foreground">Assessment</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="anim-stagger">
           {views.map((row, i) => {
             const status = skillStatusView(row.status);
             return (
-              <tr key={`${row.name}-${i}`} className="border-b border-border last:border-0" data-testid="skill-row">
-                <td className="py-2 pr-3 text-body-sm text-foreground">
+              <tr key={`${row.name}-${i}`} className="border-b border-border last:border-0 hover:bg-background" data-testid="skill-row">
+                <td className="py-2.5 pr-3 text-body-sm text-foreground">
                   {row.name}
                   {row.required_by_job === false && (
                     <span className="text-caption text-muted-foreground"> (not asked for by this job)</span>
                   )}
                 </td>
-                <td className="py-2 pr-3">
+                <td className="py-2.5 pr-3">
                   <Badge variant={status.variant} icon={status.icon} title={status.hint}>
                     {status.label}
                   </Badge>

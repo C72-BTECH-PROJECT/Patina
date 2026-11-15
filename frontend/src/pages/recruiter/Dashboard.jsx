@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { Briefcase, CheckCircle2, ClipboardCheck, Clock, Plus, ShieldAlert, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import EmptyState from '../../components/EmptyState';
@@ -20,10 +19,10 @@ const StatCard = ({ icon: Icon, label, value, hint, testId }) => (
     <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center mb-3">
       <Icon className="w-4 h-4 text-foreground" aria-hidden="true" />
     </div>
-    <div className="text-h2 font-extrabold text-foreground tabular-nums mb-1" data-testid={testId ? `${testId}-value` : undefined}>
+    <div className="font-display text-[28px] leading-tight text-foreground tabular-nums mb-1" data-testid={testId ? `${testId}-value` : undefined}>
       {value}
     </div>
-    <div className="text-body-sm text-foreground">{label}</div>
+    <div className="eyebrow text-muted-foreground">{label}</div>
     {hint && <div className="text-caption text-muted-foreground mt-1">{hint}</div>}
   </div>
 );
@@ -35,11 +34,7 @@ function RecruiterDashboard() {
   const perJob = useMemo(() => countsByJob(data.items), [data.items]);
 
   const header = (
-    <motion.div
-      className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
         <h1 className="text-h1 font-heading font-semibold text-foreground mb-2">Recruiter Dashboard</h1>
         <p className="text-body-sm text-muted-foreground">
@@ -56,7 +51,7 @@ function RecruiterDashboard() {
         <Plus className="w-4 h-4" aria-hidden="true" />
         Create new job
       </Link>
-    </motion.div>
+    </div>
   );
 
   if (data.status === 'loading' && !data.items.length) {
@@ -158,15 +153,15 @@ function RecruiterDashboard() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-border">
-              <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Job</th>
-              <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Applications</th>
-              <th className="py-2 pr-3 text-caption font-medium text-muted-foreground">Scored</th>
-              <th className="py-2 text-caption font-medium text-muted-foreground">Shortlisted</th>
+              <th className="py-2 pr-3 eyebrow text-muted-foreground">Job</th>
+              <th className="py-2 pr-3 eyebrow text-muted-foreground">Applications</th>
+              <th className="py-2 pr-3 eyebrow text-muted-foreground">Scored</th>
+              <th className="py-2 eyebrow text-muted-foreground">Shortlisted</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="anim-stagger">
             {perJob.map((j) => (
-              <tr key={j.jobId} className="border-b border-border last:border-0">
+              <tr key={j.jobId} className="border-b border-border last:border-0 hover:bg-background">
                 <td className="py-2 pr-3 text-body-sm">
                   <Link to={`/recruiter/jobs/${j.jobId}`} className="text-foreground no-underline hover:underline">
                     {j.title || 'Untitled job'}

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { AlertTriangle, MapPin } from 'lucide-react';
 import Badge from '../../components/Badge';
 import Button from '../../components/Button';
@@ -71,7 +70,7 @@ function JobHeader({ id }) {
 
   const { job } = state;
   return (
-    <motion.div className="card p-6" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+    <div className="card p-6">
       <div className="flex flex-col md:flex-row justify-between items-start gap-6">
         <div className="min-w-0">
           <h1 className="text-h1 font-heading font-semibold text-foreground mb-2">{job.title}</h1>
@@ -92,14 +91,14 @@ function JobHeader({ id }) {
         </div>
         {typeof job.applicationCount === 'number' && (
           <div className="text-right flex-shrink-0">
-            <div className="text-h1 font-extrabold text-foreground tabular-nums">{job.applicationCount}</div>
+            <div className="font-display text-[28px] leading-tight text-foreground tabular-nums">{job.applicationCount}</div>
             <div className="text-caption text-muted-foreground">
               {job.applicationCount === 1 ? 'application received' : 'applications received'}
             </div>
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }
 

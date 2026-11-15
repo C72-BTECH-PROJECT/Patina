@@ -4,7 +4,7 @@ import React from 'react';
  * Badge — Status indicator / label
  *
  * @param {Object} props
- * @param {'default' | 'outline' | 'primary' | 'success' | 'warning' | 'destructive'
+ * @param {'default' | 'outline' | 'primary' | 'solid' | 'success' | 'warning' | 'destructive'
  *   | 'evidenced' | 'claimed' | 'notfound' | 'unverified' | 'partly' | 'verified'} props.variant
  * @param {'sm' | 'md'} props.size
  * @param {React.ElementType} [props.icon] - lucide component, rendered first (decorative)
@@ -30,6 +30,7 @@ function Badge({
     default: 'bg-muted text-foreground border-transparent',
     outline: 'bg-surface text-foreground border-border',
     primary: 'bg-primary/10 text-primary border-primary/20',
+    solid: 'bg-primary text-primary-foreground border-transparent',
     success: 'bg-success/10 text-success border-success/20',
     warning: 'bg-warning/10 text-warning-text border-warning/30',
     destructive: 'bg-destructive/10 text-destructive border-destructive/20',

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { Briefcase, ChevronRight, Plus, RefreshCw } from 'lucide-react';
 import { api, isAborted } from '../../lib/api';
 
@@ -12,12 +11,7 @@ const applicationsLabel = (count) => `${count} ${count === 1 ? 'application' : '
 
 // Job Card Component
 const JobCard = ({ job, index }) => (
-  <motion.div
-    className="card p-6 relative"
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: index * 0.05 }}
-  >
+  <div className="card p-6 relative">
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-3 mb-2">
@@ -54,7 +48,7 @@ const JobCard = ({ job, index }) => (
         </Link>
       </div>
     </div>
-  </motion.div>
+  </div>
 );
 
 // Main Jobs Component
@@ -85,11 +79,7 @@ function Jobs() {
   return (
     <div className="relative">
       {/* Header */}
-      <motion.div
-        className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-extrabold text-foreground mb-2 flex items-center gap-3">
             <Briefcase className="w-8 h-8 text-foreground" />
@@ -105,7 +95,7 @@ function Jobs() {
           <Plus className="w-4 h-4" />
           Create New Job
         </Link>
-      </motion.div>
+      </div>
 
       {loading && <p className="text-muted-foreground">Loading your jobs...</p>}
 
@@ -133,11 +123,7 @@ function Jobs() {
       )}
 
       {!loading && !error && jobs.length === 0 && (
-        <motion.div
-          className="card p-12 text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
+        <div className="card p-12 text-center">
           <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
             <Briefcase className="w-8 h-8 text-foreground" />
           </div>
@@ -150,7 +136,7 @@ function Jobs() {
             <Plus className="w-5 h-5" />
             Create Job
           </Link>
-        </motion.div>
+        </div>
       )}
     </div>
   );

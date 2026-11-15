@@ -107,8 +107,8 @@ function AdminDashboard() {
           {cards.map(([key, label, Icon, color]) => (
             <div key={key} className="card p-5">
               <Icon className={`h-5 w-5 ${color}`} />
-              <p className="mt-5 text-3xl font-bold text-foreground">{overview?.[key] ?? '—'}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{label}</p>
+              <p className="mt-5 font-display text-[28px] leading-tight text-foreground tabular-nums">{overview?.[key] ?? '—'}</p>
+              <p className="mt-1 eyebrow text-muted-foreground">{label}</p>
             </div>
           ))}
         </section>
