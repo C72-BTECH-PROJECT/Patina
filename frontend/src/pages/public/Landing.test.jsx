@@ -62,7 +62,7 @@ describe('Landing without a sample file', () => {
     renderLanding(null);
     expect(screen.getAllByText('Get Started').length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText('Three Steps to a Score')).toBeInTheDocument();
-    expect(screen.getByTestId('landing-mid-cta')).toHaveAttribute('href', '/signup');
+    expect(screen.getByTestId('landing-mid-cta')).toHaveAttribute('href', '/select-role');
     expect(screen.getByText(/© 2026 PATINA/)).toBeInTheDocument();
   });
 });

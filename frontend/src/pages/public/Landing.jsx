@@ -322,7 +322,7 @@ const HowItWorksSection = () => {
         </div>
 
         <div className="mt-12 flex justify-center">
-          <Link to="/signup" className={ctaPrimary} data-testid="landing-mid-cta">
+          <Link to="/select-role" className={ctaPrimary} data-testid="landing-mid-cta">
             Get Started
             <ArrowRight className="w-4 h-4" />
           </Link>

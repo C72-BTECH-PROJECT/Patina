@@ -4,7 +4,7 @@ Written 2026-11-15 on branch `design/refresh`. **Approved by Anthony on 2026-11-
 version includes them:
 - the Blue leather palette;
 - a violet "Partly verified";
-- the stitched-tag logo;
+- the stitched-tag logo (replaced on 2026-11-15 by the layered-L mark, `brand/patina-mark.svg`);
 - the card priority;
 - the framer-motion rule;
 - the go-ahead for O-10.
@@ -18,8 +18,7 @@ D-cards in §10. `main` stays the demo fallback and does not change.
 |---|---|
 | `mock.html` | Login, score breakdown and token sheet, in the final palette |
 | `mock-blue.html` | Anthony's palette study. Its default "Blue leather" `:root` values are the source of §2 |
-| `logo.svg` | The mark |
-| `favicon.svg` | The mark without the stitch line |
+| `brand/patina-mark.svg` | The mark: the layered-L. `brand/` also holds the favicon and app icons |
 
 The breakdown in the mock is filled from a real stored score, `tests/e2e/output/r16-r17/recruiter-detail-A.json`
 (the e2e run of 2026-11-13). That row was stored before weights versions existed, so the mock shows the
@@ -34,8 +33,9 @@ reads that as worn, trusted leather.
 
 - **The base and the brand colour.** A cool paper base, white working surfaces, and one deep blue-leather
   primary (`#1F3D58`) that carries every action.
-- **The mark.** The logo is a stitched leather tag in that blue. Its "p" has a bowl made of three arcs, and
-  one arc is verdigris (`#5FC4B0`), the patina itself. It is the only decorative colour in the product.
+- **The mark.** The logo is a layered L on a tile in that blue: three white L strokes stacked up and to the
+  right, with a small verdigris square (`#5FC4B0`), the patina itself, at the top right. It is the only
+  decorative colour in the product.
 - **Colour has one meaning each.**
   - **Green** means evidence and verification only: Evidenced, Verified, a Confirmed mark, a factor that
     raises the score, a right answer, the high-band ring.
@@ -89,7 +89,8 @@ change. The values are the effective defaults of `mock-blue.html`: its base `:ro
 | `--success-foreground` / `--destructive-foreground` | `#FFFFFF` | `0 0% 100%` | Text on those fills |
 
 **Fixed colours that are not tokens:**
-- The logo's verdigris arc, `#5FC4B0`. It is used only inside `PatinaMark` and `favicon.svg`.
+- The logo's verdigris square, `#5FC4B0`. In the app it is the `--verdigris` token, used only inside
+  `PatinaMark`; the brand icon files carry it as a literal.
 - **Shadows and focus**, which use the palette's ink `rgb(22 27 33)` and primary `rgb(31 61 88)` (§4).
 
 **Removed since the first draft:** the `--copper` and `--info` tokens. Nothing uses them now.
@@ -135,7 +136,7 @@ or the neutral "unverified".
 | input border on surface / background | `#7B8490` | 3.79 / 3.41 | 3 (non-text) | PASS |
 | focus ring (primary) on background / surface | `#1F3D58` | 10.13 / 11.25 | 3 (non-text) | PASS |
 | warning icon on surface | `#B2700C` | 4.03 | 3 (non-text) | PASS |
-| logo: verdigris arc / white strokes on the primary tile | `#5FC4B0` / `#FFFFFF` on `#1F3D58` | 5.36 / 11.25 | 3 (non-text) | PASS |
+| logo: verdigris square / white strokes on the primary tile | `#5FC4B0` / `#FFFFFF` on `#1F3D58` | 5.36 / 11.25 | 3 (non-text) | PASS |
 
 **The tightest pairs:**
 - destructive text on its own 10% tint over the page background, 4.52;
@@ -331,16 +332,16 @@ and compares it with the API value. A visible counting number on that element wo
 - **Wordmark:** `<PatinaMark size={28} />` followed by the text `PATINA` in `font-display font-bold
   text-[15px] tracking-[.14em] text-foreground`. The text node stays exactly `PATINA`.
 - **`PatinaMark`** (new `frontend/src/components/PatinaMark.jsx`, the only place the logo is drawn):
-  - **Geometry:** `Docs/design-refs/logo.svg`, viewBox `0 0 32 32`.
-  - **Tile:** `fill="hsl(var(--primary))"`.
-  - **Stitch line:** `stroke="#FFFFFF" stroke-opacity=".35"`.
-  - **"p" stem and two arcs:** `#FFFFFF`.
-  - **Third arc:** `#5FC4B0`.
+  - **Geometry:** `Docs/design-refs/brand/patina-mark.svg`, viewBox `0 0 32 32`.
+  - **Tile:** `rx="7"`, `fill="hsl(var(--primary))"`.
+  - **Three L strokes:** `#FFFFFF`, `strokeWidth="3"`, `strokeLinejoin="round"`.
+  - **Square:** `fill="hsl(var(--verdigris))"` (`#5FC4B0`).
   - **Props:** `size` (default 28) sets `width` and `height`; `className` is passed through.
   - **Accessibility:** `aria-hidden="true"` and `focusable="false"`, because the adjacent `PATINA` text
     names the link.
-- **Favicon:** `Docs/design-refs/favicon.svg` is the same mark without the stitch line, with the tile as a
-  literal `#1F3D58` (a favicon cannot read CSS variables). D-3 copies it to `frontend/public/favicon.svg`.
+- **Favicon and app icons:** `Docs/design-refs/brand/` holds `favicon.ico`, `logo192.png`, `logo512.png` and
+  `apple-touch-icon-180.png`, drawn from `patina-mark.svg` with the tile as a literal `#1F3D58` (an icon file
+  cannot read CSS variables). They are copied to `frontend/public/` (the last as `apple-touch-icon.png`).
 - **Role pill:** `font-mono text-[11px] uppercase tracking-[.06em] px-2 py-[5px] rounded-full border
   border-border bg-surface text-muted-foreground`.
 - **Nav items:** `h-[34px] px-3 rounded-md text-body-sm text-muted-foreground hover:bg-muted
@@ -614,10 +615,13 @@ D-5 and once in D-10. That is the budget rule: one e2e per batch.
     and `outline`.
 
 ### D-3 · Logo, navigation and page transition
+> **Updated 2026-11-15:** the stitched-tag mark this card first built was replaced by the layered-L mark
+> (`Docs/design-refs/brand/patina-mark.svg`); the old `logo.svg` and `favicon.svg` are in
+> `Docs/archive/design-refs/`. Steps 1 and 2 below describe the current files.
 - **Files:**
   - new `frontend/src/components/PatinaMark.jsx`
-  - new `frontend/public/favicon.svg`
-  - `frontend/public/index.html` (one `<link>`)
+  - `frontend/public/favicon.ico`, `logo192.png`, `logo512.png`, `apple-touch-icon.png`
+  - `frontend/public/index.html`, `manifest.json`
   - `frontend/src/components/layouts/CandidateLayout.jsx`
   - `RecruiterLayout.jsx`
   - **The wordmark block only** in: `frontend/src/pages/public/Login.jsx:229-234`, `Landing.jsx:213-218`
@@ -631,23 +635,24 @@ D-5 and once in D-10. That is the budget rule: one e2e per batch.
        return (
          <svg width={size} height={size} viewBox="0 0 32 32" className={`shrink-0 ${className}`}
               aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
-           <rect width="32" height="32" rx="8" fill="hsl(var(--primary))" />
-           <rect x="3" y="3" width="26" height="26" rx="5.5" fill="none" stroke="#FFFFFF" strokeOpacity=".35" strokeWidth="1" strokeDasharray="2.2 1.8" />
-           <path d="M11 9.4V22.8" fill="none" stroke="#FFFFFF" strokeWidth="2.6" strokeLinecap="round" />
-           <g fill="none" strokeWidth="2.6" strokeLinecap="round">
-             <path d="M19.43 9.00A5.2 5.2 0 0 1 23.05 15.26" stroke="#FFFFFF" />
-             <path d="M21.61 17.74A5.2 5.2 0 0 1 14.39 17.74" stroke="#FFFFFF" />
-             <path d="M12.95 15.26A5.2 5.2 0 0 1 16.57 9.00" stroke="#5FC4B0" />
+           <rect width="32" height="32" rx="7" fill="hsl(var(--primary))" />
+           <g fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinejoin="round">
+             <path d="M7.80 9.80V24.30H22.20" />
+             <path d="M13.00 8.00V19.20H24.00" />
+             <path d="M18.00 6.20V14.20H25.80" />
            </g>
+           <rect x="21.4" y="6.20" width="4.4" height="4.4" rx="0.6" fill="hsl(var(--verdigris))" />
          </svg>
        );
      }
      ```
-     Copy this exactly. It is `Docs/design-refs/logo.svg` with only the tile fill changed.
-  2. **Favicon.** Copy `Docs/design-refs/favicon.svg` to `frontend/public/favicon.svg`, byte for byte. In
-     `frontend/public/index.html`, add `<link rel="icon" href="%PUBLIC_URL%/favicon.svg"
-     type="image/svg+xml" />` on the line **before** the existing `<link rel="icon" ...Patina.png />`. Keep
-     the PNG link, the apple-touch-icon and the manifest.
+     It is `Docs/design-refs/brand/patina-mark.svg` with the tile fill on `--primary` and the square on
+     `--verdigris` (`168.1 46.1% 57.1%`, defined in `:root` of `frontend/src/index.css`).
+  2. **Favicon and app icons.** Copy `favicon.ico`, `logo192.png` and `logo512.png` from
+     `Docs/design-refs/brand/` to `frontend/public/`, and `apple-touch-icon-180.png` as
+     `apple-touch-icon.png`. In `frontend/public/index.html` the icon link is
+     `<link rel="icon" href="%PUBLIC_URL%/favicon.ico" sizes="any" />` and the apple-touch-icon link points
+     at `apple-touch-icon.png`; `manifest.json` lists the same files.
   3. **Every wordmark site.**
      - Replace the tile element with `<PatinaMark size={28} />`. The tile element is the `div` holding
        `Zap`, `Lock` or `UploadIcon`; in the admin Dashboard it is the bare `<Zap className="h-5 w-5" />`.
@@ -678,7 +683,7 @@ D-5 and once in D-10. That is the budget rule: one e2e per batch.
   - `grep -rn "PATINA" frontend/src --include=*.jsx` shows the same lines of text as before D-3.
   - `grep -rln "PatinaMark" frontend/src` lists the component and the 7 page/layout files with wordmarks.
   - **Lead:** screenshots of `/login`, `/candidate/dashboard` and `/recruiter/dashboard` show the mark and
-    the active nav item underlined; the browser tab shows the SVG favicon.
+    the active nav item underlined; the browser tab shows the layered-L favicon.
 
 ### D-4 · Auth screens
 - **Files:**

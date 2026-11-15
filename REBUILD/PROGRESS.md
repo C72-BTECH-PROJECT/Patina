@@ -2,7 +2,12 @@
 
 Resume a fresh session with: "Read REBUILD/KICKOFF.md, REBUILD/CHECKPOINT1_ANSWERS.md and REBUILD/PROGRESS.md and continue."
 
-## Layered-L logo on `design/refresh` (2026-11-15; this block is the newest and wins)
+## Old logo files archived, mid CTA to select-role on `design/refresh` (2026-11-15; this block is the newest and wins)
+- **Archived:** `Docs/design-refs/logo.svg` and `favicon.svg` moved to `Docs/archive/design-refs/`. `DESIGN_SPEC.md` now describes the layered-L mark and points at `brand/patina-mark.svg`: the approval list, the companion-files table, §1, the fixed-colour note, the contrast row, §6.5, and the D-3 card (which has an update note and the current component). The unused `i-zap` symbol is removed from both mocks.
+- **Flow change (Anthony):** `landing-mid-cta` now goes to `/select-role`, and `Landing.test.jsx:65` expects that. No landing link goes to `/signup` now.
+- **G:** 15 suites / 169 tests pass, build exit 0. Docs check: 6 problems (unchanged).
+
+## Layered-L logo on `design/refresh` (2026-11-15)
 - **Mark:** `PatinaMark.jsx` now draws `Docs/design-refs/brand/patina-mark.svg`. The tile uses `hsl(var(--primary))` and the square uses a new `--verdigris` token (`#5FC4B0`, `frontend/src/index.css`); before this the colour existed only as a literal. All 9 wordmarks already used the component and say `PATINA`.
 - **Icons:** the brand `favicon.ico`, `logo192.png`, `logo512.png` and `apple-touch-icon.png` are in `frontend/public/`. `index.html` and `manifest.json` (now named Patina, theme `#1F3D58`) point to them. The old `favicon.svg` and `Patina.png` are deleted.
 - **Old mark:** the `i-mark` and `i-patina` symbols in `Docs/design-refs/mock.html` and `mock-blue.html` were replaced. Left and listed for Anthony: `Docs/design-refs/logo.svg` and `favicon.svg` and the spec text that cites them (`DESIGN_SPEC.md` §1, §5, D-3), the unused `i-zap` symbols in both mocks, and the Zap icon on CreateJob's "Post Job Listing" button (a button icon, not the logo).
