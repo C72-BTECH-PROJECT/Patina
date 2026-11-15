@@ -179,7 +179,7 @@ const HeroSection = () => {
   // Read once per mount: the file cannot appear while the page is open.
   const sample = useMemo(() => loadLandingSample(), []);
   return (
-  <section className="relative flex items-center justify-center pt-28 pb-24 lg:min-h-screen">
+  <section className="auth-bg relative flex items-center justify-center pt-28 pb-24 lg:min-h-screen">
     <div className="max-w-6xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center w-full">
       <div className="text-center lg:text-left anim-stagger">
         <div className="inline-flex items-center rounded-full border border-border bg-surface px-3 py-1.5 mb-6">
@@ -201,7 +201,7 @@ const HeroSection = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
-          <Link to="/signup" className={ctaPrimary}>
+          <Link to="/select-role" className={ctaPrimary}>
             Get Started
             <ArrowRight className="w-4 h-4" />
           </Link>
@@ -368,7 +368,7 @@ function Landing() {
               Log In
             </Link>
             <Link
-              to="/signup"
+              to="/select-role"
               className="inline-flex h-9 items-center justify-center px-4 rounded-md bg-primary text-primary-foreground text-body-sm font-medium shadow-xs hover:bg-primary-hover transition-[background-color,box-shadow,transform] duration-150 ease-out active:scale-[.98] focus-visible:outline-none focus-visible:shadow-focus no-underline"
             >
               Get Started

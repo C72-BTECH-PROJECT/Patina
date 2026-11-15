@@ -59,7 +59,7 @@ function RoleSelection() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <RoleCard
-              to="/signup"
+              to="/signup?role=candidate"
               icon={User}
               title="I'm a Candidate"
               description="Upload your resume, apply to jobs, and take a short technical assessment. Each application gets a credibility score that shows how it was worked out."
@@ -68,7 +68,7 @@ function RoleSelection() {
             />
 
             <RoleCard
-              to="/signup"
+              to="/signup?role=recruiter"
               icon={Building2}
               title="I'm a Recruiter"
               description="Post jobs, review the applications to them ranked by credibility score, see the evidence behind each score, and shortlist or reject."

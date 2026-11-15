@@ -2,7 +2,19 @@
 
 Resume a fresh session with: "Read REBUILD/KICKOFF.md, REBUILD/CHECKPOINT1_ANSWERS.md and REBUILD/PROGRESS.md and continue."
 
-## Morning follow-ups on `design/refresh`: sweep guard, NLP timing, limiter, D-9, R-36 part 1 (2026-11-15; this block is the newest and wins)
+## Layered-L logo on `design/refresh` (2026-11-15; this block is the newest and wins)
+- **Mark:** `PatinaMark.jsx` now draws `Docs/design-refs/brand/patina-mark.svg`. The tile uses `hsl(var(--primary))` and the square uses a new `--verdigris` token (`#5FC4B0`, `frontend/src/index.css`); before this the colour existed only as a literal. All 9 wordmarks already used the component and say `PATINA`.
+- **Icons:** the brand `favicon.ico`, `logo192.png`, `logo512.png` and `apple-touch-icon.png` are in `frontend/public/`. `index.html` and `manifest.json` (now named Patina, theme `#1F3D58`) point to them. The old `favicon.svg` and `Patina.png` are deleted.
+- **Old mark:** the `i-mark` and `i-patina` symbols in `Docs/design-refs/mock.html` and `mock-blue.html` were replaced. Left and listed for Anthony: `Docs/design-refs/logo.svg` and `favicon.svg` and the spec text that cites them (`DESIGN_SPEC.md` §1, §5, D-3), the unused `i-zap` symbols in both mocks, and the Zap icon on CreateJob's "Post Job Listing" button (a button icon, not the logo).
+- **G:** 15 suites / 169 tests pass, build exit 0. Screenshots `tests/e2e/output/design/logo-{landing,login,candidate}-1440.png`, no page errors.
+
+## Role carry-through, landing grid, L1441 decision on `design/refresh` (2026-11-15)
+- **Role:** `/select-role` cards link to `/signup?role=candidate|recruiter`; `Login.jsx` preselects the role from `location.search` (`useSearchParams` is not in the test mock). The landing hero and nav "Get Started" go to `/select-role`; `landing-mid-cta` stays `/signup` because `Landing.test.jsx` asserts it. Back from signup already went to `/select-role`. Built by Sonnet `patina-implementer`.
+- **Landing grid:** the hero `<section>` reuses the existing `auth-bg` class (`frontend/src/index.css` 198-220). Nothing animates. `index.css` is unchanged.
+- **L1441, investigated only:** nothing prepares at startup. Preparations start on candidate status reads, Start, reset and apply, and only core's memory records what already started. Each run re-parses the résumé (`assessmentService.js:515`), because the full text is never stored. Not a small change, so no code. Now in `REBUILD/ROADMAP.md` A6 step 2 (priority queue, second nlp-engine worker), with the demo-morning routine in `REVIEW_BRIEF.md` §1.
+- **G:** 15 suites / 169 tests pass, build exit 0. Docs check: 6 problems (unchanged). **Not run:** e2e (Anthony runs it); the pages were not viewed in a browser.
+
+## Morning follow-ups on `design/refresh`: sweep guard, NLP timing, limiter, D-9, R-36 part 1 (2026-11-15)
 - **Housekeeping:** the tree was clean (every D-4 to D-8 file committed), so `REBUILD/backup/` was deleted. It had been committed, so the 29 deletions appear in `git status`.
 - **Sweep:** every row counted is the four t0001_ accounts' (read-only check: no application, score or assessment links to another account; 6 untagged test-recruiter jobs are kept by design). The 50-row guard was checked table by table **while deleting**, so the aborted run had already removed notifications (12) and assessments (36). Now every table is counted first, and `--max-rows N` raises the ceiling for one run (`tests/backend/lib/testdb.mjs`, `sweep.mjs`, test `sweep-guard.test.mjs` 3/3). Command for Anthony: `node tests/backend/sweep.mjs --max-rows 150`. Not run here.
 - **NLP timing:** the D-5 failure was an idle stall. 727 MB of the 1197 MB nlp-engine process was paged out, with about 1.2 GB RAM free. First parses took 6.9, 32.4 and 55.0 s; 22 later parses took 0.12 to 2.3 s. The 30 s timeout was not raised. start-all already had a warm-up (R-38). It is now shared through `scripts/nlp-warm.lib.ps1`, and the new `scripts/warm-nlp.ps1` (parse plus `/skills/extract`) re-warms after idle: 15.2 s then 0.9 s after about 30 min idle. start-all itself was not re-run, to avoid restarting core.

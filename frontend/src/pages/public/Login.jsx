@@ -159,7 +159,11 @@ function Login() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
-  const [signupRole, setSignupRole] = useState('candidate');
+  // /select-role links to /signup?role=candidate|recruiter; anything else keeps the default.
+  const [signupRole, setSignupRole] = useState(() => {
+    const requested = new URLSearchParams(location.search || '').get('role');
+    return requested === 'candidate' || requested === 'recruiter' ? requested : 'candidate';
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login: loginWithSession, refreshUser, user, loading: authLoading } = useAuth();
   const roleSelectId = useId();
