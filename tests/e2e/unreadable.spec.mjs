@@ -8,9 +8,12 @@ import { newRoleContext } from './lib/auth.mjs';
 import { actAndWait } from './lib/network.mjs';
 import { chooseResumeFile } from './lib/pages.mjs';
 import { fixturePath } from './fixtures/index.mjs';
+import { waitForRateLimitHeadroom } from './lib/ratelimit.mjs';
 
 test('image-only resume: "unreadable" is shown and the earlier resume stays', async ({ browser }) => {
   test.setTimeout(4 * 60_000);
+  // It runs straight after the spine, which can leave the per-IP limiter almost spent.
+  await waitForRateLimitHeadroom();
   const { context, page: p } = await newRoleContext(browser, 'candidate');
 
   const { status: s0, body: before } = await actAndWait(p, 'GET', /^\/api\/resume\/status$/, () => p.goto('/candidate/upload'));

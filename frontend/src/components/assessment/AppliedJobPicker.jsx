@@ -44,7 +44,7 @@ function AppliedJobPicker() {
 
   return (
     <div className="max-w-3xl mx-auto" data-testid="assessment-state" data-state={phase === 'ready' ? 'choose_job' : phase === 'error' ? 'error' : 'loading'}>
-      <h1 className="text-h2 text-foreground">Skill assessment</h1>
+      <h1 className="text-h1 text-foreground">Skill assessment</h1>
       <p className="text-body-sm text-muted-foreground mt-1 mb-6">
         The assessment is offered for jobs you have applied to. Choose one.
       </p>

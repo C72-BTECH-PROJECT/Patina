@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Lock, ArrowRight, ShieldAlert, MailCheck } from 'lucide-react';
+import { ArrowRight, ShieldAlert, MailCheck } from 'lucide-react';
 import { api, isNetworkError } from '../../lib/api';
+import PatinaMark from '../../components/PatinaMark';
 
 // Pull the Supabase recovery credentials out of the URL that the reset email
 // links to. Supabase either appends `#access_token=...&refresh_token=...&type=recovery`
@@ -111,36 +111,25 @@ function ResetPassword() {
   };
 
   const inputClass =
-    'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-body-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+    'flex h-11 w-full rounded-md border border-input bg-surface px-3.5 text-[15px] text-foreground placeholder:text-muted-foreground hover:border-foreground focus:outline-none focus:border-primary focus:shadow-focus transition-[border-color,box-shadow] duration-150';
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <motion.header
-        className="flex justify-between items-center py-4 px-6 border-b border-border"
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+    <div className="min-h-screen auth-bg bg-background text-foreground flex flex-col">
+      <header className="flex justify-between items-center py-4 px-6 border-b border-border">
         <Link to="/" className="flex items-center gap-2.5 no-underline">
-          <div className="w-8 h-8 flex items-center justify-center bg-primary rounded-md">
-            <Lock className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-bold text-lg tracking-tight text-foreground">PATINA</span>
+          <PatinaMark size={28} />
+          <span className="font-display font-bold text-[15px] tracking-[.14em] text-foreground">PATINA</span>
         </Link>
         <Link to="/login" className="text-body-sm text-muted-foreground hover:text-foreground transition-colors">
           ← Back to Login
         </Link>
-      </motion.header>
+      </header>
 
       <main className="flex-1 flex justify-center items-center py-8 px-6">
-        <motion.div
-          className="w-full max-w-md"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          <div className="card p-8">
+        <div className="w-full max-w-md">
+          <div className="card p-8 shadow-pop anim-rise">
             <div className="text-center mb-8">
-              <h1 className="text-h2 text-foreground mb-1">
+              <h1 className="text-h1 text-foreground mb-1">
                 {inRecoveryMode ? 'Choose a New Password' : 'Reset Password'}
               </h1>
               <p className="text-body-sm text-muted-foreground">
@@ -151,15 +140,15 @@ function ResetPassword() {
             </div>
 
             {message && (
-              <div className="mb-6 flex gap-3 rounded-md border border-border bg-success/10 p-4 text-left text-sm text-success">
+              <div className="mb-6 flex gap-3 rounded-lg border border-primary/20 bg-primary-soft p-3.5 text-left text-sm text-primary">
                 <MailCheck className="mt-0.5 h-5 w-5 flex-shrink-0" />
                 <p className="leading-5">{message}</p>
               </div>
             )}
             {(error || linkError) && (
-              <div role="alert" className="mb-6 flex gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-left">
-                <span className="mt-0.5 rounded-md bg-destructive/15 p-2 text-destructive">
-                  <ShieldAlert className="h-5 w-5" />
+              <div role="alert" className="mb-6 flex gap-3 rounded-lg border border-destructive/25 bg-destructive/10 p-3.5 text-left">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-destructive/[.12] text-destructive">
+                  <ShieldAlert className="h-[18px] w-[18px]" />
                 </span>
                 <div>
                   <p className="text-sm font-semibold text-destructive">
@@ -216,14 +205,14 @@ function ResetPassword() {
               </form>
             )}
 
-            <div className="mt-6 text-center text-body-sm text-muted-foreground">
+            <div className="mt-6 border-t border-border pt-5 text-center text-body-sm text-muted-foreground">
               Remember your password?{' '}
-              <Link to="/login" className="text-foreground font-medium hover:text-foreground/80 transition-colors">
+              <Link to="/login" className="text-primary font-semibold hover:underline underline-offset-[3px]">
                 Log in
               </Link>
             </div>
           </div>
-        </motion.div>
+        </div>
       </main>
     </div>
   );
@@ -234,14 +223,10 @@ function SubmitButton({ isLoading, label }) {
     <button
       type="submit"
       disabled={isLoading}
-      className="w-full h-10 rounded-md bg-primary text-primary-foreground font-medium text-body-sm hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+      className="w-full h-11 rounded-md bg-primary text-primary-foreground font-medium text-body-sm shadow-xs hover:bg-primary-hover transition-[background-color,box-shadow,transform] duration-150 ease-out active:scale-[.98] focus-visible:outline-none focus-visible:shadow-focus disabled:opacity-50 disabled:pointer-events-none cursor-pointer flex items-center justify-center gap-2"
     >
       {isLoading ? (
-        <motion.div
-          className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-        />
+        <span className="w-4 h-4 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
       ) : (
         <>
           {label}

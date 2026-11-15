@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import {
   AlertCircle, ArrowRight, Briefcase, Code2, FolderGit2, GraduationCap, LayoutDashboard, Wrench,
 } from 'lucide-react';
 import Badge from '../../components/Badge';
 import ScoreBadge, {
-  VerificationBadge, bandTone, showEvidenceLimited, weightsVersionLabel,
+  VerificationBadge, showEvidenceLimited, weightsVersionLabel,
 } from '../../components/ScoreBadge';
+import ScoreRing from '../../components/ScoreRing';
 import Spinner from '../../components/Spinner';
 import ScoreBreakdown from '../../components/recruiter/ScoreBreakdown';
 import { api } from '../../lib/api';
@@ -25,65 +25,9 @@ import { ScoreAgainButton, StatusBadge, scoringReasonText } from './applicationS
 //   POST /api/applications/:id/score      "Score again"
 // Nothing here is defaulted: no 0 for a missing score, no stock sentence for a
 // missing explanation.
-
-const fadeUp = {
-  initial: { opacity: 0, y: 16 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.4 },
-};
-
-// Tone from the backend band only (ScoreBadge.bandTone). Literal class strings so
-// Tailwind emits them.
-const TONE_TEXT = {
-  success: 'text-success',
-  warning: 'text-warning-text',
-  destructive: 'text-destructive',
-  neutral: 'text-foreground',
-};
-
-const TONE_STROKE = {
-  success: 'hsl(var(--success))',
-  warning: 'hsl(var(--warning))',
-  destructive: 'hsl(var(--destructive))',
-  neutral: 'hsl(var(--foreground))',
-};
-
-function ScoreRing({ value, band }) {
-  const tone = bandTone(band);
-  const circumference = 2 * Math.PI * 54;
-  const offset = circumference - (Math.min(100, Math.max(0, value)) / 100) * circumference;
-
-  return (
-    <div className="relative w-36 h-36 flex-shrink-0">
-      <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
-        <circle cx="60" cy="60" r="54" fill="none" stroke="hsl(var(--border))" strokeWidth="8" />
-        <motion.circle
-          cx="60"
-          cy="60"
-          r="54"
-          fill="none"
-          stroke={TONE_STROKE[tone]}
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1, delay: 0.2, ease: 'easeOut' }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span
-          className={`text-h1 font-extrabold ${TONE_TEXT[tone]} tabular-nums`}
-          data-testid="application-score"
-          data-state="scored"
-        >
-          {String(value)}
-        </span>
-        <span className="text-caption text-muted-foreground">/100</span>
-      </div>
-    </div>
-  );
-}
+// ScoreRing lives in components/ScoreRing.jsx (D-9: the landing page uses it too) and is
+// re-exported here.
+export { ScoreRing };
 
 /**
  * R-27 (D§7.1 W3): what would verify this score further, from the stored sub-scores.
@@ -175,13 +119,13 @@ function SubScoreList({ subScores }) {
 
 function Message({ icon: Icon = AlertCircle, title, children, testId, tone = 'muted' }) {
   return (
-    <motion.div {...fadeUp} className="max-w-xl mx-auto text-center py-12" data-testid={testId}>
+    <div className="max-w-xl mx-auto text-center py-12" data-testid={testId}>
       <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-6">
         <Icon className={`w-8 h-8 ${tone === 'error' ? 'text-destructive' : 'text-muted-foreground'}`} />
       </div>
       <h1 className="text-h2 font-heading font-semibold text-foreground mb-2">{title}</h1>
       <div className="text-body-sm text-muted-foreground space-y-4">{children}</div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -189,14 +133,14 @@ const BackLinks = () => (
   <div className="mt-8 flex flex-col sm:flex-row gap-3">
     <Link
       to="/candidate/dashboard"
-      className="inline-flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-background px-6 py-3 font-medium text-foreground no-underline hover:bg-muted transition-colors"
+      className="inline-flex flex-1 items-center justify-center gap-2 rounded-md h-11 px-6 font-medium border border-border bg-surface text-foreground no-underline hover:bg-muted transition-[background-color,box-shadow,transform] duration-150 ease-out active:scale-[.98] focus-visible:outline-none focus-visible:shadow-focus"
     >
       <LayoutDashboard className="w-4 h-4" />
       My applications
     </Link>
     <Link
       to="/candidate/jobs"
-      className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground px-6 py-3 font-medium no-underline hover:bg-primary/90 transition-colors"
+      className="inline-flex flex-1 items-center justify-center gap-2 rounded-md h-11 px-6 font-medium bg-primary text-primary-foreground shadow-xs no-underline hover:bg-primary-hover transition-[background-color,box-shadow,transform] duration-150 ease-out active:scale-[.98] focus-visible:outline-none focus-visible:shadow-focus"
     >
       <Briefcase className="w-4 h-4" />
       Browse jobs
@@ -303,13 +247,13 @@ function ApplicationResult({ applicationId }) {
   const analysis = data?.score || null;
 
   const header = (
-    <motion.div {...fadeUp} className="mb-6">
-      <p className="text-sm text-muted-foreground">Result for your application to</p>
+    <div className="mb-6">
+      <p className="eyebrow">Result for your application to</p>
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-h1 text-foreground">{app.job_title || 'an untitled job'}</h1>
         <StatusBadge status={app.status} />
       </div>
-    </motion.div>
+    </div>
   );
 
   // No score row for this application.
@@ -361,7 +305,8 @@ function ApplicationResult({ applicationId }) {
       {header}
 
       {/* Composite */}
-      <motion.div {...fadeUp} transition={{ delay: 0.1, duration: 0.4 }} className="card p-8 mb-6">
+      <div className="anim-stagger">
+      <div className="card p-8 mb-6">
         <div className="flex flex-col md:flex-row items-center gap-8">
           {hasComposite ? (
             <ScoreRing value={composite} band={analysis.band} />
@@ -392,7 +337,7 @@ function ApplicationResult({ applicationId }) {
               <p className="mt-2 text-caption text-muted-foreground">{explanation.band_thresholds.note}</p>
             )}
             {nextStep && (
-              <div className="mt-3 p-3 rounded-lg border border-border bg-muted text-left" data-testid="next-step" data-next-step={nextStep.kind}>
+              <div className="mt-3 rounded-lg bg-muted border border-border p-3 text-left" data-testid="next-step" data-next-step={nextStep.kind}>
                 <p className="text-body-sm text-foreground">{nextStep.text}</p>
                 {nextStep.kind === 'assessment' && analysis.jobId && (
                   <Link
@@ -413,10 +358,10 @@ function ApplicationResult({ applicationId }) {
             )}
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Sub-scores and evidence, read from the stored explanation */}
-      <motion.div {...fadeUp} transition={{ delay: 0.2, duration: 0.4 }} className="card p-6 mb-6">
+      <div className="card p-6 mb-6">
         <h2 className="text-body font-medium text-foreground mb-4">How this score was calculated</h2>
         {hasFactors ? (
           <ScoreBreakdown analysis={analysis} />
@@ -426,10 +371,10 @@ function ApplicationResult({ applicationId }) {
             <SubScoreList subScores={analysis.subScores} />
           </>
         )}
-      </motion.div>
+      </div>
 
       {/* What the parser read from the resume this score used */}
-      <motion.div {...fadeUp} transition={{ delay: 0.3, duration: 0.4 }} className="card p-6 mb-6">
+      <div className="card p-6 mb-6">
         <h2 className="text-body font-medium text-foreground mb-4 flex items-center gap-2">
           <Code2 className="w-4 h-4 text-muted-foreground" />
           What was read from your resume
@@ -488,7 +433,8 @@ function ApplicationResult({ applicationId }) {
             </ul>
           </EntitySection>
         </div>
-      </motion.div>
+      </div>
+      </div>
 
       <BackLinks />
     </div>

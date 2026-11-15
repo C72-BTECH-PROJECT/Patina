@@ -134,7 +134,7 @@ function Dashboard() {
     <div>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">My applications</h1>
+          <h1 className="text-h1 text-foreground">My applications</h1>
           <p className="mt-1 text-sm text-muted-foreground">Each job you applied to, its score and its assessment.</p>
         </div>
         <div className="flex gap-2">
@@ -147,7 +147,7 @@ function Dashboard() {
           </Link>
           <Link
             to="/candidate/jobs"
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground no-underline transition hover:bg-primary/90"
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground no-underline transition hover:bg-primary-hover active:scale-[.98] focus-visible:outline-none focus-visible:shadow-focus"
           >
             <Briefcase className="h-4 w-4" />
             Browse jobs
@@ -162,7 +162,7 @@ function Dashboard() {
       {status === 'error' && (
         <div className="card p-8 text-center" role="alert" data-testid="applications-error">
           <AlertCircle className="mx-auto mb-3 h-8 w-8 text-destructive" />
-          <h2 className="text-lg font-semibold text-foreground">Could not load your applications</h2>
+          <h2 className="text-h3 text-foreground">Could not load your applications</h2>
           <p className="mt-2 text-sm text-muted-foreground">{error}</p>
           <button
             type="button"
@@ -177,14 +177,14 @@ function Dashboard() {
       {status === 'ready' && apps.length === 0 && (
         <div className="card p-8 text-center" data-testid="applications-empty">
           <Briefcase className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-          <h2 className="text-lg font-semibold text-foreground">You have not applied to any job yet</h2>
+          <h2 className="text-h3 text-foreground">You have not applied to any job yet</h2>
           <p className="mt-2 text-sm text-muted-foreground">Upload your resume, then apply to an open role.</p>
         </div>
       )}
 
       {status === 'ready' && apps.length > 0 && (
         <>
-          <div className="space-y-3">
+          <div className="space-y-3 anim-stagger">
             {apps.map((app) => {
               const title = app.job_title;
               const appliedOn = formatDate(app.submitted_at);

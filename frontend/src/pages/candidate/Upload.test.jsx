@@ -4,7 +4,7 @@
 import React from 'react';
 import '@testing-library/jest-dom';
 import { render, screen, within } from '@testing-library/react';
-import { ParsedSummary } from './Upload';
+import { ParsedSummary, isResumeFile } from './Upload';
 
 // Jest 27 (react-scripts 5) cannot resolve react-router-dom 7's package exports (as in
 // Login.test.jsx); ParsedSummary renders no router element, so a stand-in Link is enough.
@@ -75,4 +75,14 @@ test('Contact has no LinkedIn or GitHub line when the parser returned none', () 
   renderSummary({ education: [], links: [], contact: { candidate_name: 'Sam Support', email: 'sam@example.com', github: null, linkedin: '' } });
   const contact = screen.getByTestId('parsed-contact');
   expect([...contact.querySelectorAll('dt')].map((dt) => dt.textContent)).toEqual(['Name', 'Email']);
+});
+
+// I-0006: the same check runs when a file is chosen (button or drop), not only at submit.
+test('isResumeFile accepts PDF and DOCX by type or extension and rejects anything else', () => {
+  expect(isResumeFile({ name: 'cv.pdf', type: '' })).toBe(true);
+  expect(isResumeFile({ name: 'CV.DOCX', type: '' })).toBe(true);
+  expect(isResumeFile({ name: 'resume', type: 'application/pdf' })).toBe(true);
+  expect(isResumeFile({ name: 'photo.png', type: 'image/png' })).toBe(false);
+  expect(isResumeFile({ name: 'old.doc', type: 'application/msword' })).toBe(false);
+  expect(isResumeFile({ name: 'notes.txt', type: 'text/plain' })).toBe(false);
 });

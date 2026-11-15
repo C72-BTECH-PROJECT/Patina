@@ -7,8 +7,8 @@ function NotFound() {
   const location = useLocation();
 
   return (
-    <main className="min-h-screen bg-background text-foreground flex items-center justify-center px-6">
-      <div className="card p-10 max-w-md w-full text-center">
+    <main className="min-h-screen auth-bg bg-background text-foreground flex items-center justify-center px-6">
+      <div className="card p-10 shadow-pop anim-rise max-w-md w-full text-center">
         <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center mx-auto mb-5">
           <Compass className="w-7 h-7 text-muted-foreground" aria-hidden="true" />
         </div>

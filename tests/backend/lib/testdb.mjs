@@ -163,8 +163,26 @@ export async function counts(sb, ids) {
   return out;
 }
 
-// Delete everything owned by the test accounts.
-export async function sweep(sb, ids) {
+export const DEFAULT_MAX_ROWS = MAX_ROWS;
+
+// Delete everything owned by the test accounts. The filters are the same as
+// counts(); `maxRows` only raises the per-table ceiling, it never widens a
+// filter. Every table and storage prefix is checked against the ceiling BEFORE
+// anything is deleted, so an over-limit table aborts the whole sweep instead
+// of leaving it half done (before 2026-11-15 the check ran table by table).
+export async function sweep(sb, ids, { maxRows = MAX_ROWS } = {}) {
+  if (!Number.isInteger(maxRows) || maxRows < 1) throw new Error(`guard: maxRows must be a positive integer (got ${maxRows})`);
+  const over = [];
+  for (const { table, label: rowLabel, apply } of TABLE_FILTERS(ids)) {
+    const { count, error } = await apply(sb.from(table).select('*', { count: 'exact', head: true }));
+    if (!error && count > maxRows) over.push(`${rowLabel ?? table}=${count}`);
+  }
+  for (const { prefix } of STORAGE_PREFIXES(ids)) {
+    const n = (await listObjects(sb, prefix)).length;
+    if (n > maxRows) over.push(`storage ${prefix}=${n}`);
+  }
+  if (over.length) throw new Error(`guard: delete would exceed ${maxRows} rows per table (${over.join(', ')}); nothing deleted`);
+
   const removed = {};
   for (const { table, label: rowLabel, apply } of TABLE_FILTERS(ids)) {
     const { count, error: countErr } = await apply(sb.from(table).select('*', { count: 'exact', head: true }));
@@ -173,7 +191,7 @@ export async function sweep(sb, ids) {
       removed[rowLabel ?? table] = `skipped (${countErr.message})`;
       continue;
     }
-    if (count > MAX_ROWS) throw new Error(`guard: ${rowLabel ?? table} delete would remove ${count} rows (> ${MAX_ROWS}); aborting`);
+    if (count > maxRows) throw new Error(`guard: ${rowLabel ?? table} delete would remove ${count} rows (> ${maxRows}); aborting`);
     if (count > 0) {
       const { error } = await apply(sb.from(table).delete());
       if (error) throw new Error(`${table} delete failed: ${error.message}`);
@@ -182,7 +200,7 @@ export async function sweep(sb, ids) {
   }
   for (const { prefix, label } of STORAGE_PREFIXES(ids)) {
     const paths = await listObjects(sb, prefix);
-    if (paths.length > MAX_ROWS) throw new Error(`guard: storage ${prefix} has ${paths.length} objects (> ${MAX_ROWS}); aborting`);
+    if (paths.length > maxRows) throw new Error(`guard: storage ${prefix} has ${paths.length} objects (> ${maxRows}); aborting`);
     if (paths.length) {
       const { error } = await sb.storage.from(BUCKET).remove(paths);
       if (error) throw new Error(`storage remove under ${prefix} failed: ${error.message}`);

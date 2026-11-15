@@ -1,6 +1,5 @@
 import React, { useEffect, useId, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Sparkles, Briefcase, MapPin, Clock, ChevronDown, Zap, ArrowRight, ArrowLeft, Lightbulb, FileText, Search, Plus, X } from 'lucide-react';
 import { api, isAborted } from '../../lib/api';
 
@@ -20,7 +19,7 @@ const FIELD_CLASS = 'w-full px-5 py-4 bg-background border border-input rounded-
 const PRIMARY_BUTTON = 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer';
 const DISABLED_BUTTON = 'bg-muted text-muted-foreground cursor-not-allowed';
 const SECONDARY_BUTTON = 'px-6 py-3 rounded-xl font-medium bg-background border border-input text-foreground hover:bg-muted transition-all flex items-center gap-2';
-const CHIP_BUTTON = 'px-3 py-1.5 rounded-xl text-sm font-medium border transition-all flex items-center gap-1.5';
+const CHIP_BUTTON = 'h-8 px-3 rounded-full text-sm font-medium border transition-all flex items-center gap-1.5';
 
 export const SEARCH_DEBOUNCE_MS = 200;
 
@@ -286,7 +285,7 @@ export function SkillPicker({ description, skills, onChange }) {
               data-testid="selected-skill"
               data-skill={s.name}
               data-custom={s.custom ? 'true' : 'false'}
-              className="px-3 py-1 rounded-full bg-background border border-border text-foreground text-sm flex items-center gap-2"
+              className="h-7 px-3 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium flex items-center gap-2"
             >
               <span>{s.name}</span>
               {s.custom && <span className="text-xs text-muted-foreground border border-border rounded-full px-1.5">custom</span>}
@@ -294,7 +293,7 @@ export function SkillPicker({ description, skills, onChange }) {
                 type="button"
                 onClick={() => remove(s.name)}
                 aria-label={`Remove ${s.name}`}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-primary/70 hover:text-primary"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -319,7 +318,7 @@ const FormProgress = ({ currentStep }) => (
         <div
           className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
             step < currentStep
-              ? 'bg-success text-success-foreground'
+              ? 'bg-primary-soft text-primary'
               : step === currentStep
               ? 'bg-primary text-primary-foreground'
               : 'bg-muted text-muted-foreground'
@@ -329,11 +328,9 @@ const FormProgress = ({ currentStep }) => (
         </div>
         {step < 3 && (
           <div className="w-12 h-0.5 bg-muted">
-            <motion.div
-              className="h-full bg-primary"
-              initial={{ width: '0%' }}
-              animate={{ width: step < currentStep ? '100%' : '0%' }}
-              transition={{ duration: 0.5 }}
+            <div
+              className="h-full bg-primary transition-[width] duration-500"
+              style={{ width: step < currentStep ? '100%' : '0%' }}
             />
           </div>
         )}
@@ -428,27 +425,20 @@ function CreateJob() {
 
       <main className="relative max-w-3xl mx-auto pb-12">
         {/* Header */}
-        <motion.div
-          className="text-center mb-12"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <div className="text-center mb-12">
           <h1 className="text-4xl font-extrabold mb-4 text-foreground">Create New Job Listing</h1>
           <p className="text-muted-foreground max-w-xl mx-auto">
             Applicants to this job are scored against the skills you select here.
           </p>
-        </motion.div>
+        </div>
 
         {/* Progress Indicator */}
         <FormProgress currentStep={currentStep} />
 
         {/* Form Card */}
-        <motion.form
+        <form
           onSubmit={handleCreate}
           className="card p-8 md:p-10 relative"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
           noValidate
         >
           {formError && (
@@ -457,15 +447,9 @@ function CreateJob() {
             </p>
           )}
 
-          <AnimatePresence mode="wait">
+          <>
             {currentStep === 1 && (
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
+              <div className="space-y-6">
                 <LabelledInput
                   label="Job Title"
                   icon={Briefcase}
@@ -509,29 +493,21 @@ function CreateJob() {
                 </div>
 
                 <div className="flex justify-end">
-                  <motion.button
+                  <button
                     type="button"
                     onClick={nextStep}
                     disabled={!stepOneReady}
                     className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${stepOneReady ? PRIMARY_BUTTON : DISABLED_BUTTON}`}
-                    whileHover={stepOneReady ? { scale: 1.02 } : {}}
-                    whileTap={stepOneReady ? { scale: 0.98 } : {}}
                   >
                     Next Step
                     <ArrowRight className="w-4 h-4" />
-                  </motion.button>
+                  </button>
                 </div>
-              </motion.div>
+              </div>
             )}
 
             {currentStep === 2 && (
-              <motion.div
-                key="step2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
+              <div className="space-y-6">
                 <LabelledTextarea
                   label="Job Description"
                   icon={FileText}
@@ -546,69 +522,51 @@ function CreateJob() {
                 </p>
 
                 <div className="flex justify-between">
-                  <motion.button
+                  <button
                     type="button"
                     onClick={prevStep}
                     className={SECONDARY_BUTTON}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
                   >
                     <ArrowLeft className="w-4 h-4" />
                     Back
-                  </motion.button>
+                  </button>
 
-                  <motion.button
+                  <button
                     type="button"
                     onClick={nextStep}
                     disabled={!stepTwoReady}
                     className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${stepTwoReady ? PRIMARY_BUTTON : DISABLED_BUTTON}`}
-                    whileHover={stepTwoReady ? { scale: 1.02 } : {}}
-                    whileTap={stepTwoReady ? { scale: 0.98 } : {}}
                   >
                     Next Step
                     <ArrowRight className="w-4 h-4" />
-                  </motion.button>
+                  </button>
                 </div>
-              </motion.div>
+              </div>
             )}
 
             {currentStep === 3 && (
-              <motion.div
-                key="step3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
+              <div className="space-y-6">
                 <SkillPicker description={description} skills={skills} onChange={setSkills} />
 
                 <div className="flex justify-between">
-                  <motion.button
+                  <button
                     type="button"
                     onClick={prevStep}
                     className={SECONDARY_BUTTON}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
                   >
                     <ArrowLeft className="w-4 h-4" />
                     Back
-                  </motion.button>
+                  </button>
 
-                  <motion.button
+                  <button
                     type="submit"
                     disabled={!canSubmit}
                     data-testid="job-submit"
                     className={`px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all ${canSubmit ? PRIMARY_BUTTON : DISABLED_BUTTON}`}
-                    whileHover={canSubmit ? { scale: 1.02 } : {}}
-                    whileTap={canSubmit ? { scale: 0.98 } : {}}
                   >
                     {isSubmitting ? (
                       <>
-                        <motion.div
-                          className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full"
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                        />
+                        <span className="w-5 h-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
                         Creating...
                       </>
                     ) : (
@@ -617,12 +575,12 @@ function CreateJob() {
                         Post Job Listing
                       </>
                     )}
-                  </motion.button>
+                  </button>
                 </div>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
-        </motion.form>
+          </>
+        </form>
       </main>
     </div>
   );

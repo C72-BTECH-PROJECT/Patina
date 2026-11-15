@@ -188,7 +188,7 @@ try {
     # Offline unit tests (T-0014): explainability layer and the github-evidence client against a
     # local stub. They import this repo's backend modules, so they mean nothing for baseline.
     if ($Target -eq 'current') {
-      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim', 'upload-limits', 'applicant-identity', 'assessment-service-client', 'backend-cruft', 'error-contract', 'auth-session', 'resume-pipeline', 'resume-links', 'score-on-apply', 'resume-current-on-apply', 'assessment-orchestration', 'assessment-time-reset', 'apply-scoring-throws', 'recruiter-applications', 'candidate-results', 'skills-api') {
+      foreach ($f in 'explainability', 'github-evidence-client', 'migration-guards', 'signup-profile', 'grading-claim', 'upload-limits', 'applicant-identity', 'assessment-service-client', 'backend-cruft', 'error-contract', 'auth-session', 'resume-pipeline', 'resume-links', 'score-on-apply', 'resume-current-on-apply', 'assessment-orchestration', 'assessment-time-reset', 'apply-scoring-throws', 'recruiter-applications', 'candidate-results', 'skills-api', 'sweep-guard') {
         $files += (Join-Path $tests "backend\$f.test.mjs")
       }
       # T-0024/T-0025 route guards (T-0023): no session, no assessment service, no LLM. Baseline has no route.
@@ -284,8 +284,11 @@ try {
       # frontend or the gateway is down. cmd.exe merges stderr (PowerShell 5.1 NativeCommandError).
       Push-Location $e2eDir
       try {
+        # The offline answer-key scan tests (R-37) run first; no browser, no stack.
+        & cmd.exe /c "node --test lib/network.test.mjs 2>&1" | Tee-Object (Join-Path $out "$Target-e2e-lib.log")
+        $libExit = $LASTEXITCODE
         & cmd.exe /c "npx playwright test 2>&1" | Tee-Object (Join-Path $out "$Target-e2e.log")
-        $results['e2e'] = $LASTEXITCODE
+        $results['e2e'] = if ($libExit -ne 0) { $libExit } else { $LASTEXITCODE }
       } finally { Pop-Location }
     }
   }

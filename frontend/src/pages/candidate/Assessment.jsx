@@ -462,7 +462,7 @@ function AssessmentForJob({ jobId }) {
 
   const header = (
     <div className="mb-6">
-      <h1 className="text-h2 text-foreground">Skill assessment</h1>
+      <h1 className="text-h1 text-foreground">Skill assessment</h1>
       <p className="text-body-sm text-muted-foreground mt-1">
         {jobTitle ? `For: ${jobTitle}` : jobTitleError ? `The job title could not be loaded: ${jobTitleError}` : 'For the job you applied to'}
       </p>
@@ -599,13 +599,13 @@ function AssessmentForJob({ jobId }) {
           <div className="sticky top-0 z-10 card p-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2" data-testid="assessment-timer" data-remaining-ms={left === null ? '' : String(Math.round(left))}>
               <Clock className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
-              <span className={`font-semibold tabular-nums ${left !== null && left < 60000 ? 'text-destructive' : 'text-foreground'}`}>
+              <span className={`font-semibold tabular-nums font-mono ${left !== null && left < 60000 ? 'text-destructive' : 'text-foreground'}`}>
                 {left === null ? 'Time remaining not known' : formatClock(left)}
               </span>
               {limit !== null && <span className="text-caption text-muted-foreground">of {limit} min</span>}
             </div>
             <span className="text-caption text-muted-foreground">{answered} of {attempt.questions.length} answered</span>
-            <span className={`text-caption ${saveCls}`} data-testid="assessment-save-indicator" data-save-state={save.state} aria-live="polite">
+            <span className={`text-caption tabular-nums font-mono ${saveCls}`} data-testid="assessment-save-indicator" data-save-state={save.state} aria-live="polite">
               {SAVE_TEXT[save.state] || save.state}
             </span>
           </div>

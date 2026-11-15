@@ -28,7 +28,9 @@ export const resumeUpload = (req, res, next) => {
       }
       return res.status(400).json({ message: 'Invalid upload. Send one file in the "resume" field.' });
     }
-    return next(err);
+    // I-0076: busboy's own errors (a truncated body, a multipart header with no
+    // boundary, a malformed part) are a bad request, not a server failure.
+    return res.status(400).json({ error: 'invalid_multipart', message: 'The upload could not be read. Send one file in the "resume" field.' });
   });
 };
 

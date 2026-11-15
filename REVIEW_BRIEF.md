@@ -14,12 +14,18 @@ rehearsal, not from this file.
 
 ## 1. Staging (Nov 17 rehearsal, repeated on the morning of Nov 18)
 
-**The stack**
+**The stack (the demo-morning routine, in this order)**
 
-1. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start-all.ps1` and wait for `all services up`.
-2. Open `http://127.0.0.1:5000/health`: `status: ok` and four `true` values.
-3. Do not restart core after this. Sessions are in its memory; a restart logs every browser out.
-4. Needed live: internet for Supabase and Gemini. GitHub is needed only while staging the verified candidate.
+1. Sweep the test rows: `node tests/backend/sweep.mjs --max-rows 150`, then `node tests/backend/sweep.mjs --check`
+   exits 0. Leftover e2e applications make every candidate status read start a pool preparation, and those
+   parses can hold up nlp-engine (ISSUES, the L1441 entry).
+2. Restart the stack: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\stop-all.ps1`, then
+   `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start-all.ps1` and wait for `all services up`.
+3. Open `http://127.0.0.1:5000/health`: `status: ok` and four `true` values.
+4. Warm nlp-engine: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\warm-nlp.ps1`. Run it again
+   after any long idle before the demo (a first parse after idle took up to 55 s on Nov 15).
+5. Do not restart core after this. Sessions are in its memory; a restart logs every browser out.
+6. Needed live: internet for Supabase and Gemini. GitHub is needed only while staging the verified candidate.
 
 **The job.** One recruiter account, one job: the "dev" job of `tests/fixtures/manifest.json`. Required skills:
 python, sql, postgresql, docker, git, rest api. Preferred: react, redis, aws, kubernetes.

@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
 import { AlertTriangle, Calendar, Mail, ShieldAlert, X } from 'lucide-react';
 import Badge from '../Badge';
 import Button from '../Button';
@@ -11,7 +10,7 @@ import ScoreBreakdown, { EvidenceUnavailable, FlagsPanel } from './ScoreBreakdow
 import { api, isAborted, isStillWorking, pollServerState, stillWorkingSeconds } from '../../lib/api';
 import {
   SUBSCORES, assessmentStateText, attemptStateText, describeVoid, formatWhen, resettableAttempt,
-  scoringFailureText, statusText, subscoreLabel,
+  scoringFailureText, statusText, subscoreLabel, withoutRepeatedUnproctoredNote,
 } from './applicationsLogic';
 
 /**
@@ -292,7 +291,7 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
               {formatWhen(detail.applied_at)}
             </span>
           )}
-          <Badge variant={status.variant} data-status={detail.status || ''}>{status.label}</Badge>
+          <Badge variant={status.variant} icon={status.icon} data-status={detail.status || ''}>{status.label}</Badge>
         </div>
       </div>
 
@@ -355,9 +354,9 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="py-1.5 pr-3 text-caption font-medium text-muted-foreground">Evidence source</th>
-                    <th className="py-1.5 pr-3 text-caption font-medium text-muted-foreground">Weight used</th>
-                    {baseWeights && <th className="py-1.5 text-caption font-medium text-muted-foreground">Base weight</th>}
+                    <th className="py-1.5 pr-3 eyebrow text-muted-foreground">Evidence source</th>
+                    <th className="py-1.5 pr-3 eyebrow text-muted-foreground">Weight used</th>
+                    {baseWeights && <th className="py-1.5 eyebrow text-muted-foreground">Base weight</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -401,7 +400,7 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
       {score && (
         <Section title="Sub-scores and evidence" testId="drilldown-subscores">
           {explanation?.factors?.length ? (
-            <ScoreBreakdown explanation={explanation} evidenceLimited={score.evidence_limited} showFlags={false} />
+            <ScoreBreakdown explanation={withoutRepeatedUnproctoredNote(explanation)} evidenceLimited={score.evidence_limited} showFlags={false} />
           ) : (
             <>
               <EvidenceUnavailable
@@ -556,22 +555,15 @@ function CandidateModal({ applicationId, onClose, onChanged, currentUserId = nul
   const name = state.detail?.candidate?.name;
 
   return (
-    <motion.div
-      className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+    <div
+      className="fixed inset-0 anim-fade bg-foreground/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={name ? `Application details for ${name}` : 'Application details'}
     >
-      <motion.div
-        className="bg-background rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden relative border border-border shadow-lg"
-        initial={{ opacity: 0, scale: 0.96, y: 24 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 24 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      <div
+        className="anim-pop bg-surface rounded-xl shadow-pop w-full max-w-4xl max-h-[90vh] overflow-hidden relative border border-border"
         onClick={(e) => e.stopPropagation()}
         data-testid="drilldown"
         data-state={state.status}
@@ -610,8 +602,8 @@ function CandidateModal({ applicationId, onClose, onChanged, currentUserId = nul
             />
           )}
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 

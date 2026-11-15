@@ -198,7 +198,15 @@ number is claimed before it is measured.
 In this order, each step leaving the system working:
 
 1. **External session store** **[ask]**, so core can run as more than one instance (I-0035).
-2. **A queue for pool preparation and scoring**, replacing in-memory state in core.
+2. **A queue for pool preparation and scoring**, replacing in-memory state in core. It is a **priority
+   queue**: interactive NLP calls (`/skills/extract` for job creation, the apply-time parse) go ahead of
+   background pool preparations, and preparations run with bounded concurrency. Add a **second nlp-engine
+   worker** (or run `/parse` off the event loop) so one CPU-bound parse cannot block every other NLP call.
+   Basis: the ISSUES L1441 entry. On Nov 15, 39 preparations started by status reads blocked nlp-engine's
+   event loop and `POST /api/skills/extract` timed out at 10 s. Each preparation also re-parses the stored
+   résumé (`runResumePipeline`, `backend/Services/assessmentService.js:515`), because the full text it sends to
+   the generator is never stored (`backend/Services/resumePipeline.js:12`). Whether to store it is an
+   **[ask]** (a schema change and a privacy decision).
 3. **Service-to-service authentication** on every internal call (builds on the token from A1).
 4. **Split core** along the lines `ARCHITECTURE.md` names: authentication, applications, scoring
    orchestration. The gateway then routes to more than one upstream. **[ask]** if any table changes owner.

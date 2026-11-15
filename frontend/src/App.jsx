@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { MotionConfig } from 'framer-motion';
 
 // common pages
 import Landing from './pages/public/Landing';
@@ -34,6 +35,7 @@ import RequireRole from './components/auth/RequireRole';
 
 function App() {
   return (
+    <MotionConfig reducedMotion="user">
     <AuthProvider>
       <Router>
         <div className="min-h-screen">
@@ -88,6 +90,7 @@ function App() {
         </div>
       </Router>
     </AuthProvider>
+    </MotionConfig>
   );
 }
 

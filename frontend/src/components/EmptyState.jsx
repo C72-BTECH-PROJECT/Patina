@@ -20,13 +20,13 @@ function EmptyState({
   return (
     <div className={`flex flex-col items-center justify-center py-12 px-6 text-center ${className}`}>
       {Icon && (
-        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+        <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mb-4">
           <Icon className="w-6 h-6 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
         </div>
       )}
 
       {title && (
-        <h3 className="font-heading font-semibold text-h3 text-foreground mb-1">
+        <h3 className="text-h2 text-foreground mb-1">
           {title}
         </h3>
       )}

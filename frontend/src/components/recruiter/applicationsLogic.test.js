@@ -1,6 +1,7 @@
 import {
   SUBSCORES, assessmentStateText, countsByJob, dashboardCounts, describeVoid, filterByStatus,
   resettableAttempt, scoringFailureText, statusFilterOptions, statusText, subscoreTestId, withStatus,
+  withoutRepeatedUnproctoredNote,
 } from './applicationsLogic';
 
 // Rows in the GET /api/recruiter/applications list-item shape (analysis.controller.js R-13 header).
@@ -147,4 +148,23 @@ describe('scoring and sub-score labels', () => {
     expect(subscoreTestId('github_evidence')).toBe('subscore-github');
     expect(subscoreTestId('other')).toBeNull();
   });
+});
+
+test('drill-down: the assessment evidence line drops only the leading unproctored sentence', () => {
+  const note = 'Unproctored online assessment. Scored server-side against the answer key generated with the questions: 7 of 10 points.';
+  const explanation = {
+    weights_version: 'w3',
+    factors: [
+      { key: 'assessment_results', evidence: [{ key: 'assessment_score', note }, { key: 'other', note: 'Kept as is.' }] },
+      { key: 'github_evidence', evidence: [] },
+      { key: 'parsing_semantic_alignment' },
+    ],
+  };
+  const out = withoutRepeatedUnproctoredNote(explanation);
+  expect(out.factors[0].evidence[0].note).toBe('Scored server-side against the answer key generated with the questions: 7 of 10 points.');
+  expect(out.factors[0].evidence[1].note).toBe('Kept as is.');
+  expect(out.factors[2]).toBe(explanation.factors[2]);
+  expect(out.weights_version).toBe('w3');
+  expect(explanation.factors[0].evidence[0].note).toBe(note); // input untouched
+  expect(withoutRepeatedUnproctoredNote(null)).toBeNull();
 });

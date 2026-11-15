@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BriefcaseBusiness, ShieldCheck, ShieldOff, Users, UserRoundCheck, Zap } from 'lucide-react';
+import { BriefcaseBusiness, ShieldCheck, ShieldOff, Users, UserRoundCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { api, isAborted } from '../../lib/api';
+import PatinaMark from '../../components/PatinaMark';
 
 const cards = [
   ['candidates', 'Candidates', Users, 'text-foreground'],
@@ -87,8 +88,9 @@ function AdminDashboard() {
     <main className="min-h-screen bg-background px-5 py-7 text-foreground sm:px-8">
       <div className="mx-auto max-w-6xl">
         <header className="flex items-center justify-between gap-4 border-b border-border pb-6">
-          <Link to="/" className="flex items-center gap-2 text-xl font-extrabold no-underline text-foreground">
-            <Zap className="h-5 w-5" /> PATINA
+          <Link to="/" className="flex items-center gap-2.5 no-underline">
+            <PatinaMark size={28} />
+            <span className="font-display font-bold text-[15px] tracking-[.14em] text-foreground">PATINA</span>
           </Link>
           <div className="flex items-center gap-4">
             <span className="hidden text-sm text-muted-foreground sm:block">{user.username}</span>
@@ -105,8 +107,8 @@ function AdminDashboard() {
           {cards.map(([key, label, Icon, color]) => (
             <div key={key} className="card p-5">
               <Icon className={`h-5 w-5 ${color}`} />
-              <p className="mt-5 text-3xl font-bold text-foreground">{overview?.[key] ?? '—'}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{label}</p>
+              <p className="mt-5 font-display text-[28px] leading-tight text-foreground tabular-nums">{overview?.[key] ?? '—'}</p>
+              <p className="mt-1 eyebrow text-muted-foreground">{label}</p>
             </div>
           ))}
         </section>

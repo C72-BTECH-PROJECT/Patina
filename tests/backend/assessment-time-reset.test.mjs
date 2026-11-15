@@ -369,6 +369,8 @@ test('expired open attempt is finalised on the candidate\'s read: the read answe
   assert.ok(r.ms < 2000, `the read took ${r.ms} ms`);
   await waitFor(() => heldEvals.length === 1, 'the background grading call');
   assert.ok(rowOf(id).answers.submitted_at, 'the submission was fixed by the read');
+  // R-12 N3: the read that finalised the attempt already names the time it wrote.
+  assert.equal(r.body.submitted_at, rowOf(id).answers.submitted_at, 'first grading_pending answer carries submitted_at');
   assert.equal(rowOf(id).answers.auto_submitted, 'expired');
   // A save or a start while it grades: refused, never re-opened.
   assert.equal((await save(c, id, [{ question_id: 'q2', response: 'C' }])).res.status, 409);

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Star } from 'lucide-react';
 import Badge from '../../components/Badge';
 import {
   api, isAborted, isStillWorking, pollServerState, STILL_WORKING_POLL_MS, stillWorkingSeconds,
@@ -45,7 +45,7 @@ export const scoringReasonText = (reason) => {
 const APPLICATION_STATUS = {
   submitted: { label: 'Submitted', variant: 'outline' },
   under_review: { label: 'Under review', variant: 'primary' },
-  shortlisted: { label: 'Shortlisted', variant: 'success' },
+  shortlisted: { label: 'Shortlisted', variant: 'solid', icon: Star },
   rejected: { label: 'Not selected', variant: 'destructive' },
   withdrawn: { label: 'Withdrawn', variant: 'default' },
 };
@@ -53,7 +53,7 @@ const APPLICATION_STATUS = {
 export function StatusBadge({ status }) {
   const known = APPLICATION_STATUS[status];
   return (
-    <Badge variant={known ? known.variant : 'outline'} data-testid="status-badge" data-status={status || ''}>
+    <Badge variant={known ? known.variant : 'outline'} icon={known?.icon} data-testid="status-badge" data-status={status || ''}>
       {known ? known.label : String(status || 'Unknown')}
     </Badge>
   );

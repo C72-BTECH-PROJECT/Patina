@@ -34,8 +34,8 @@ function QuestionCard({ index, question, value, onChoose, onType, disabled }) {
                 data-selected={selected ? 'true' : 'false'}
                 disabled={disabled}
                 onClick={() => onChoose(id, opt.label)}
-                className={`flex items-start gap-3 p-3 rounded-md border w-full text-left transition-colors disabled:opacity-60 ${
-                  selected ? 'bg-primary/10 border-primary' : 'bg-muted border-border hover:border-primary/50'
+                className={`flex items-start gap-3 p-3 rounded-lg border w-full text-left transition-colors disabled:opacity-60 ${
+                  selected ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border bg-surface hover:bg-background'
                 }`}
               >
                 <span className={`w-6 h-6 rounded-md border flex items-center justify-center text-caption font-semibold flex-shrink-0 ${
@@ -61,7 +61,7 @@ function QuestionCard({ index, question, value, onChoose, onType, disabled }) {
             placeholder="Type your answer here"
             rows={5}
             maxLength={10000}
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-body-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y disabled:opacity-60"
+            className="flex w-full rounded-md border border-input bg-surface px-3.5 min-h-[96px] py-2.5 text-[15px] text-foreground placeholder:text-muted-foreground hover:border-foreground focus:outline-none focus:border-primary focus:shadow-focus transition-[border-color,box-shadow] duration-150 resize-y disabled:opacity-60"
           />
           <div className="text-caption text-muted-foreground mt-1">
             {(value || '').split(/\s+/).filter(Boolean).length} words

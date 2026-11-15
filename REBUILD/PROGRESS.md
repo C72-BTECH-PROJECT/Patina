@@ -2,7 +2,94 @@
 
 Resume a fresh session with: "Read REBUILD/KICKOFF.md, REBUILD/CHECKPOINT1_ANSWERS.md and REBUILD/PROGRESS.md and continue."
 
-## Rebuild handed over: decisions A9 to A12 recorded, uncommitted (2026-11-15; this block is the newest and wins)
+## Old logo files archived, mid CTA to select-role on `design/refresh` (2026-11-15; this block is the newest and wins)
+- **Archived:** `Docs/design-refs/logo.svg` and `favicon.svg` moved to `Docs/archive/design-refs/`. `DESIGN_SPEC.md` now describes the layered-L mark and points at `brand/patina-mark.svg`: the approval list, the companion-files table, §1, the fixed-colour note, the contrast row, §6.5, and the D-3 card (which has an update note and the current component). The unused `i-zap` symbol is removed from both mocks.
+- **Flow change (Anthony):** `landing-mid-cta` now goes to `/select-role`, and `Landing.test.jsx:65` expects that. No landing link goes to `/signup` now.
+- **G:** 15 suites / 169 tests pass, build exit 0. Docs check: 6 problems (unchanged).
+
+## Layered-L logo on `design/refresh` (2026-11-15)
+- **Mark:** `PatinaMark.jsx` now draws `Docs/design-refs/brand/patina-mark.svg`. The tile uses `hsl(var(--primary))` and the square uses a new `--verdigris` token (`#5FC4B0`, `frontend/src/index.css`); before this the colour existed only as a literal. All 9 wordmarks already used the component and say `PATINA`.
+- **Icons:** the brand `favicon.ico`, `logo192.png`, `logo512.png` and `apple-touch-icon.png` are in `frontend/public/`. `index.html` and `manifest.json` (now named Patina, theme `#1F3D58`) point to them. The old `favicon.svg` and `Patina.png` are deleted.
+- **Old mark:** the `i-mark` and `i-patina` symbols in `Docs/design-refs/mock.html` and `mock-blue.html` were replaced. Left and listed for Anthony: `Docs/design-refs/logo.svg` and `favicon.svg` and the spec text that cites them (`DESIGN_SPEC.md` §1, §5, D-3), the unused `i-zap` symbols in both mocks, and the Zap icon on CreateJob's "Post Job Listing" button (a button icon, not the logo).
+- **G:** 15 suites / 169 tests pass, build exit 0. Screenshots `tests/e2e/output/design/logo-{landing,login,candidate}-1440.png`, no page errors.
+
+## Role carry-through, landing grid, L1441 decision on `design/refresh` (2026-11-15)
+- **Role:** `/select-role` cards link to `/signup?role=candidate|recruiter`; `Login.jsx` preselects the role from `location.search` (`useSearchParams` is not in the test mock). The landing hero and nav "Get Started" go to `/select-role`; `landing-mid-cta` stays `/signup` because `Landing.test.jsx` asserts it. Back from signup already went to `/select-role`. Built by Sonnet `patina-implementer`.
+- **Landing grid:** the hero `<section>` reuses the existing `auth-bg` class (`frontend/src/index.css` 198-220). Nothing animates. `index.css` is unchanged.
+- **L1441, investigated only:** nothing prepares at startup. Preparations start on candidate status reads, Start, reset and apply, and only core's memory records what already started. Each run re-parses the résumé (`assessmentService.js:515`), because the full text is never stored. Not a small change, so no code. Now in `REBUILD/ROADMAP.md` A6 step 2 (priority queue, second nlp-engine worker), with the demo-morning routine in `REVIEW_BRIEF.md` §1.
+- **G:** 15 suites / 169 tests pass, build exit 0. Docs check: 6 problems (unchanged). **Not run:** e2e (Anthony runs it); the pages were not viewed in a browser.
+
+## Morning follow-ups on `design/refresh`: sweep guard, NLP timing, limiter, D-9, R-36 part 1 (2026-11-15)
+- **Housekeeping:** the tree was clean (every D-4 to D-8 file committed), so `REBUILD/backup/` was deleted. It had been committed, so the 29 deletions appear in `git status`.
+- **Sweep:** every row counted is the four t0001_ accounts' (read-only check: no application, score or assessment links to another account; 6 untagged test-recruiter jobs are kept by design). The 50-row guard was checked table by table **while deleting**, so the aborted run had already removed notifications (12) and assessments (36). Now every table is counted first, and `--max-rows N` raises the ceiling for one run (`tests/backend/lib/testdb.mjs`, `sweep.mjs`, test `sweep-guard.test.mjs` 3/3). Command for Anthony: `node tests/backend/sweep.mjs --max-rows 150`. Not run here.
+- **NLP timing:** the D-5 failure was an idle stall. 727 MB of the 1197 MB nlp-engine process was paged out, with about 1.2 GB RAM free. First parses took 6.9, 32.4 and 55.0 s; 22 later parses took 0.12 to 2.3 s. The 30 s timeout was not raised. start-all already had a warm-up (R-38). It is now shared through `scripts/nlp-warm.lib.ps1`, and the new `scripts/warm-nlp.ps1` (parse plus `/skills/extract`) re-warms after idle: 15.2 s then 0.9 s after about 30 min idle. start-all itself was not re-run, to avoid restarting core.
+- **Limiter:** keyed per client IP (express-rate-limit default `req.ip`, no `trust proxy`), not global. It is logged as BATCH with a Track B note about proxies. No product change.
+- **D-9:** built. Without the data file the landing keeps `ScoreInputsPanel` and shows no figures. Details are in the R-35j row in `REBUILD/TASKS.md`. framer-motion is left only in `App.jsx`.
+- **CandidateModal:** the Shortlisted chip now has the star (`icon={status.icon}`).
+- **R-36, part 1:** fixes with tests are I-0006, I-0074 plus R-13 N1, I-0076, R-12 N3 and the unproctored repeat. Closed on evidence: contrast, degraded start, demo PDFs, R-38 cold start, its duplicate, and the README / `network.test.mjs` parts of the R-31 entry. Skipped:
+  - auth changes: the Supabase auth timeout and the login error code;
+  - needs the rehearsal: the storage upload timeout;
+  - owned by R-33: the stale `index.js` comments;
+  - more than a few lines or risky before the demo: R-12 N1 and N2, the void `by_name`, the spine capture flake;
+  - a new feature: Open résumé;
+  - needs Anthony's decision: the recruiter company line, the phone and "sas" parts.
+- **Tests:** frontend 15 suites / 169, build exit 0; backend offline files 279/279 (run in-process, not through `run-suite`, to keep the stack up); capture script 7/7; `network.test.mjs` 5/5; docs check 6 problems (unchanged).
+- **e2e: failed twice at spine step 1**, which was the one allowed re-run. The cause, from the logs: about 39 assessment preparations were started by status reads over the t0001_ candidate's 36 leftover applications, nlp-engine's `async def` parse blocked its event loop, and `POST /api/skills/extract` timed out at 10 s. The ISSUES L1441 entry is re-opened as BATCH·demo for Anthony's NOW-or-roadmap decision. smoke, signup and `unreadable` passed. The running core predates today's backend edits.
+- **Next:** Anthony sweeps (`--max-rows 150`), runs `scripts\warm-nlp.ps1`, re-runs `-Suites e2e`, runs `scripts/capture-landing-sample.mjs` after staging, checks `/` by hand, and decides on the L1441 entry.
+
+## Overnight run D-4 to D-10 on `design/refresh`, unattended (2026-11-15 night)
+- Run by `REBUILD/OVERNIGHT_RUN.md`; the final summary is `REBUILD/MORNING_REPORT.md`. Backups of every card's files are in `REBUILD/backup/<card>/`.
+- **D-4 (R-35d) PASS:** Sonnet `patina-mechanical` built it; the lead re-ran G: 11 suites / 121 tests, build exit 0, only the 5 auth files changed, hook-grep lines differ in `className` only, `type="submit"` count 2 (unchanged). Screenshots `tests/e2e/output/design/d4-{login,signup,select-role}.png`.
+- **D-5 (R-35e) PASS:** G 12 suites / 125 tests (4 new `useCountUp` tests), build exit 0. e2e spine run 1 failed at apply with `parser_unavailable` (core log: nlp timeout after 30000 ms, before the results page; not caused by D-5); re-run once: exit 0, 5 passed, 1 opt-in skip (spine :313 and :548 pass). Logs `tests/e2e/output/design/e2e-d5-{1,2}.log`. Screenshot `d5-result.png` (ring 16.23 = stored composite).
+- **D-6 (R-35f) PASS:** G 12 suites / 125 tests, build exit 0; no `framer-motion` in ScoreBreakdown or CandidateModal; hook diff adds one `aria-hidden` stripe span, `skill-row` line changed in `className` only. Screenshot `d6-drilldown.png` (taken with a throwaway click helper `tests/e2e/output/design/shot-click.mjs`, git-ignored).
+- **D-7 (R-35g) PASS:** G 12 suites / 125 tests, build exit 0; no `framer-motion` in `pages/candidate`. Shortlisted chip is now filled primary with a `Star` (OVERNIGHT_RUN §2) via one new Badge variant `solid` (decision: Badge had no filled variant). Hook diff: `className` on the save indicator, `icon` prop on `status-badge`. Screenshots `d7-candidate-{dashboard,jobs}.png`.
+- **D-8 (R-35h) PASS:** G 12 suites / 125 tests, build exit 0; no `framer-motion` in recruiter pages, recruiter components or admin. Shortlisted chip `solid` + `Star` in `applicationsLogic.js` (also reaches CandidateModal, without the icon). `AnimatePresence` around CandidateModal removed; the modal still mounts only on `openId`. Step indicator kept as numbered circles (dots would change content/aria). `Applications.jsx`, `Profile.jsx` needed no change. Screenshot `d8-recruiter-dashboard.png`.
+- **D-10 (R-35k) done, one e2e failure recorded:** `Docs/design-refs/VERIFY.md`. G 12 / 125, build exit 0. e2e: spine, smoke and signup pass; `unreadable` returned **429** (gateway global rate limit straight after the spine; ISSUES, BATCH·demo); not re-run because of the one-run cap. Contrast: 36/36 pairs pass, identical to §2.4. `framer-motion` is left only in `App.jsx` (MotionConfig) and `Landing.jsx` (D-9 not run). Ten `d10-*.png` screenshots, no page errors, no horizontal scroll at 390. Reduced motion **not checked**: Anthony checks by hand.
+- **D-9 not run** (waits for O-10). **Stack left running** on :3000.
+- **Next:** Anthony reads `REBUILD/MORNING_REPORT.md`, checks the screens and reduced motion, commits per card (suggested in the report), and sweeps the leftover e2e rows.
+
+## Design refresh D-1 to D-3 built and checked on `design/refresh`, waiting for Anthony's visual check (2026-11-15)
+- **Anthony approved the spec with changes, and the spec, mock and favicon now include them:**
+  - the Blue leather palette, with a violet "Partly verified" and green for evidence only;
+  - the stitched-tag `PatinaMark` logo, with `favicon.svg` as the mark without the stitch line;
+  - core cards D-1 to D-6 plus D-10, with D-7 and D-8 only if the budget allows;
+  - framer-motion removed only from restyled files, and the dependency kept until after Nov 18;
+  - his permission for O-10.
+- **Contrast** (`DESIGN_SPEC.md` §2.4): every pair passes. The tightest are destructive text on its 10% tint over the background, 4.52, and the warning ring on the track, 3.18.
+- **Built by Sonnet `patina-implementer`; the lead re-ran each check:**
+  - D-1 (R-35a): tokens, config clean-up, fonts, motion classes, MotionConfig.
+  - D-2 (R-35b): Button, Badge chips with icons, verification and skill-status variants.
+  - D-3 (R-35c): `PatinaMark` in all 9 wordmark places, the favicon, NavLink active state, `.route-root`.
+  - After each card: 11 suites / 121 tests pass and `CI=true npm run build` exits 0. The baseline before D-1 was the same.
+- **`@tailwindcss/vite` was already absent** (removed in `219249b`).
+- **Screenshots:** `tests/e2e/output/design/d3-{login,candidate-dashboard,recruiter-dashboard,landing}.png`. The stack was found running (a `start-all` run already registered, plus a dev server on :3000) and was left running for Anthony.
+- **Not run:** e2e, which is due after D-5 per the budget rule.
+- **Open:**
+  - the colour of the `Shortlisted` chip, which is still green and is a D-7/D-8 decision;
+  - the login inputs still have the old look until D-4.
+- **Next:** after Anthony's visual check, D-4, D-5 (with the e2e spine), D-6, then D-10.
+
+## Design refresh spec and mock written on `design/refresh`, waiting for approval (2026-11-15)
+- **Written, docs only, no app code changed:** `Docs/design-refs/DESIGN_SPEC.md` and `Docs/design-refs/mock.html`. The spec covers:
+  - direction (verdigris on paper);
+  - tokens, including the evidence and verification chips, all WCAG AA with the computed ratios recorded;
+  - type, spacing, radius and shadows;
+  - motion (CSS first, reduced motion, the ring count-up);
+  - components, plus the auth, landing and breakdown treatments;
+  - build cards D-1 to D-10 and O-10, which specify card R-35;
+  - the test-hook inventory.
+- **The mock uses real data only:** a stored score from `tests/e2e/output/r16-r17/recruiter-detail-A.json`.
+- **Found:**
+  - `@tailwindcss/vite` was already removed in `219249b`.
+  - The spine reads the Results ring text once (`spine.spec.mjs:310-313`), so the count-up renders in an `aria-hidden` span beside an `sr-only` test span.
+  - The landing's real breakdown needs Anthony to capture a current-format score (O-10). The only stored captures predate weights versions.
+- **Verification:**
+  - The mock renders at 1440 and 390 wide with no console errors and no horizontal scroll.
+  - Docs check: 6 problems, unchanged.
+  - No suite run, because no code changed.
+- **Waiting on Anthony:** approval of the spec and the mock. Then the cards are copied into `REBUILD/TASKS.md` as R-35a to R-35k.
+
+## Rebuild handed over: decisions A9 to A12 recorded, uncommitted (2026-11-15)
 - **The next session runs on Opus.** This was the Fable session's last task. Start from `REBUILD/HANDOFF.md`.
 - **Anthony's decisions of 2026-11-14 are recorded** as `DECISIONS.md` §0 A9 to A12: `AUDIT.md` re-verified by a full rewrite as the first card of roadmap A1 (not done yet); the `REBUILD/` files are the session protocol; the six security items accepted; parsing chosen by measurement between runtime LLM extraction and an LLM-taught spaCy NER model; O*NET Technology Skills by default and ESCO for broader skills, licences to confirm; proctoring is tab-switch and focus-loss only; design refresh in Track B unless the design branch merges before Nov 18; the demo runs from `main` after his merge and he stages the verified candidate.
 - **Changed:** `tasks/` and `WORKLOG.md` moved to `Docs/archive/` (moved, not deleted); `CLAUDE.md` (source of truth, session protocol, rebuild-mode intro); `tests/docs/check-trackers.mjs` (reads task specs from `Docs/archive/tasks`; the only non-doc file touched); `REBUILD/ROADMAP.md` (A1 first card, A2 rewritten as the comparison, A4 proctoring, decisions section); `REBUILD/HANDOFF.md`; NER wording in `eval/RESULTS.md` and `REVIEW_BRIEF.md` (no number changed).

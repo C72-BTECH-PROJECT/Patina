@@ -15,6 +15,8 @@
 //   void record            { by, role, at, reason, prior_state } (assessmentService.js voidRecord)
 //   scoring reason codes   Services/scoringPipeline.js, sent as `scoring: { status, reason }`
 
+import { Star } from 'lucide-react';
+
 /** The three sub-score keys (backend/Services/explainability.js SUBSCORE_KEYS), in display order. */
 export const SUBSCORES = [
   { key: 'parsing_semantic_alignment', testId: 'subscore-parsing', label: 'Resume to job alignment' },
@@ -32,7 +34,7 @@ export const subscoreLabel = (key) => SUBSCORES.find((s) => s.key === key)?.labe
 const APPLICATION_STATUS = {
   submitted: { label: 'Submitted', filterLabel: 'Submitted (no decision yet)', variant: 'outline' },
   under_review: { label: 'Under review', filterLabel: 'Under review', variant: 'primary' },
-  shortlisted: { label: 'Shortlisted', filterLabel: 'Shortlisted', variant: 'success' },
+  shortlisted: { label: 'Shortlisted', filterLabel: 'Shortlisted', variant: 'solid', icon: Star },
   rejected: { label: 'Rejected', filterLabel: 'Rejected', variant: 'destructive' },
   withdrawn: { label: 'Withdrawn', filterLabel: 'Withdrawn', variant: 'default' },
 };
@@ -236,4 +238,19 @@ export const formatWhen = (iso) => {
   if (!iso) return null;
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString();
+};
+
+// ISSUES (R-19 verification): the drill-down always shows its own "Unproctored online
+// assessment" note, so the assessment evidence line does not repeat that sentence there.
+// The candidate's Results page has no such note and keeps the backend's text unchanged.
+const UNPROCTORED_PREFIX = /^\s*Unproctored online assessment\.\s*/i;
+export const withoutRepeatedUnproctoredNote = (explanation) => {
+  if (!explanation || !Array.isArray(explanation.factors)) return explanation;
+  const trim = (e) => (typeof e?.note === 'string' && UNPROCTORED_PREFIX.test(e.note)
+    ? { ...e, note: e.note.replace(UNPROCTORED_PREFIX, '') }
+    : e);
+  return {
+    ...explanation,
+    factors: explanation.factors.map((f) => (Array.isArray(f?.evidence) ? { ...f, evidence: f.evidence.map(trim) } : f)),
+  };
 };

@@ -66,3 +66,26 @@ test('the one constant equals file_size_limit in the bucket migration', async ()
   assert.ok(m, 'file_size_limit not found in the migration');
   assert.equal(MAX_RESUME_BYTES, Number(m[1]));
 });
+
+// I-0076: bodies busboy cannot parse (a browser's FormData never sends these).
+const raw = async (contentType, body) => {
+  const r = await fetch(`${base}/upload`, { method: 'POST', headers: { 'content-type': contentType }, body });
+  return { status: r.status, type: r.headers.get('content-type') || '', text: await r.text() };
+};
+
+test('a multipart header with no boundary gives 400 JSON, never a 500', async () => {
+  const r = await raw('multipart/form-data', 'whatever');
+  assert.equal(r.status, 400, r.text.slice(0, 200));
+  assert.match(r.type, /application\/json/);
+  assert.equal(JSON.parse(r.text).error, 'invalid_multipart');
+});
+
+test('a truncated multipart body gives 400 JSON, never a 500', async () => {
+  const b = 'X'.repeat(16);
+  const r = await raw(`multipart/form-data; boundary=${b}`,
+    `--${b}\r\nContent-Disposition: form-data; name="resume"; filename="r.pdf"\r\n`
+    + 'Content-Type: application/pdf\r\n\r\n%PDF-1.4 partial');
+  assert.equal(r.status, 400, r.text.slice(0, 200));
+  assert.match(r.type, /application\/json/);
+  assert.equal(JSON.parse(r.text).error, 'invalid_multipart');
+});

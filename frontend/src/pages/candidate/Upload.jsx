@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload as UploadIcon,
   FileText,
@@ -14,6 +13,7 @@ import {
   Clock,
 } from 'lucide-react';
 import Badge from '../../components/Badge';
+import PatinaMark from '../../components/PatinaMark';
 import { api } from '../../lib/api';
 import { EDUCATION_EMPTY_ENTRY, educationLine } from '../../lib/education';
 
@@ -25,7 +25,8 @@ import { EDUCATION_EMPTY_ENTRY, educationLine } from '../../lib/education';
 //   any other failure: the server's own message, shown as an error
 // A failed parse is never shown as a success.
 
-const isResumeFile = (file) => {
+// I-0006: checked when a file is chosen (button or drop), and again at submit.
+export const isResumeFile = (file) => {
   const name = (file.name || '').toLowerCase();
   return (
     file.type === 'application/pdf' ||
@@ -59,10 +60,7 @@ const DocumentPreview =({ file, onRemove }) => {
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
+    <div
       className="flex items-center justify-between p-6 rounded-xl bg-muted border border-border"
     >
       <div className="flex items-center gap-4 min-w-0">
@@ -85,7 +83,7 @@ const DocumentPreview =({ file, onRemove }) => {
       >
         <X className="w-5 h-5 text-muted-foreground" />
       </button>
-    </motion.div>
+    </div>
   );
 };
 
@@ -117,9 +115,7 @@ export function ParsedSummary({ fileName, parsed }) {
   ].filter(([, v]) => typeof v === 'string' && v.trim());
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
+    <div
       className="mt-5 rounded-xl border border-success/30 bg-success/5 p-5 space-y-5"
       data-testid="resume-parsed"
     >
@@ -193,7 +189,7 @@ export function ParsedSummary({ fileName, parsed }) {
           </dl>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -243,6 +239,11 @@ function Upload() {
 
   const pickFile = (picked) => {
     if (!picked) return;
+    if (!isResumeFile(picked)) {
+      setFile(null);
+      setOutcome({ kind: 'error', message: 'Please choose a PDF or DOCX resume.' });
+      return;
+    }
     setFile(picked);
     setOutcome(null);
     setIsUpdating(true);
@@ -319,11 +320,7 @@ function Upload() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <motion.header
-        className="flex justify-between items-center py-4 px-6 border-b border-border"
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <header className="flex justify-between items-center py-4 px-6 border-b border-border">
         <Link
           to="/candidate/dashboard"
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors no-underline"
@@ -333,18 +330,16 @@ function Upload() {
         </Link>
 
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 flex items-center justify-center bg-primary rounded-md">
-            <UploadIcon className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-bold text-lg tracking-tight">PATINA</span>
+          <PatinaMark size={28} />
+          <span className="font-display font-bold text-[15px] tracking-[.14em] text-foreground">PATINA</span>
         </div>
 
         <div className="w-[60px]" />
-      </motion.header>
+      </header>
 
       <main className="max-w-2xl mx-auto px-6 py-12">
         <div className="text-center mb-10">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">Upload resume</h1>
+          <h1 className="text-h1 mb-4 text-foreground">Upload resume</h1>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
             Keep one latest resume on your profile. It is read when you upload it and used for every job you apply to.
           </p>
@@ -418,11 +413,11 @@ function Upload() {
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
               >
-                <AnimatePresence mode="wait">
+                <>
                   {file ? (
-                    <DocumentPreview key="file" file={file} onRemove={() => setFile(null)} />
+                    <DocumentPreview file={file} onRemove={() => setFile(null)} />
                   ) : (
-                    <motion.div key="empty" className="text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="text-center">
                       <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
                         <FileText className="w-8 h-8 text-foreground" />
                       </div>
@@ -431,15 +426,15 @@ function Upload() {
                       <button
                         type="button"
                         onClick={() => inputRef.current?.click()}
-                        className="mt-3 inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                        className="mt-3 inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover active:scale-[.98] focus-visible:outline-none focus-visible:shadow-focus transition-colors"
                       >
                         <UploadIcon className="w-4 h-4" />
                         Browse files
                       </button>
                       <p className="text-xs text-muted-foreground mt-3">PDF or DOCX</p>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
+                </>
               </div>
             </div>
           )}
@@ -504,7 +499,7 @@ function Upload() {
                 data-testid="resume-upload-button"
                 className={`mt-6 w-full h-12 rounded-md font-medium text-sm flex items-center justify-center gap-2 transition-all ${
                   file && !uploading
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary-hover active:scale-[.98] focus-visible:outline-none focus-visible:shadow-focus'
                     : 'bg-muted text-muted-foreground cursor-not-allowed'
                 }`}
               >
@@ -542,7 +537,7 @@ function Upload() {
           <div className="mt-6 flex flex-col sm:flex-row gap-3">
             <Link
               to="/candidate/jobs"
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground no-underline hover:bg-primary/90 transition-colors"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground no-underline hover:bg-primary-hover active:scale-[.98] focus-visible:outline-none focus-visible:shadow-focus transition-colors"
             >
               Browse jobs
             </Link>

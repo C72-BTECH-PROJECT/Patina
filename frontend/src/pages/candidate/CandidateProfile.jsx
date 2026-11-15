@@ -26,7 +26,7 @@ function CandidateProfile() {
 
   return (
     <div className="card p-8">
-      <h1 className="text-2xl font-bold text-foreground mb-6">My Profile</h1>
+      <h1 className="text-h1 text-foreground mb-6">My Profile</h1>
 
       <div className="space-y-4 mb-8">
         <div className="flex items-center gap-3 text-foreground">
@@ -46,7 +46,7 @@ function CandidateProfile() {
       <div className="flex items-center gap-3">
         <Link
           to="/candidate/upload"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground font-medium text-body-sm hover:bg-primary/90 transition-colors no-underline"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground font-medium text-body-sm hover:bg-primary-hover active:scale-[.98] focus-visible:outline-none focus-visible:shadow-focus transition-colors no-underline"
         >
           <FileUp className="w-4 h-4" />
           Upload / Update Resume
