@@ -5,13 +5,13 @@ import {
 } from 'lucide-react';
 import Badge from '../../components/Badge';
 import ScoreBadge, {
-  VerificationBadge, bandTone, showEvidenceLimited, weightsVersionLabel,
+  VerificationBadge, showEvidenceLimited, weightsVersionLabel,
 } from '../../components/ScoreBadge';
+import ScoreRing from '../../components/ScoreRing';
 import Spinner from '../../components/Spinner';
 import ScoreBreakdown from '../../components/recruiter/ScoreBreakdown';
 import { api } from '../../lib/api';
 import { EDUCATION_EMPTY_ENTRY, educationLine } from '../../lib/education';
-import useCountUp from '../../lib/useCountUp';
 import { ScoreAgainButton, StatusBadge, scoringReasonText } from './applicationState';
 
 // R-16 (D§8.2, F13, F14): the result of ONE application.
@@ -25,81 +25,9 @@ import { ScoreAgainButton, StatusBadge, scoringReasonText } from './applicationS
 //   POST /api/applications/:id/score      "Score again"
 // Nothing here is defaulted: no 0 for a missing score, no stock sentence for a
 // missing explanation.
-
-// Tone from the backend band only (ScoreBadge.bandTone). Literal class strings so
-// Tailwind emits them.
-const TONE_TEXT = {
-  success: 'text-success',
-  warning: 'text-warning-text',
-  destructive: 'text-destructive',
-  neutral: 'text-foreground',
-};
-
-const TONE_STROKE = {
-  success: 'hsl(var(--success))',
-  warning: 'hsl(var(--warning))',
-  destructive: 'hsl(var(--destructive))',
-  neutral: 'hsl(var(--foreground))',
-};
-
-const TONE_VAR = {
-  success: '--success',
-  warning: '--warning',
-  destructive: '--destructive',
-  neutral: '--foreground',
-};
-
-const RING_RADIUS = 52;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-
-function ScoreRing({ value, band }) {
-  const tone = bandTone(band);
-  const finalOffset = RING_CIRCUMFERENCE - (Math.min(100, Math.max(0, value)) / 100) * RING_CIRCUMFERENCE;
-  const [offset, setOffset] = useState(RING_CIRCUMFERENCE);
-  const displayed = useCountUp(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setOffset(finalOffset), 120);
-    return () => clearTimeout(timer);
-  }, [finalOffset]);
-
-  return (
-    <div className="relative w-40 h-40 flex-shrink-0">
-      <div
-        className="absolute inset-[18px] rounded-full"
-        style={{ background: `radial-gradient(circle, hsl(var(${TONE_VAR[tone]}) / .07), transparent 70%)` }}
-        aria-hidden="true"
-      />
-      <svg className="relative w-full h-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
-        <circle cx="60" cy="60" r={RING_RADIUS} fill="none" stroke="hsl(var(--track))" strokeWidth="10" />
-        <circle
-          cx="60"
-          cy="60"
-          r={RING_RADIUS}
-          fill="none"
-          stroke={TONE_STROKE[tone]}
-          strokeWidth="10"
-          strokeLinecap="round"
-          strokeDasharray={RING_CIRCUMFERENCE}
-          strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset var(--dur-signature) var(--ease-emph)' }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="sr-only" data-testid="application-score" data-state="scored">
-          {String(value)}
-        </span>
-        <span
-          aria-hidden="true"
-          className={`font-display text-[44px] font-bold tracking-[-.03em] tabular-nums ${TONE_TEXT[tone]}`}
-        >
-          {displayed}
-        </span>
-        <span className="text-caption text-muted-foreground" aria-hidden="true">/100</span>
-      </div>
-    </div>
-  );
-}
+// ScoreRing lives in components/ScoreRing.jsx (D-9: the landing page uses it too) and is
+// re-exported here.
+export { ScoreRing };
 
 /**
  * R-27 (D§7.1 W3): what would verify this score further, from the stored sub-scores.

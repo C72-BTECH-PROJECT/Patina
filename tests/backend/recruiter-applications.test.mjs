@@ -454,6 +454,18 @@ test('status actions: shortlist and reject notify the candidate once; ownership 
   const rj2 = await call('POST', '/api/jobs/applications/shortlist', { user: REC_A, body: { applicationId: app.id, status: 'rejected' } });
   assert.equal(rj2.body.notified, true);
   assert.deepEqual(notes().map((n) => n.type), ['shortlisted', 'rejected']);
+  // I-0074: a third identical decision is a no-op: no second notification.
+  const rj3 = await call('POST', '/api/jobs/applications/shortlist', { user: REC_A, body: { applicationId: app.id, status: 'rejected' } });
+  assert.equal(rj3.res.status, 200, rj3.text);
+  assert.equal(rj3.body.status, 'rejected');
+  assert.equal(rj3.body.unchanged, true);
+  assert.equal(rj3.body.notified, false);
+  assert.deepEqual(notes().map((n) => n.type), ['shortlisted', 'rejected'], 'no duplicate notification');
+  // Fixed error codes (R-13 verification N1).
+  const bad = await call('POST', '/api/jobs/applications/shortlist', { user: REC_A, body: { applicationId: app.id, status: 'under_review' } });
+  assert.equal(bad.body.error, 'invalid_status');
+  assert.equal(other.body.error, 'application_not_found');
+  assert.equal((await call('POST', '/api/jobs/applications/shortlist', { user: REC_A, body: { applicationId: app.id } })).body.error, 'missing_field');
   // Both name the job, the same way.
   assert.deepEqual(notes().map((n) => n.message), [
     'You have been shortlisted for [R-13 TEST] status job.',

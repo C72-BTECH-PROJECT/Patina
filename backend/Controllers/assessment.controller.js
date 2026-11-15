@@ -457,7 +457,13 @@ async function settleOnRead(req, row) {
   const phase = attemptPhase(row);
   if (phase === 'expired') {
     try {
-      await persistSubmission(row, savedResponses(row), { auto_submitted: 'expired' });
+      // The time written is also put on `row`, so this same read answers with it
+      // (before, the first grading_pending answer showed submitted_at: null).
+      const at = iso(serverNow());
+      const responses = savedResponses(row);
+      if (await persistSubmission(row, responses, { auto_submitted: 'expired', submitted_at: at })) {
+        row.answers = { ...(row.answers || {}), responses, submitted_at: at, auto_submitted: 'expired' };
+      }
     } catch (err) {
       logError(req, `[assessment] could not close expired attempt ${row.id}; next read retries`, err.cause || err);
       return 'expired';

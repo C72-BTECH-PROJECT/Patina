@@ -2,7 +2,25 @@
 
 Resume a fresh session with: "Read REBUILD/KICKOFF.md, REBUILD/CHECKPOINT1_ANSWERS.md and REBUILD/PROGRESS.md and continue."
 
-## Overnight run D-4 to D-10 on `design/refresh`, unattended (2026-11-15 night; this block is the newest and wins)
+## Morning follow-ups on `design/refresh`: sweep guard, NLP timing, limiter, D-9, R-36 part 1 (2026-11-15; this block is the newest and wins)
+- **Housekeeping:** the tree was clean (every D-4 to D-8 file committed), so `REBUILD/backup/` was deleted. It had been committed, so the 29 deletions appear in `git status`.
+- **Sweep:** every row counted is the four t0001_ accounts' (read-only check: no application, score or assessment links to another account; 6 untagged test-recruiter jobs are kept by design). The 50-row guard was checked table by table **while deleting**, so the aborted run had already removed notifications (12) and assessments (36). Now every table is counted first, and `--max-rows N` raises the ceiling for one run (`tests/backend/lib/testdb.mjs`, `sweep.mjs`, test `sweep-guard.test.mjs` 3/3). Command for Anthony: `node tests/backend/sweep.mjs --max-rows 150`. Not run here.
+- **NLP timing:** the D-5 failure was an idle stall. 727 MB of the 1197 MB nlp-engine process was paged out, with about 1.2 GB RAM free. First parses took 6.9, 32.4 and 55.0 s; 22 later parses took 0.12 to 2.3 s. The 30 s timeout was not raised. start-all already had a warm-up (R-38). It is now shared through `scripts/nlp-warm.lib.ps1`, and the new `scripts/warm-nlp.ps1` (parse plus `/skills/extract`) re-warms after idle: 15.2 s then 0.9 s after about 30 min idle. start-all itself was not re-run, to avoid restarting core.
+- **Limiter:** keyed per client IP (express-rate-limit default `req.ip`, no `trust proxy`), not global. It is logged as BATCH with a Track B note about proxies. No product change.
+- **D-9:** built. Without the data file the landing keeps `ScoreInputsPanel` and shows no figures. Details are in the R-35j row in `REBUILD/TASKS.md`. framer-motion is left only in `App.jsx`.
+- **CandidateModal:** the Shortlisted chip now has the star (`icon={status.icon}`).
+- **R-36, part 1:** fixes with tests are I-0006, I-0074 plus R-13 N1, I-0076, R-12 N3 and the unproctored repeat. Closed on evidence: contrast, degraded start, demo PDFs, R-38 cold start, its duplicate, and the README / `network.test.mjs` parts of the R-31 entry. Skipped:
+  - auth changes: the Supabase auth timeout and the login error code;
+  - needs the rehearsal: the storage upload timeout;
+  - owned by R-33: the stale `index.js` comments;
+  - more than a few lines or risky before the demo: R-12 N1 and N2, the void `by_name`, the spine capture flake;
+  - a new feature: Open résumé;
+  - needs Anthony's decision: the recruiter company line, the phone and "sas" parts.
+- **Tests:** frontend 15 suites / 169, build exit 0; backend offline files 279/279 (run in-process, not through `run-suite`, to keep the stack up); capture script 7/7; `network.test.mjs` 5/5; docs check 6 problems (unchanged).
+- **e2e: failed twice at spine step 1**, which was the one allowed re-run. The cause, from the logs: about 39 assessment preparations were started by status reads over the t0001_ candidate's 36 leftover applications, nlp-engine's `async def` parse blocked its event loop, and `POST /api/skills/extract` timed out at 10 s. The ISSUES L1441 entry is re-opened as BATCH·demo for Anthony's NOW-or-roadmap decision. smoke, signup and `unreadable` passed. The running core predates today's backend edits.
+- **Next:** Anthony sweeps (`--max-rows 150`), runs `scripts\warm-nlp.ps1`, re-runs `-Suites e2e`, runs `scripts/capture-landing-sample.mjs` after staging, checks `/` by hand, and decides on the L1441 entry.
+
+## Overnight run D-4 to D-10 on `design/refresh`, unattended (2026-11-15 night)
 - Run by `REBUILD/OVERNIGHT_RUN.md`; the final summary is `REBUILD/MORNING_REPORT.md`. Backups of every card's files are in `REBUILD/backup/<card>/`.
 - **D-4 (R-35d) PASS:** Sonnet `patina-mechanical` built it; the lead re-ran G: 11 suites / 121 tests, build exit 0, only the 5 auth files changed, hook-grep lines differ in `className` only, `type="submit"` count 2 (unchanged). Screenshots `tests/e2e/output/design/d4-{login,signup,select-role}.png`.
 - **D-5 (R-35e) PASS:** G 12 suites / 125 tests (4 new `useCountUp` tests), build exit 0. e2e spine run 1 failed at apply with `parser_unavailable` (core log: nlp timeout after 30000 ms, before the results page; not caused by D-5); re-run once: exit 0, 5 passed, 1 opt-in skip (spine :313 and :548 pass). Logs `tests/e2e/output/design/e2e-d5-{1,2}.log`. Screenshot `d5-result.png` (ring 16.23 = stored composite).

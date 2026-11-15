@@ -339,13 +339,18 @@ export const getMyApplications = async (req, res) => {
 // status, only on an application to a job this recruiter owns (404 otherwise, so ids
 // cannot be probed). The candidate is notified; R-13 reports whether that insert
 // succeeded as `notified` instead of assuming it.
-//   200 { id, candidate_id, job_id, status, notified }
-//   400 missing or invalid field · 404 not found / not yours · 500 database_error
+// I-0074: repeating the decision the application already has changes nothing and
+// sends no second notification (`unchanged: true`). If no notification of that type
+// exists for the application (its insert failed earlier), the repeat sends it, so a
+// repeat is still the way to retry a failed notification.
+//   200 { id, candidate_id, job_id, status, notified[, unchanged] }
+//   400 missing_field / invalid_application_id / invalid_status
+//   404 application_not_found (missing or not yours) · 500 database_error
 export const shortlistCandidate = async (req, res) => {
   const { applicationId, status } = req.body || {};
 
   if (!applicationId || !status) {
-    return res.status(400).json({ message: 'applicationId and status are required.' });
+    return res.status(400).json({ error: 'missing_field', message: 'applicationId and status are required.' });
   }
   if (!isUuid(applicationId)) {
     return res.status(400).json({ error: 'invalid_application_id', message: 'applicationId must be a UUID.' });
@@ -353,14 +358,14 @@ export const shortlistCandidate = async (req, res) => {
 
   const allowed = ['shortlisted', 'rejected'];
   if (!allowed.includes(status)) {
-    return res.status(400).json({ message: 'Invalid status.' });
+    return res.status(400).json({ error: 'invalid_status', message: 'Invalid status.' });
   }
 
   // The application must belong to a job this recruiter owns. A missing row and
   // someone else's row look the same (404) so ids can't be probed.
   const { data: owned, error: lookupError } = await supabase
     .from('applications')
-    .select('id, job:jobs!inner(recruiter_id, title)')
+    .select('id, candidate_id, job_id, status, job:jobs!inner(recruiter_id, title)')
     .eq('id', applicationId)
     .maybeSingle();
 
@@ -368,7 +373,24 @@ export const shortlistCandidate = async (req, res) => {
     return sendError(req, res, { status: 500, error: 'database_error', message: 'Could not update application status.', cause: lookupError, context: 'shortlist: lookup' });
   }
   if (!owned || owned.job?.recruiter_id !== req.session.userId) {
-    return res.status(404).json({ message: 'Application not found.' });
+    return res.status(404).json({ error: 'application_not_found', message: 'Application not found.' });
+  }
+
+  if (owned.status === status) {
+    const { data: prior, error: priorError } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('user_id', owned.candidate_id)
+      .eq('type', status)
+      .eq('data->>applicationId', owned.id)
+      .limit(1);
+    if (priorError) {
+      logError(req, '[shortlist] could not check for an earlier notification; sending one', priorError);
+    } else if (Array.isArray(prior) && prior.length > 0) {
+      return res.status(200).json({
+        id: owned.id, candidate_id: owned.candidate_id, job_id: owned.job_id, status, notified: false, unchanged: true,
+      });
+    }
   }
 
   const { data, error } = await supabase

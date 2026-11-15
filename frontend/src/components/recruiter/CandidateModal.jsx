@@ -10,7 +10,7 @@ import ScoreBreakdown, { EvidenceUnavailable, FlagsPanel } from './ScoreBreakdow
 import { api, isAborted, isStillWorking, pollServerState, stillWorkingSeconds } from '../../lib/api';
 import {
   SUBSCORES, assessmentStateText, attemptStateText, describeVoid, formatWhen, resettableAttempt,
-  scoringFailureText, statusText, subscoreLabel,
+  scoringFailureText, statusText, subscoreLabel, withoutRepeatedUnproctoredNote,
 } from './applicationsLogic';
 
 /**
@@ -291,7 +291,7 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
               {formatWhen(detail.applied_at)}
             </span>
           )}
-          <Badge variant={status.variant} data-status={detail.status || ''}>{status.label}</Badge>
+          <Badge variant={status.variant} icon={status.icon} data-status={detail.status || ''}>{status.label}</Badge>
         </div>
       </div>
 
@@ -400,7 +400,7 @@ function Detail({ detail, currentUserId, onReset, resetResult }) {
       {score && (
         <Section title="Sub-scores and evidence" testId="drilldown-subscores">
           {explanation?.factors?.length ? (
-            <ScoreBreakdown explanation={explanation} evidenceLimited={score.evidence_limited} showFlags={false} />
+            <ScoreBreakdown explanation={withoutRepeatedUnproctoredNote(explanation)} evidenceLimited={score.evidence_limited} showFlags={false} />
           ) : (
             <>
               <EvidenceUnavailable

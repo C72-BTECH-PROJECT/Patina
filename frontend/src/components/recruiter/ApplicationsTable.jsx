@@ -230,6 +230,11 @@ function DecisionButtons({ item, onStatus }) {
         return;
       }
       onStatus(item.id, data.status);
+      // I-0074: a repeated decision changes nothing and is not notified twice.
+      if (data.unchanged) {
+        setMessage({ tone: 'ok', text: 'No change: the application already had this status, and the candidate was notified then.' });
+        return;
+      }
       setMessage(data.notified
         ? { tone: 'ok', text: 'Saved. The candidate was notified.' }
         : { tone: 'warn', text: 'Saved, but the candidate notification could not be sent.' });

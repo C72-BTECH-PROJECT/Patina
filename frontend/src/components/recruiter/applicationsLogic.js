@@ -239,3 +239,18 @@ export const formatWhen = (iso) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString();
 };
+
+// ISSUES (R-19 verification): the drill-down always shows its own "Unproctored online
+// assessment" note, so the assessment evidence line does not repeat that sentence there.
+// The candidate's Results page has no such note and keeps the backend's text unchanged.
+const UNPROCTORED_PREFIX = /^\s*Unproctored online assessment\.\s*/i;
+export const withoutRepeatedUnproctoredNote = (explanation) => {
+  if (!explanation || !Array.isArray(explanation.factors)) return explanation;
+  const trim = (e) => (typeof e?.note === 'string' && UNPROCTORED_PREFIX.test(e.note)
+    ? { ...e, note: e.note.replace(UNPROCTORED_PREFIX, '') }
+    : e);
+  return {
+    ...explanation,
+    factors: explanation.factors.map((f) => (Array.isArray(f?.evidence) ? { ...f, evidence: f.evidence.map(trim) } : f)),
+  };
+};

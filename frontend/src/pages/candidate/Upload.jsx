@@ -25,7 +25,8 @@ import { EDUCATION_EMPTY_ENTRY, educationLine } from '../../lib/education';
 //   any other failure: the server's own message, shown as an error
 // A failed parse is never shown as a success.
 
-const isResumeFile = (file) => {
+// I-0006: checked when a file is chosen (button or drop), and again at submit.
+export const isResumeFile = (file) => {
   const name = (file.name || '').toLowerCase();
   return (
     file.type === 'application/pdf' ||
@@ -238,6 +239,11 @@ function Upload() {
 
   const pickFile = (picked) => {
     if (!picked) return;
+    if (!isResumeFile(picked)) {
+      setFile(null);
+      setOutcome({ kind: 'error', message: 'Please choose a PDF or DOCX resume.' });
+      return;
+    }
     setFile(picked);
     setOutcome(null);
     setIsUpdating(true);

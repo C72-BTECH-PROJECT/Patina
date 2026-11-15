@@ -98,51 +98,8 @@ function Get-HealthBody([string]$url) {
   }
 }
 
-# R-38: one real parse through nlp-engine before the stack is reported up: a synthetic
-# fixture with a job description, so text extraction, spaCy and the sentence model all
-# run once. nlp-engine loads its models while importing, before it listens (its GET /
-# cannot answer earlier), but the batch-7 live pass saw the first upload after a start
-# get 503 parser_unavailable; this makes "up" mean "a parse has answered 200".
-# Returns @{ Code = <HTTP status, 0 for no answer>; Seconds = <elapsed> }.
-function Invoke-WarmParse([string]$url, [string]$file, [int]$timeoutMs) {
-  $watch = [System.Diagnostics.Stopwatch]::StartNew()
-  $code = 0
-  try {
-    $boundary = [Guid]::NewGuid().ToString('N')
-    $enc = [System.Text.Encoding]::UTF8
-    $ms = New-Object System.IO.MemoryStream
-    $parts = @(
-      "--$boundary`r`nContent-Disposition: form-data; name=`"jd`"`r`n`r`nIT support analyst: Linux, SQL, ServiceNow, Jira.`r`n",
-      "--$boundary`r`nContent-Disposition: form-data; name=`"required_skills`"`r`n`r`n[`"linux`",`"sql`"]`r`n",
-      "--$boundary`r`nContent-Disposition: form-data; name=`"resume`"; filename=`"warmup.pdf`"`r`nContent-Type: application/pdf`r`n`r`n"
-    )
-    foreach ($text in $parts) { $b = $enc.GetBytes($text); $ms.Write($b, 0, $b.Length) }
-    $fileBytes = [System.IO.File]::ReadAllBytes($file)
-    $ms.Write($fileBytes, 0, $fileBytes.Length)
-    $b = $enc.GetBytes("`r`n--$boundary--`r`n"); $ms.Write($b, 0, $b.Length)
-    $body = $ms.ToArray()
-
-    $req = [System.Net.HttpWebRequest]::Create($url)
-    $req.Method = 'POST'
-    $req.Proxy = $null
-    $req.Timeout = $timeoutMs
-    $req.ReadWriteTimeout = $timeoutMs
-    $req.ContentType = "multipart/form-data; boundary=$boundary"
-    $req.Headers.Add('X-Request-ID', 'start-all-warm-up')
-    $req.ContentLength = $body.Length
-    $stream = $req.GetRequestStream()
-    $stream.Write($body, 0, $body.Length)
-    $stream.Close()
-    $resp = $req.GetResponse()
-    $code = [int]$resp.StatusCode
-    $resp.Close()
-  } catch [System.Net.WebException] {
-    if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode; $_.Exception.Response.Close() }
-  } catch {
-    $code = 0
-  }
-  return @{ Code = $code; Seconds = [math]::Round($watch.Elapsed.TotalSeconds, 1) }
-}
+# R-38 warm parse helper (Invoke-WarmParse), shared with scripts\warm-nlp.ps1.
+. (Join-Path $PSScriptRoot 'nlp-warm.lib.ps1')
 
 # R-03/R-04: a 2xx health body that says status "degraded" (core: database check failed).
 function Test-Degraded([string]$text) {
@@ -314,6 +271,13 @@ if ($failed.Count -gt 0) {
   Write-Host ''
   foreach ($f in $failed) {
     Write-Host "start-all: FAILED: $($f.Name) did not come up on port $($f.Port): $($f.Note). Logs: tests\.out\start-all\$($f.Name).err.log"
+    # The service's own reason (e.g. core's SESSION_SECRET rule) is in its error log;
+    # show its last line here. Services log rule names there, never values.
+    $errLog = Join-Path $runDir "$($f.Name).err.log"
+    if (Test-Path $errLog) {
+      $last = Get-Content $errLog -Tail 20 -ErrorAction SilentlyContinue | Where-Object { $_.Trim() } | Select-Object -Last 1
+      if ($last) { Write-Host "start-all:   last line of $($f.Name).err.log: $($last.Trim())" }
+    }
   }
   if ($KeepOnFailure) {
     Write-Host 'start-all: processes left running (-KeepOnFailure); stop them with scripts\stop-all.ps1'

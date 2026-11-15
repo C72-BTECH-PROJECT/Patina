@@ -367,7 +367,7 @@ All of these keep the rules at the top of this file. Each ends with the e2e spin
   | R-35g | D-7 | Candidate pages | **PASS** 2026-11-15 overnight (run approved in `OVERNIGHT_RUN.md`). 125/125, build exit 0; Shortlisted = filled primary + Star via new Badge `solid` variant |
   | R-35h | D-8 | Recruiter and admin pages | **PASS** 2026-11-15 overnight (run approved in `OVERNIGHT_RUN.md`). 125/125, build exit 0; framer grep empty; Shortlisted = `solid` + Star |
   | R-35i | O-10 | Anthony captures the support candidate's result (permission given 2026-11-15) | Anthony |
-  | R-35j | D-9 | Landing page | waits for O-10 |
+  | R-35j | D-9 | Landing page | **Built 2026-11-15** (Sonnet `patina-implementer`; Anthony: the sample reads `frontend/src/data/landingSample.json` and renders nothing without it; `scripts/capture-landing-sample.mjs <applicationId>` writes it). Lead re-ran G: 15 suites / 169 tests, build exit 0; capture-script tests 7/7; e2e smoke "landing page loads" ✓. framer-motion left only in `App.jsx` (MotionConfig). **Not seen live with a sample; screenshots not taken** |
   | R-35k | D-10 | Verification pass | **Done 2026-11-15 overnight; `VERIFY.md`:** G PASS; e2e spine/smoke PASS, `unreadable` FAIL on a 429 rate limit (ISSUES); contrast PASS; framer left in App.jsx + Landing.jsx; reduced motion needs Anthony |
 
 ### R-36 · Nov 17 sweep of the `BATCH·demo` issues
@@ -375,6 +375,7 @@ All of these keep the rules at the top of this file. Each ends with the e2e spin
 - **Goal:** the triage rule in `CLAUDE.md`. Every `ISSUES.md` entry tagged `BATCH·demo` (18 on 2026-11-13, plus any logged since) is fixed or closed with a reason.
 - **Do:** take the entries in the order the rehearsal makes them matter; a fix that needs more than a few lines, a schema change or an auth change is not made here: it is closed with "roadmap" and named in `REBUILD/ROADMAP.md`. Update each entry's tag in the same edit.
 - **Check:** `grep -c "BATCH·demo" ISSUES.md` counts only the rule text; the e2e spine suite and the batch smoke pass afterwards.
+- **Partly done 2026-11-15 (Anthony asked for it before the rehearsal):** closed with evidence: I-0006, I-0074, I-0076, R-12 N3, R-13 N1, the unproctored repeat, the contrast entry, the degraded start table, the demo PDFs in git, the cold-start 503 and its root-cause entry. Fixes written but not yet verified: start-all's last-line message, and the e2e limiter wait. Still open, listed in `REBUILD/PROGRESS.md`. The e2e spine failed at step 1 in both runs (the L1441 entry, re-opened), so the check is **not met**.
 
 ---
 

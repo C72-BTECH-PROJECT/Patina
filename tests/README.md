@@ -158,7 +158,10 @@ node tests\e2e\shot.mjs --role candidate --path /candidate/dashboard --out tests
 - `lib/network.mjs`: observes (never intercepts) the API responses a page
   received: `actAndWait` (click and wait for the response it caused),
   `recordApiResponses` (every response of a browser context, bodies read),
-  `findFieldNames` (the answer-key field scan).
+  `findFieldNames` (the answer-key field scan), and since R-37 `answerKeyFieldsFor`
+  and `findAnswerKeyLeaks` (assessment responses are also scanned for
+  `explanation`). Its offline tests, `lib/network.test.mjs`, run at the start of
+  `-Suites e2e`.
 - `lib/pages.mjs`: `chooseResumeFile` (Upload page, through its own "Browse
   files" button and the file chooser) and `checkDrilldown` (the recruiter
   drill-down invariants, see below).
